@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google"
 import "@workspace/ui/globals.css"
 import { Providers } from "@/components/providers"
 import { cn } from "@workspace/ui/lib/utils";
+import { ClerkProvider } from "@clerk/nextjs"
 
 const fontSans = Geist({
   subsets: ["latin"],
@@ -25,8 +26,10 @@ export default function RootLayout({
       suppressHydrationWarning
       className={cn("antialiased", fontMono.variable, "font-sans", fontSans.variable)}
     >
-      <body>
-        <Providers>{children}</Providers>
+      <body suppressHydrationWarning>
+        <ClerkProvider>
+          <Providers>{children}</Providers>
+        </ClerkProvider>
       </body>
     </html>
   )
