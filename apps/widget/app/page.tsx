@@ -1,25 +1,30 @@
 'use client'
 
 import { Button } from "@workspace/ui/components/button"
-import { useQuery } from "convex/react";
-import { api } from "@workspace/backend/_generated/api";
+import { useVapi } from "../modules/widget/hooks/use-vapi";
 
 export default function Page() {
-  const users = useQuery(api.users.getMany);
+  const {
+    isSpeaking,
+    isConnecting,
+    isConnected,
+    transcript,
+    startCall,
+    endCall,
+  } = useVapi()
+
   return (
-    <div className="flex min-h-svh p-6">
-      <div className="flex max-w-md min-w-0 flex-col gap-4 text-sm leading-loose">
-        <div>
-          <h1 className="font-medium">App widget!</h1>
-          <p>You may now add components and start building.</p>
-          <p>We&apos;ve already added the button component for you.</p>
-          <Button className="mt-2">Button</Button>
-        </div>
-        <div className="text-muted-foreground font-mono text-xs">
-          (Press <kbd>d</kbd> to toggle dark mode)
-        </div>
-        <pre>{JSON.stringify(users, null, 2)}</pre>
-      </div>
+    <div className="flex flex-col items-center justify-center min-h-svh max-w-md mx-auto w-full">
+      <Button onClick={startCall}>
+        Start call 
+      </Button>
+      <Button onClick={endCall} variant="destructive">
+        End call
+      </Button>
+      <p>Is Connected: {`${isConnected}`}</p>
+      <p>Is Connecting: {`${isConnecting}`}</p>
+      <p>Is Speaking: {`${isSpeaking}`}</p>
+      <p>{JSON.stringify(transcript, null, 2)}</p>
     </div>
   )
 }
