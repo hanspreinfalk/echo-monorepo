@@ -1,4 +1,4 @@
-import { WidgetHeader } from "@/modules/widget/components/widget-header";
+import { WidgetHeader } from "@/modules/widget/ui/components/widget-header";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
