@@ -1,7 +1,5 @@
+import { ConversationsView } from "@/modules/dashboard/ui/views/conversations-view";
+
 export default function ConversationsPage() {
-    return (
-        <div>
-            <h1>Conversations</h1>
-        </div>
-    )
+    return <ConversationsView />
 }
