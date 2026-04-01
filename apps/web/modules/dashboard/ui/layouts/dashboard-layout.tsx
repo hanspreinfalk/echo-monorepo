@@ -4,6 +4,7 @@ import { SidebarProvider } from "@workspace/ui/components/sidebar";
 import { TooltipProvider } from "@workspace/ui/components/tooltip";
 import { cookies } from "next/headers";
 import { DashboardSidebar } from "@/modules/dashboard/ui/components/dashboard-sidebar";
+import { Provider } from "jotai";
 
 export async function DashboardLayout({ children }: { children: React.ReactNode }) {
     const cookieStore = await cookies()
@@ -12,14 +13,16 @@ export async function DashboardLayout({ children }: { children: React.ReactNode 
     return (
         <AuthGuard>
             <OrganizationGuard>
-                <TooltipProvider>
-                    <SidebarProvider defaultOpen={defaultOpen}>
-                        <DashboardSidebar />
-                        <main className="flex flex-1 flex-col">
-                            {children}
-                        </main>
-                    </SidebarProvider>
-                </TooltipProvider>
+                <Provider>
+                    <TooltipProvider>
+                        <SidebarProvider defaultOpen={defaultOpen}>
+                            <DashboardSidebar />
+                            <main className="flex flex-1 flex-col">
+                                {children}
+                            </main>
+                        </SidebarProvider>
+                    </TooltipProvider>
+                </Provider>
             </OrganizationGuard>
         </AuthGuard>
     )
