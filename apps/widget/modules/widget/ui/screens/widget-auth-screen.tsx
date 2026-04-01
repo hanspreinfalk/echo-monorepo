@@ -13,7 +13,7 @@ import { contactSessionIdAtomFamily, organizationIdAtom, screenAtom } from "../.
 
 const formSchema = z.object({
     name: z.string().min(1, { message: "Name is required" }),
-    email: z.email({ error: "Invalid email address" }),
+    email: z.string().email({ message: "Invalid email address" }),
 });
 
 export function WidgetAuthScreen() {
