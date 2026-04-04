@@ -7,7 +7,8 @@ import {
     LayoutDashboardIcon,
     LibraryBigIcon,
     Mic,
-    PaletteIcon
+    PaletteIcon,
+    BugIcon
 } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
@@ -38,6 +39,11 @@ const customerSupportItems = [
         url: '/files',
         icon: LibraryBigIcon
     },
+    {
+        title: 'Product Issues',
+        url: '/issues',
+        icon: BugIcon
+    }
 ]
 
 const configurationItems = [
