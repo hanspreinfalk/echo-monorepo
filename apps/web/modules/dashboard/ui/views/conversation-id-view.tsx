@@ -37,7 +37,7 @@ import { cn } from "@workspace/ui/lib/utils";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import { toast } from "sonner";
 
-const MAX_ATTACHMENT_SIZE = 5 * 1024 * 1024; // 5 MB
+const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024; // 10 MB
 
 interface AttachedFile {
     id: string;
@@ -145,7 +145,7 @@ export function ConversationIdView({ conversationId }: { conversationId: Id<"con
 
         for (const file of files) {
             if (file.size > MAX_ATTACHMENT_SIZE) {
-                console.warn(`File "${file.name}" exceeds the 5 MB limit.`);
+                toast.error(`"${file.name}" exceeds the 10 MB limit.`);
                 continue;
             }
 
@@ -276,100 +276,63 @@ export function ConversationIdView({ conversationId }: { conversationId: Id<"con
                         onLoadMore={handleLoadMore}
                         ref={topElementRef}
                     />
-                    {toUIMessages(messages.results ?? [])?.map((message) => (
-                        (() => {
-                            const parsedMessage = parseMessageAttachments(message.content);
-                            const hasTextContent = parsedMessage.textContent.length > 0;
-                            const hasOnlyImageAttachments =
-                                !hasTextContent &&
-                                parsedMessage.attachments.length > 0 &&
-                                parsedMessage.attachments.every((attachment) => attachment.isImage);
-
-                            return (
-                                <AIMessage
-                                    // In reverse, because we are watching from "assistant" perspective
-                                    from={message.role === "user" ? "assistant" : "user"}
-                                    key={message.id}
-                                >
-                                    {hasOnlyImageAttachments ? (
-                                        <div className="flex flex-col gap-2">
-                                            {parsedMessage.attachments.map((attachment, index) => (
-                                                <a
-                                                    key={`${message.id}-attachment-${index}`}
-                                                    href={attachment.url}
-                                                    rel="noreferrer"
-                                                    target="_blank"
-                                                    className="block overflow-hidden rounded-lg border bg-background transition hover:opacity-90"
-                                                >
-                                                    {/* eslint-disable-next-line @next/next/no-img-element -- dynamic Convex storage URLs */}
-                                                    <img
-                                                        src={attachment.url}
-                                                        alt={attachment.name}
-                                                        loading="lazy"
-                                                        className="h-auto max-h-64 w-full object-cover"
-                                                    />
-                                                    <div className="border-t px-3 py-1.5 text-xs text-muted-foreground">
-                                                        {attachment.name}
-                                                    </div>
-                                                </a>
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <AIMessageContent>
-                                            {hasTextContent ? (
-                                                <AIResponse>
-                                                    {parsedMessage.textContent}
-                                                </AIResponse>
-                                            ) : null}
-                                            {parsedMessage.attachments.length > 0 ? (
-                                                <div className="mt-2 flex flex-col gap-2">
-                                                    {parsedMessage.attachments.map((attachment, index) => (
-                                                        attachment.isImage ? (
-                                                            <a
-                                                                key={`${message.id}-attachment-${index}`}
-                                                                href={attachment.url}
-                                                                rel="noreferrer"
-                                                                target="_blank"
-                                                                className="block overflow-hidden rounded-lg border bg-background transition hover:opacity-90"
-                                                            >
-                                                                {/* eslint-disable-next-line @next/next/no-img-element -- dynamic Convex storage URLs */}
-                                                                <img
-                                                                    src={attachment.url}
-                                                                    alt={attachment.name}
-                                                                    loading="lazy"
-                                                                    className="h-auto max-h-64 w-full object-cover"
-                                                                />
-                                                                <div className="border-t px-3 py-1.5 text-xs text-muted-foreground">
-                                                                    {attachment.name}
-                                                                </div>
-                                                            </a>
-                                                        ) : (
-                                                            <a
-                                                                key={`${message.id}-attachment-${index}`}
-                                                                href={attachment.url}
-                                                                rel="noreferrer"
-                                                                target="_blank"
-                                                                className="inline-flex w-fit items-center gap-1.5 rounded-full border bg-transparent px-2.5 py-1 text-xs font-medium text-foreground hover:opacity-90"
-                                                            >
-                                                                <FileIcon className="size-3 shrink-0 text-muted-foreground" />
-                                                                <span className="max-w-[220px] truncate">{attachment.name}</span>
-                                                            </a>
-                                                        )
-                                                    ))}
+                    {toUIMessages(messages.results ?? [])?.map((message) => {
+                        const parsedMessage = parseMessageAttachments(message.content);
+                        return (
+                            <AIMessage
+                                // In reverse, because we are watching from "assistant" perspective
+                                from={message.role === "user" ? "assistant" : "user"}
+                                key={message.id}
+                            >
+                                <div className="flex flex-col gap-2">
+                                    {parsedMessage.attachments.map((attachment, index) => (
+                                        attachment.isImage ? (
+                                            <a
+                                                key={`${message.id}-attachment-${index}`}
+                                                href={attachment.url}
+                                                rel="noreferrer"
+                                                target="_blank"
+                                                className="block overflow-hidden rounded-lg border bg-background transition hover:opacity-90"
+                                            >
+                                                {/* eslint-disable-next-line @next/next/no-img-element -- dynamic Convex storage URLs */}
+                                                <img
+                                                    src={attachment.url}
+                                                    alt={attachment.name}
+                                                    loading="lazy"
+                                                    className="h-auto max-h-64 w-full object-cover"
+                                                />
+                                                <div className="border-t px-3 py-1.5 text-xs text-muted-foreground">
+                                                    {attachment.name}
                                                 </div>
-                                            ) : null}
+                                            </a>
+                                        ) : (
+                                            <a
+                                                key={`${message.id}-attachment-${index}`}
+                                                href={attachment.url}
+                                                rel="noreferrer"
+                                                target="_blank"
+                                                className="inline-flex w-fit items-center gap-1.5 rounded-full border bg-transparent px-2.5 py-1 text-xs font-medium text-foreground hover:opacity-90"
+                                            >
+                                                <FileIcon className="size-3 shrink-0 text-muted-foreground" />
+                                                <span className="max-w-[220px] truncate">{attachment.name}</span>
+                                            </a>
+                                        )
+                                    ))}
+                                    {parsedMessage.textContent && (
+                                        <AIMessageContent>
+                                            <AIResponse>{parsedMessage.textContent}</AIResponse>
                                         </AIMessageContent>
                                     )}
-                                    {message.role === "user" && (
-                                        <DicebearAvatar 
-                                            seed={conversation?.contactSessionId ?? "user"}
-                                            size={32}
-                                        />
-                                    )}
-                                </AIMessage>
-                            );
-                        })()
-                    ))}
+                                </div>
+                                {message.role === "user" && (
+                                    <DicebearAvatar 
+                                        seed={conversation?.contactSessionId ?? "user"}
+                                        size={32}
+                                    />
+                                )}
+                            </AIMessage>
+                        );
+                    })}
                 </AIConversationContent>
                 <AIConversationScrollButton />
             </AIConversation>

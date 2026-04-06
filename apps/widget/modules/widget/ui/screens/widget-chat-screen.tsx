@@ -1,43 +1,43 @@
-'use client'
+"use client";
 
-import { zodResolver } from "@hookform/resolvers/zod"
-import { z } from "zod"
-import { useForm } from "react-hook-form"
-import { useThreadMessages, toUIMessages } from "@convex-dev/agent/react"
-import { WidgetHeader } from "@/modules/widget/ui/components/widget-header"
-import { Button } from "@workspace/ui/components/button"
-import { useAtomValue, useSetAtom } from "jotai"
-import { ArrowLeftIcon, FileIcon, Loader2Icon, MenuIcon, PaperclipIcon, XIcon } from "lucide-react"
-import { contactSessionIdAtomFamily, conversationIdAtom, organizationIdAtom, screenAtom, widgetSettingsAtom } from "@/modules/widget/atoms/widget-atoms"
-import { api } from "@workspace/backend/_generated/api"
-import { useAction, useQuery } from "convex/react"
-import { Form, FormField } from "@workspace/ui/components/form"
-import { DicebearAvatar } from "@workspace/ui/components/dicebear-avatar"
-import { useInfiniteScroll } from "@workspace/ui/hooks/use-infinite-scroll"
-import { InfiniteScrollTrigger } from "@workspace/ui/components/infinite-scroll-trigger"
+import { AISuggestion, AISuggestions } from "@workspace/ui/components/ai/suggestion";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { useForm } from "react-hook-form";
+import { useThreadMessages, toUIMessages } from "@convex-dev/agent/react";
+import { WidgetHeader } from "@/modules/widget/ui/components/widget-header";
+import { Button } from "@workspace/ui/components/button";
+import { useAtomValue, useSetAtom } from "jotai";
+import { ArrowLeftIcon, FileIcon, Loader2Icon, MenuIcon, PaperclipIcon, XIcon } from "lucide-react";
+import { DicebearAvatar } from "@workspace/ui/components/dicebear-avatar";
+import { useInfiniteScroll } from "@workspace/ui/hooks/use-infinite-scroll";
+import { InfiniteScrollTrigger } from "@workspace/ui/components/infinite-scroll-trigger";
+import { contactSessionIdAtomFamily, conversationIdAtom, organizationIdAtom, screenAtom, widgetSettingsAtom } from "../../atoms/widget-atoms";
+import { useAction, useQuery } from "convex/react";
+import { api } from "@workspace/backend/_generated/api";
+import { Form, FormField } from "@workspace/ui/components/form";
 import {
     AIConversation,
     AIConversationContent,
     AIConversationScrollButton,
-} from "@workspace/ui/components/ai/conversation"
+} from "@workspace/ui/components/ai/conversation";
 import {
     AIInput,
     AIInputButton,
     AIInputSubmit,
     AIInputTextarea,
     AIInputToolbar,
-    AIInputTools
-} from "@workspace/ui/components/ai/input"
-import { AIResponse } from "@workspace/ui/components/ai/response"
+    AIInputTools,
+} from "@workspace/ui/components/ai/input";
 import {
-    AISuggestion,
-    AISuggestions
-} from "@workspace/ui/components/ai/suggestion"
-import { AIMessage, AIMessageContent } from "@workspace/ui/components/ai/message"
-import { useMemo, useRef, useState } from "react"
-import { cn } from "@workspace/ui/lib/utils"
+    AIMessage,
+    AIMessageContent,
+} from "@workspace/ui/components/ai/message";
+import { AIResponse } from "@workspace/ui/components/ai/response";
+import { cn } from "@workspace/ui/lib/utils";
+import { useRef, useState, useMemo } from "react";
 
-const MAX_ATTACHMENT_SIZE = 5 * 1024 * 1024; // 5 MB
+const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024; // 10 MB
 
 interface AttachedFile {
     id: string;
@@ -60,26 +60,17 @@ const IMAGE_MIME_TYPE_PREFIX = "image/";
 const IMAGE_FILE_EXTENSION_REGEX = /\.(png|jpe?g|webp|gif|bmp|svg)$/i;
 
 function isImageAttachment(fileName: string, mimeType?: string) {
-    if (mimeType?.startsWith(IMAGE_MIME_TYPE_PREFIX)) {
-        return true;
-    }
+    if (mimeType?.startsWith(IMAGE_MIME_TYPE_PREFIX)) return true;
     return IMAGE_FILE_EXTENSION_REGEX.test(fileName);
 }
 
-function parseMessageAttachments(content: string): {
-    textContent: string;
-    attachments: ParsedAttachment[];
-} {
+function parseMessageAttachments(content: string): { textContent: string; attachments: ParsedAttachment[] } {
     const attachmentRegex = /\[📎\s*([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;
     const attachments: ParsedAttachment[] = [];
 
     const textContent = content
         .replace(attachmentRegex, (_match, name: string, url: string) => {
-            attachments.push({
-                name,
-                url,
-                isImage: isImageAttachment(name),
-            });
+            attachments.push({ name, url, isImage: isImageAttachment(name) });
             return "";
         })
         .replace(/\n{3,}/g, "\n\n")
@@ -90,24 +81,23 @@ function parseMessageAttachments(content: string): {
 
 const formSchema = z.object({
     message: z.string(),
-})
+});
 
-export function WidgetChatScreen() {
-    const setScreen = useSetAtom(screenAtom)
-    const setConversationId = useSetAtom(conversationIdAtom)
+export const WidgetChatScreen = () => {
+    const setScreen = useSetAtom(screenAtom);
+    const setConversationId = useSetAtom(conversationIdAtom);
 
     const widgetSettings = useAtomValue(widgetSettingsAtom);
-    const conversationId = useAtomValue(conversationIdAtom)
-    const organizationId = useAtomValue(organizationIdAtom)
-    const contactSessionId = useAtomValue(contactSessionIdAtomFamily(organizationId || ""))
-
-    const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
-    const fileInputRef = useRef<HTMLInputElement>(null);
+    const conversationId = useAtomValue(conversationIdAtom);
+    const organizationId = useAtomValue(organizationIdAtom);
+    const contactSessionId = useAtomValue(
+        contactSessionIdAtomFamily(organizationId || "")
+    );
 
     const onBack = () => {
-        setConversationId(null)
-        setScreen('selection')
-    }
+        setConversationId(null);
+        setScreen("selection");
+    };
 
     const suggestions = useMemo(() => {
         if (!widgetSettings) {
@@ -127,8 +117,9 @@ export function WidgetChatScreen() {
             ? {
                 conversationId,
                 contactSessionId,
-            } : "skip"
-    )
+            }
+            : "skip"
+    );
 
     const messages = useThreadMessages(
         api.public.messages.getMany,
@@ -138,38 +129,36 @@ export function WidgetChatScreen() {
                 contactSessionId,
             }
             : "skip",
-        { initialNumItems: 10 }
-    )
+        { initialNumItems: 10 },
+    );
 
     const { topElementRef, handleLoadMore, canLoadMore, isLoadingMore } = useInfiniteScroll({
         status: messages.status,
         loadMore: messages.loadMore,
-        loadSize: 10
-    })
+        loadSize: 10,
+    });
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
         defaultValues: {
             message: "",
-        }
-    })
+        },
+    });
 
-    const messageValue = form.watch('message');
-    const isUploadingFiles = attachedFiles.some(f => f.uploading);
-    const validAttachments = attachedFiles.filter(f => f.url && !f.error);
-    const canSubmit = ((messageValue ?? "").trim().length > 0 || validAttachments.length > 0) && !isUploadingFiles;
-
-    const createMessage = useAction(api.public.messages.create)
-    const storeAttachment = useAction(api.public.messages.storeAttachment)
+    const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
+    const [attachmentError, setAttachmentError] = useState<string | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const storeAttachment = useAction(api.public.messages.storeAttachment);
 
     const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(e.target.files ?? []);
         e.target.value = '';
-        if (!files.length || !conversation || !contactSessionId) return;
+        setAttachmentError(null);
+        if (!files.length || !contactSessionId) return;
 
         for (const file of files) {
             if (file.size > MAX_ATTACHMENT_SIZE) {
-                console.warn(`File "${file.name}" exceeds the 5 MB limit.`);
+                setAttachmentError(`"${file.name}" exceeds the 10 MB limit.`);
                 continue;
             }
 
@@ -188,7 +177,6 @@ export function WidgetChatScreen() {
                     bytes,
                     filename: file.name,
                     mimeType: file.type || 'application/octet-stream',
-                    threadId: conversation.threadId,
                     contactSessionId,
                 });
                 setAttachedFiles(prev => prev.map(f =>
@@ -211,14 +199,18 @@ export function WidgetChatScreen() {
         setAttachedFiles(prev => prev.filter(f => f.id !== id));
     };
 
+    const messageValue = form.watch('message');
+    const isUploadingFiles = attachedFiles.some(f => f.uploading);
+    const validAttachments = attachedFiles.filter(f => f.url && !f.error);
+    const canSubmit = (messageValue.trim().length > 0 || validAttachments.length > 0) && !isUploadingFiles;
+
+    const createMessage = useAction(api.public.messages.create);
     const onSubmit = async (values: z.infer<typeof formSchema>) => {
-        if (!conversation || !contactSessionId) {
+        if (!conversation || !contactSessionId || !canSubmit) {
             return;
         }
 
-        if (!canSubmit) return;
-
-        let prompt = (values.message ?? "").trim();
+        let prompt = values.message.trim();
 
         if (validAttachments.length > 0) {
             const attachmentText = validAttachments
@@ -227,32 +219,24 @@ export function WidgetChatScreen() {
             prompt = prompt ? `${prompt}\n\n${attachmentText}` : attachmentText;
         }
 
-        try {
-            await createMessage({
-                threadId: conversation.threadId,
-                prompt,
-                contactSessionId,
-            });
+        form.reset();
+        setAttachedFiles([]);
 
-            form.reset();
-            setAttachedFiles([]);
-        } catch (error) {
-            console.error(error);
-        }
-    }
-
-    const inputDisabled =
-        conversation?.status === "resolved" ||
-        form.formState.isSubmitting;
+        await createMessage({
+            threadId: conversation.threadId,
+            prompt,
+            contactSessionId,
+        });
+    };
 
     return (
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            <WidgetHeader className="flex shrink-0 items-center justify-between">
+        <>
+            <WidgetHeader className="flex items-center justify-between">
                 <div className="flex items-center gap-x-2">
                     <Button
+                        onClick={onBack}
                         size="icon"
                         variant="transparent"
-                        onClick={onBack}
                     >
                         <ArrowLeftIcon />
                     </Button>
@@ -265,7 +249,7 @@ export function WidgetChatScreen() {
                     <MenuIcon />
                 </Button>
             </WidgetHeader>
-            <AIConversation className="min-h-0 flex-1">
+            <AIConversation>
                 <AIConversationContent>
                     <InfiniteScrollTrigger
                         canLoadMore={canLoadMore}
@@ -273,105 +257,68 @@ export function WidgetChatScreen() {
                         onLoadMore={handleLoadMore}
                         ref={topElementRef}
                     />
-                    {toUIMessages(messages.results ?? [])?.map((message) => (
-                        (() => {
-                            const parsedMessage = parseMessageAttachments(message.content);
-                            const hasTextContent = parsedMessage.textContent.length > 0;
-                            const hasOnlyImageAttachments =
-                                !hasTextContent &&
-                                parsedMessage.attachments.length > 0 &&
-                                parsedMessage.attachments.every((attachment) => attachment.isImage);
-
-                            return (
-                                <AIMessage
-                                    from={message.role === "user" ? "user" : "assistant"}
-                                    key={message.id}
-                                >
-                                    {hasOnlyImageAttachments ? (
-                                        <div className="flex flex-col gap-2">
-                                            {parsedMessage.attachments.map((attachment, index) => (
-                                                <a
-                                                    key={`${message.id}-attachment-${index}`}
-                                                    href={attachment.url}
-                                                    rel="noreferrer"
-                                                    target="_blank"
-                                                    className="block overflow-hidden rounded-lg border bg-background transition hover:opacity-90"
-                                                >
-                                                    {/* eslint-disable-next-line @next/next/no-img-element -- dynamic Convex storage URLs */}
-                                                    <img
-                                                        src={attachment.url}
-                                                        alt={attachment.name}
-                                                        loading="lazy"
-                                                        className="h-auto max-h-64 w-full object-cover"
-                                                    />
-                                                    <div className="border-t px-3 py-1.5 text-xs text-muted-foreground">
-                                                        {attachment.name}
-                                                    </div>
-                                                </a>
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <AIMessageContent>
-                                            {hasTextContent ? (
-                                                <AIResponse>
-                                                    {parsedMessage.textContent}
-                                                </AIResponse>
-                                            ) : null}
-                                            {parsedMessage.attachments.length > 0 ? (
-                                                <div className="mt-2 flex flex-col gap-2">
-                                                    {parsedMessage.attachments.map((attachment, index) => (
-                                                        attachment.isImage ? (
-                                                            <a
-                                                                key={`${message.id}-attachment-${index}`}
-                                                                href={attachment.url}
-                                                                rel="noreferrer"
-                                                                target="_blank"
-                                                                className="block overflow-hidden rounded-lg border bg-background transition hover:opacity-90"
-                                                            >
-                                                                {/* eslint-disable-next-line @next/next/no-img-element -- dynamic Convex storage URLs */}
-                                                                <img
-                                                                    src={attachment.url}
-                                                                    alt={attachment.name}
-                                                                    loading="lazy"
-                                                                    className="h-auto max-h-64 w-full object-cover"
-                                                                />
-                                                                <div className="border-t px-3 py-1.5 text-xs text-muted-foreground">
-                                                                    {attachment.name}
-                                                                </div>
-                                                            </a>
-                                                        ) : (
-                                                            <a
-                                                                key={`${message.id}-attachment-${index}`}
-                                                                href={attachment.url}
-                                                                rel="noreferrer"
-                                                                target="_blank"
-                                                                className="inline-flex w-fit items-center gap-1.5 rounded-full border bg-transparent px-2.5 py-1 text-xs font-medium text-foreground hover:opacity-90"
-                                                            >
-                                                                <FileIcon className="size-3 shrink-0 text-muted-foreground" />
-                                                                <span className="max-w-[220px] truncate">{attachment.name}</span>
-                                                            </a>
-                                                        )
-                                                    ))}
+                    {toUIMessages(messages.results ?? [])?.map((message) => {
+                        const parsed = parseMessageAttachments(message.content);
+                        return (
+                            <AIMessage
+                                from={message.role === "user" ? "user" : "assistant"}
+                                key={message.id}
+                            >
+                                <div className="flex flex-col gap-2">
+                                    {parsed.attachments.map((attachment, index) => (
+                                        attachment.isImage ? (
+                                            <a
+                                                key={index}
+                                                href={attachment.url}
+                                                rel="noreferrer"
+                                                target="_blank"
+                                                className="block overflow-hidden rounded-lg border bg-background transition hover:opacity-90"
+                                            >
+                                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                <img
+                                                    src={attachment.url}
+                                                    alt={attachment.name}
+                                                    loading="lazy"
+                                                    className="h-auto max-h-48 w-full object-cover"
+                                                />
+                                                <div className="border-t px-3 py-1.5 text-xs text-muted-foreground">
+                                                    {attachment.name}
                                                 </div>
-                                            ) : null}
+                                            </a>
+                                        ) : (
+                                            <a
+                                                key={index}
+                                                href={attachment.url}
+                                                rel="noreferrer"
+                                                target="_blank"
+                                                className="inline-flex w-fit items-center gap-1.5 rounded-full border bg-transparent px-2.5 py-1 text-xs font-medium text-foreground hover:opacity-90"
+                                            >
+                                                <FileIcon className="size-3 shrink-0 text-muted-foreground" />
+                                                <span className="max-w-[180px] truncate">{attachment.name}</span>
+                                            </a>
+                                        )
+                                    ))}
+                                    {parsed.textContent && (
+                                        <AIMessageContent>
+                                            <AIResponse>{parsed.textContent}</AIResponse>
                                         </AIMessageContent>
                                     )}
-                                    {message.role === "assistant" && (
-                                        <DicebearAvatar
-                                            imageUrl="/logo.svg"
-                                            seed="assistant"
-                                            size={32}
-                                        />
-                                    )}
-                                </AIMessage>
-                            );
-                        })()
-                    ))}
+                                </div>
+                                {message.role === "assistant" && (
+                                    <DicebearAvatar
+                                        imageUrl="/logo.svg"
+                                        seed="assistant"
+                                        size={32}
+                                    />
+                                )}
+                            </AIMessage>
+                        )
+                    })}
                 </AIConversationContent>
                 <AIConversationScrollButton />
             </AIConversation>
             {toUIMessages(messages.results ?? [])?.length === 1 && (
-                <AISuggestions className="flex w-full shrink-0 flex-col items-end p-2">
+                <AISuggestions className="flex w-full flex-col items-end p-2">
                     {suggestions.map((suggestion) => {
                         if (!suggestion) {
                             return null;
@@ -394,7 +341,7 @@ export function WidgetChatScreen() {
                     })}
                 </AISuggestions>
             )}
-            <div className="relative shrink-0 bg-background p-2">
+            <div className="relative">
                 <input
                     accept=".pdf,.txt,.csv,.doc,.docx,.png,.jpg,.jpeg,.webp"
                     className="hidden"
@@ -404,8 +351,8 @@ export function WidgetChatScreen() {
                     type="file"
                 />
                 {attachedFiles.length > 0 && (
-                    <div className="pointer-events-none absolute bottom-[calc(100%+0.005rem)] left-2 right-2 z-10">
-                        <div className="pointer-events-auto flex flex-wrap gap-1.5 rounded-md border bg-background/95 p-2 shadow-sm backdrop-blur-sm">
+                    <div className="pointer-events-none absolute bottom-[calc(100%+0.005rem)] left-0 right-0 z-10">
+                        <div className="pointer-events-auto flex flex-wrap gap-1.5 border bg-background/95 p-2 shadow-sm backdrop-blur-sm">
                             {attachedFiles.map(file => (
                                 <div
                                     key={file.id}
@@ -419,7 +366,7 @@ export function WidgetChatScreen() {
                                     {isImageAttachment(file.name, file.mimeType) && !file.error ? (
                                         <div className="relative">
                                             {file.url ? (
-                                                // eslint-disable-next-line @next/next/no-img-element -- local attachment preview
+                                                // eslint-disable-next-line @next/next/no-img-element
                                                 <img
                                                     src={file.url}
                                                     alt={file.name}
@@ -469,16 +416,16 @@ export function WidgetChatScreen() {
                 )}
                 <Form {...form}>
                     <AIInput
-                        className="rounded-md "
+                        className="rounded-none border-x-0 border-b-0"
                         onSubmit={form.handleSubmit(onSubmit)}
                     >
                         <FormField
                             control={form.control}
-                            disabled={inputDisabled}
+                            disabled={conversation?.status === "resolved"}
                             name="message"
                             render={({ field }) => (
                                 <AIInputTextarea
-                                    disabled={inputDisabled}
+                                    disabled={conversation?.status === "resolved"}
                                     onChange={field.onChange}
                                     onKeyDown={(e) => {
                                         if (e.key === "Enter" && !e.shiftKey) {
@@ -491,19 +438,17 @@ export function WidgetChatScreen() {
                                             ? "This conversation has been resolved."
                                             : "Type your message..."
                                     }
-                                    value={field.value ?? ""}
+                                    value={field.value}
                                 />
                             )}
                         />
+                        {attachmentError && (
+                            <p className="px-3 pb-1 text-xs text-destructive">{attachmentError}</p>
+                        )}
                         <AIInputToolbar>
                             <AIInputTools>
                                 <AIInputButton
-                                    disabled={
-                                        conversation?.status === "resolved" ||
-                                        form.formState.isSubmitting ||
-                                        !conversation ||
-                                        !contactSessionId
-                                    }
+                                    disabled={conversation?.status === "resolved"}
                                     onClick={() => fileInputRef.current?.click()}
                                     type="button"
                                 >
@@ -512,11 +457,7 @@ export function WidgetChatScreen() {
                                 </AIInputButton>
                             </AIInputTools>
                             <AIInputSubmit
-                                disabled={
-                                    conversation?.status === "resolved" ||
-                                    form.formState.isSubmitting ||
-                                    !canSubmit
-                                }
+                                disabled={conversation?.status === "resolved" || !canSubmit}
                                 status="ready"
                                 type="submit"
                             />
@@ -524,6 +465,6 @@ export function WidgetChatScreen() {
                     </AIInput>
                 </Form>
             </div>
-        </div>
-    )
-}
+        </>
+    );
+};
