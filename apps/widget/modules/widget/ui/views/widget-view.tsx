@@ -28,7 +28,7 @@ export function WidgetView({ organizationId }: Props) {
   }
 
   return (
-    <main className="min-h-screen min-w-screen flex h-full w-full flex-col overflow-hidden rounded-xl border bg-muted">
+    <main className="flex h-dvh max-h-dvh w-full min-h-0 flex-col overflow-hidden rounded-xl border bg-muted">
         {screenComponents[screen]}
     </main>
   );
