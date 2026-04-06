@@ -165,6 +165,69 @@ export const create = mutation({
     },
 });
 
+export const getPageControlRequests = query({
+    args: {
+        conversationId: v.id("conversations"),
+        contactSessionId: v.id("contactSessions"),
+    },
+    handler: async (ctx, args) => {
+        const session = await ctx.db.get(args.contactSessionId);
+        if (!session || session.expiresAt < Date.now()) return [];
+
+        const conversation = await ctx.db.get(args.conversationId);
+        if (!conversation || conversation.contactSessionId !== args.contactSessionId) return [];
+
+        return await ctx.db
+            .query("pageControlRequests")
+            .withIndex("by_conversation_id", (q) => q.eq("conversationId", args.conversationId))
+            .collect();
+    },
+});
+
+export const addPageControlStep = mutation({
+    args: {
+        requestId: v.id("pageControlRequests"),
+        contactSessionId: v.id("contactSessions"),
+        step: v.object({ stepIndex: v.number(), goal: v.string(), actionName: v.string() }),
+    },
+    handler: async (ctx, args) => {
+        const session = await ctx.db.get(args.contactSessionId);
+        if (!session || session.expiresAt < Date.now()) {
+            throw new ConvexError({ code: "UNAUTHORIZED", message: "Invalid session" });
+        }
+        const req = await ctx.db.get(args.requestId);
+        if (!req) throw new ConvexError({ code: "NOT_FOUND", message: "Request not found" });
+        const conversation = await ctx.db.get(req.conversationId);
+        if (!conversation || conversation.contactSessionId !== args.contactSessionId) {
+            throw new ConvexError({ code: "UNAUTHORIZED", message: "Forbidden" });
+        }
+        await ctx.db.patch(args.requestId, {
+            steps: [...(req.steps ?? []), args.step],
+        });
+    },
+});
+
+export const setPageControlResult = mutation({
+    args: {
+        requestId: v.id("pageControlRequests"),
+        contactSessionId: v.id("contactSessions"),
+        result: v.object({ success: v.boolean(), data: v.string() }),
+    },
+    handler: async (ctx, args) => {
+        const session = await ctx.db.get(args.contactSessionId);
+        if (!session || session.expiresAt < Date.now()) {
+            throw new ConvexError({ code: "UNAUTHORIZED", message: "Invalid session" });
+        }
+        const req = await ctx.db.get(args.requestId);
+        if (!req) throw new ConvexError({ code: "NOT_FOUND", message: "Request not found" });
+        const conversation = await ctx.db.get(req.conversationId);
+        if (!conversation || conversation.contactSessionId !== args.contactSessionId) {
+            throw new ConvexError({ code: "UNAUTHORIZED", message: "Forbidden" });
+        }
+        await ctx.db.patch(args.requestId, { result: args.result });
+    },
+});
+
 export const getPendingPageControlRequest = query({
     args: {
         conversationId: v.id("conversations"),

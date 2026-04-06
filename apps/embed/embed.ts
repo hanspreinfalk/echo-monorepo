@@ -140,28 +140,26 @@ import { PageAgent } from 'page-agent';
         break;
       case 'page-agent-execute':
         if (payload?.action) {
-          executePageAction(payload.action);
+          executePageAction(payload.action, payload.requestId);
         }
         break;
     }
   }
 
-  async function executePageAction(action: string) {
+  async function executePageAction(action: string, requestId?: string) {
     if (!agent) {
       agent = new PageAgent({
         model: 'qwen3.5-plus',
         baseURL: 'https://page-ag-testing-ohftxirgbn.cn-shanghai.fcapp.run',
         apiKey: 'NA',
         language: 'en-US',
-        onBeforeTask: () => {
-          iframe?.contentWindow?.postMessage({ type: 'agent-start' }, '*');
-        },
         onAfterStep: (_agentInstance, history) => {
           const last = history[history.length - 1];
           if (last?.type === 'step') {
             iframe?.contentWindow?.postMessage({
               type: 'agent-step',
               payload: {
+                requestId,
                 stepIndex: last.stepIndex,
                 goal: last.reflection?.next_goal ?? '',
                 actionName: last.action?.name ?? '',
@@ -172,7 +170,7 @@ import { PageAgent } from 'page-agent';
         onAfterTask: (_agentInstance, result) => {
           iframe?.contentWindow?.postMessage({
             type: 'agent-done',
-            payload: { success: result.success, data: result.data },
+            payload: { requestId, success: result.success, data: result.data },
           }, '*');
         },
       });

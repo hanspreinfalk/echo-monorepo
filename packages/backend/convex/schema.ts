@@ -64,5 +64,14 @@ export default defineSchema({
         conversationId: v.id("conversations"),
         action: v.string(),
         status: v.union(v.literal("pending"), v.literal("approved"), v.literal("denied")),
+        steps: v.optional(v.array(v.object({
+            stepIndex: v.number(),
+            goal: v.string(),
+            actionName: v.string(),
+        }))),
+        result: v.optional(v.object({
+            success: v.boolean(),
+            data: v.string(), 
+        })),
     }).index("by_conversation_id", ["conversationId"]),
 });
