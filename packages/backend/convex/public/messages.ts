@@ -39,10 +39,7 @@ export const create = action({
     );
 
     if (!conversation) {
-      throw new ConvexError({
-        code: "NOT_FOUND",
-        message: "Conversation not found",
-      });
+      return null;
     }
 
     if (conversation.status === "resolved") {

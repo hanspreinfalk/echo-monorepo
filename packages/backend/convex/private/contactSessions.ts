@@ -27,10 +27,7 @@ export const getOneByConversationId = query({
         const conversation = await ctx.db.get(args.conversationId);
 
         if (!conversation) {
-            throw new ConvexError({
-                code: "NOT_FOUND",
-                message: "Conversation not found",
-            });
+            return null;
         }
 
         if (conversation.organizationId !== orgId) {

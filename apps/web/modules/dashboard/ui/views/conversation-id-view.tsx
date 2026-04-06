@@ -8,7 +8,7 @@ import { Id } from "@workspace/backend/_generated/dataModel";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "@workspace/backend/_generated/api";
 import { Button } from "@workspace/ui/components/button";
-import { FileIcon, Loader2Icon, MoreHorizontalIcon, PaperclipIcon, Wand2Icon, XIcon } from "lucide-react";
+import { FileIcon, Loader2Icon, MoreHorizontalIcon, PaperclipIcon, Trash2Icon, Wand2Icon, XIcon } from "lucide-react";
 import { PageControlCard } from "@workspace/ui/components/ai/page-control-card";
 import {
     AIConversation,
@@ -34,9 +34,17 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { DicebearAvatar } from "@workspace/ui/components/dicebear-avatar";
 import { ConversationStatusButton } from "../components/conversation-status-button";
+import { DeleteConversationDialog } from "../components/delete-conversation-dialog";
 import { cn } from "@workspace/ui/lib/utils";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@workspace/ui/components/dropdown-menu";
 
 const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024; // 10 MB
 
@@ -94,6 +102,7 @@ const formSchema = z.object({
 })
 
 export function ConversationIdView({ conversationId }: { conversationId: Id<"conversations"> }) {
+    const router = useRouter();
     const conversation = useQuery(api.private.conversations.getOne, {
         conversationId,
     });
@@ -226,6 +235,8 @@ export function ConversationIdView({ conversationId }: { conversationId: Id<"con
         }
     }
 
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+
     const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
     const updateConversationStatus = useMutation(api.private.conversations.updateStatus)
     const handleToggleStatus = async () => {
@@ -262,14 +273,32 @@ export function ConversationIdView({ conversationId }: { conversationId: Id<"con
     }
 
     return (
+        <>
+        <DeleteConversationDialog
+            contactName={conversation?.contactSession.name}
+            conversationId={conversationId}
+            onDeleted={() => router.push("/conversations")}
+            onOpenChange={setIsDeleteDialogOpen}
+            open={isDeleteDialogOpen}
+        />
         <div className="flex h-full flex-col bg-muted">
             <header className="flex items-center justify-between border-b bg-background p-2.5">
-                <Button
-                    size="sm"
-                    variant="ghost"
-                >
-                    <MoreHorizontalIcon />
-                </Button>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button size="sm" variant="ghost">
+                            <MoreHorizontalIcon />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start">
+                        <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onClick={() => setIsDeleteDialogOpen(true)}
+                        >
+                            <Trash2Icon className="size-4" />
+                            Delete
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
                 {!!conversation && (
                     <ConversationStatusButton
                         onClick={handleToggleStatus}
@@ -520,6 +549,7 @@ export function ConversationIdView({ conversationId }: { conversationId: Id<"con
                 </Form>
             </div>
         </div>
+        </>
     )
 }
 

@@ -4,6 +4,7 @@ import { ConvexError, v } from "convex/values";
 import { supportAgent } from "../system/ai/agents/supportAgent";
 import { MessageDoc, saveMessage } from "@convex-dev/agent";
 import { paginationOptsValidator } from "convex/server";
+import { Id } from "../_generated/dataModel";
 
 export const getIsAiTyping = query({
     args: {
@@ -245,6 +246,93 @@ export const getPendingPageControlRequest = query({
             .withIndex("by_conversation_id", (q) => q.eq("conversationId", args.conversationId))
             .filter((q) => q.eq(q.field("status"), "pending"))
             .first();
+    },
+});
+
+export const deleteConversation = mutation({
+    args: {
+        conversationId: v.id("conversations"),
+        contactSessionId: v.id("contactSessions"),
+    },
+    handler: async (ctx, args) => {
+        const session = await ctx.db.get(args.contactSessionId);
+
+        if (!session || session.expiresAt < Date.now()) {
+            throw new ConvexError({
+                code: "UNAUTHORIZED",
+                message: "Invalid session",
+            });
+        }
+
+        const conversation = await ctx.db.get(args.conversationId);
+
+        if (!conversation) {
+            throw new ConvexError({
+                code: "NOT_FOUND",
+                message: "Conversation not found",
+            });
+        }
+
+        if (conversation.contactSessionId !== args.contactSessionId) {
+            throw new ConvexError({
+                code: "UNAUTHORIZED",
+                message: "Forbidden",
+            });
+        }
+
+        // Collect attachment storage IDs from all messages before deleting them
+        const storageIds: string[] = [];
+        let cursor: string | null = null;
+        let isDone = false;
+
+        while (!isDone) {
+            const result = await supportAgent.listMessages(ctx, {
+                threadId: conversation.threadId,
+                paginationOpts: { numItems: 50, cursor },
+            });
+
+            for (const msg of result.page) {
+                const text = msg.text ?? "";
+                const regex = /\[📎[^\]]*\]\((https?:\/\/[^\s)]+)\)/g;
+                let match;
+                while ((match = regex.exec(text)) !== null) {
+                    const url = match[1];
+                    if (url) {
+                        const urlParts = url.split("/");
+                        const storageId = urlParts[urlParts.length - 1];
+                        if (storageId) storageIds.push(storageId);
+                    }
+                }
+            }
+
+            cursor = result.continueCursor;
+            isDone = result.isDone;
+        }
+
+        // Delete attachment storage files
+        for (const storageId of storageIds) {
+            try {
+                await ctx.storage.delete(storageId as Id<"_storage">);
+            } catch {
+                // File may have already been deleted or not found
+            }
+        }
+
+        // Delete page control requests for this conversation
+        const pageControlRequests = await ctx.db
+            .query("pageControlRequests")
+            .withIndex("by_conversation_id", (q) => q.eq("conversationId", args.conversationId))
+            .collect();
+
+        for (const request of pageControlRequests) {
+            await ctx.db.delete(request._id);
+        }
+
+        // Delete all thread messages asynchronously
+        await supportAgent.deleteThreadAsync(ctx, { threadId: conversation.threadId });
+
+        // Delete the conversation record itself
+        await ctx.db.delete(args.conversationId);
     },
 });
 

@@ -8,7 +8,7 @@ import { useThreadMessages, toUIMessages } from "@convex-dev/agent/react";
 import { WidgetHeader } from "@/modules/widget/ui/components/widget-header";
 import { Button } from "@workspace/ui/components/button";
 import { useAtomValue, useSetAtom } from "jotai";
-import { ArrowLeftIcon, FileIcon, Loader2Icon, MenuIcon, PaperclipIcon, XIcon } from "lucide-react";
+import { ArrowLeftIcon, FileIcon, Loader2Icon, MenuIcon, PaperclipIcon, Trash2Icon, XIcon } from "lucide-react";
 import { DicebearAvatar } from "@workspace/ui/components/dicebear-avatar";
 import { useInfiniteScroll } from "@workspace/ui/hooks/use-infinite-scroll";
 import { InfiniteScrollTrigger } from "@workspace/ui/components/infinite-scroll-trigger";
@@ -17,6 +17,20 @@ import { useAction, useMutation, useQuery } from "convex/react";
 import { Id } from "@workspace/backend/_generated/dataModel";
 import { api } from "@workspace/backend/_generated/api";
 import { Form, FormField } from "@workspace/ui/components/form";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@workspace/ui/components/dialog";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@workspace/ui/components/dropdown-menu";
 import {
     AIConversation,
     AIConversationContent,
@@ -100,6 +114,24 @@ export const WidgetChatScreen = () => {
     const onBack = () => {
         setConversationId(null);
         setScreen("selection");
+    };
+
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const deleteConversation = useMutation(api.public.conversations.deleteConversation);
+
+    const handleDeleteConversation = async () => {
+        if (!conversationId || !contactSessionId) return;
+        setIsDeleting(true);
+        try {
+            await deleteConversation({ conversationId, contactSessionId });
+            setIsDeleteDialogOpen(false);
+            onBack();
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setIsDeleting(false);
+        }
     };
 
     const suggestions = useMemo(() => {
@@ -285,6 +317,33 @@ export const WidgetChatScreen = () => {
 
     return (
         <>
+            <Dialog onOpenChange={setIsDeleteDialogOpen} open={isDeleteDialogOpen}>
+                <DialogContent className="sm:max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle>Delete conversation</DialogTitle>
+                        <DialogDescription>
+                            Are you sure you want to delete this conversation? All messages and
+                            attachments will be permanently removed. This action cannot be undone.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button
+                            disabled={isDeleting}
+                            onClick={() => setIsDeleteDialogOpen(false)}
+                            variant="outline"
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            disabled={isDeleting}
+                            onClick={handleDeleteConversation}
+                            variant="destructive"
+                        >
+                            {isDeleting ? "Deleting..." : "Delete"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
             <WidgetHeader className="flex items-center justify-between">
                 <div className="flex items-center gap-x-2">
                     <Button
@@ -296,12 +355,22 @@ export const WidgetChatScreen = () => {
                     </Button>
                     <p>Chat</p>
                 </div>
-                <Button
-                    size="icon"
-                    variant="transparent"
-                >
-                    <MenuIcon />
-                </Button>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button size="icon" variant="transparent">
+                            <MenuIcon />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onClick={() => setIsDeleteDialogOpen(true)}
+                        >
+                            <Trash2Icon className="size-4" />
+                            Delete
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
             </WidgetHeader>
             <AIConversation>
                 <AIConversationContent>

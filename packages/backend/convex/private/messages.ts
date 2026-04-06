@@ -190,10 +190,11 @@ export const getMany = query({
             .unique();
 
         if (!conversation) {
-            throw new ConvexError({
-                code: "NOT_FOUND",
-                message: "Conversation not found"
-            })
+            return {
+                page: [],
+                isDone: true,
+                continueCursor: "",
+            };
         }
 
         if (conversation.organizationId !== orgId) {
