@@ -8,6 +8,17 @@ export default defineSchema({
     })
         .index("by_organization_id", ["organizationId"])
     ,
+    widgetSettings: defineTable({
+        organizationId: v.string(),
+        greetMessage: v.string(),
+        defaultSuggestions: v.object({
+          suggestion1: v.optional(v.string()),
+          suggestion2: v.optional(v.string()),
+          suggestion3: v.optional(v.string()),
+        }),
+      })
+      .index("by_organization_id", ["organizationId"])
+    ,
     conversations: defineTable({
         threadId: v.string(),
         organizationId: v.string(),
