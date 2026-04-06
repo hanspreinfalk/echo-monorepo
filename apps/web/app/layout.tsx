@@ -27,7 +27,13 @@ export default function RootLayout({
       className={cn("antialiased", fontMono.variable, "font-sans", fontSans.variable)}
     >
       <body suppressHydrationWarning>
-        <ClerkProvider>
+        <ClerkProvider
+            appearance={{
+              variables: {
+                colorPrimary: "#3C82F6"
+              }
+            }}
+          >
           <Providers>
             {children}
           </Providers>
