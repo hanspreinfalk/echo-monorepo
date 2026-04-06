@@ -13,7 +13,8 @@ import { DicebearAvatar } from "@workspace/ui/components/dicebear-avatar";
 import { useInfiniteScroll } from "@workspace/ui/hooks/use-infinite-scroll";
 import { InfiniteScrollTrigger } from "@workspace/ui/components/infinite-scroll-trigger";
 import { contactSessionIdAtomFamily, conversationIdAtom, organizationIdAtom, screenAtom, widgetSettingsAtom } from "../../atoms/widget-atoms";
-import { useAction, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
+import { Id } from "@workspace/backend/_generated/dataModel";
 import { api } from "@workspace/backend/_generated/api";
 import { Form, FormField } from "@workspace/ui/components/form";
 import {
@@ -36,7 +37,7 @@ import {
 import { AIResponse } from "@workspace/ui/components/ai/response";
 import { cn } from "@workspace/ui/lib/utils";
 import { useRef, useState, useMemo, useEffect } from "react";
-import { WidgetRequestControlCard, WidgetRequestControlCardContent, type AgentStep, type AgentExecution } from "@/modules/widget/ui/components/widget-request-control-card";
+import { WidgetRequestControlCard, WidgetRequestControlCardContent } from "@/modules/widget/ui/components/widget-request-control-card";
 
 const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024; // 10 MB
 
@@ -149,30 +150,47 @@ export const WidgetChatScreen = () => {
 
     const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
     const [attachmentError, setAttachmentError] = useState<string | null>(null);
-    const [agentExecution, setAgentExecution] = useState<AgentExecution | null>(null);
 
-    const pendingPageControlRequest = useQuery(
-        api.public.conversations.getPendingPageControlRequest,
+    const pageControlRequests = useQuery(
+        api.public.conversations.getPageControlRequests,
         conversationId && contactSessionId
             ? { conversationId, contactSessionId }
             : "skip"
+    ) ?? [];
+
+    const requestsById = useMemo(
+        () => new Map(pageControlRequests.map((r) => [r._id as string, r])),
+        [pageControlRequests]
     );
 
+    const addStep = useMutation(api.public.conversations.addPageControlStep);
+    const setResult = useMutation(api.public.conversations.setPageControlResult);
+
     useEffect(() => {
+        if (!contactSessionId) return;
         const handler = (event: MessageEvent) => {
-            if (event.data.type === "agent-start") {
-                // phase already set to running on approve
-            } else if (event.data.type === "agent-step") {
-                const { stepIndex, goal, actionName } = event.data.payload as AgentStep;
-                setAgentExecution(prev => prev ? { ...prev, steps: [...prev.steps, { stepIndex, goal, actionName }] } : prev);
-            } else if (event.data.type === "agent-done") {
-                const result = event.data.payload as { success: boolean; data: string };
-                setAgentExecution(prev => prev ? { ...prev, phase: "done", result } : prev);
+            const { type, payload } = event.data ?? {};
+            if (type === "agent-step" && payload?.requestId) {
+                addStep({
+                    requestId: payload.requestId as Id<"pageControlRequests">,
+                    contactSessionId,
+                    step: {
+                        stepIndex: payload.stepIndex,
+                        goal: payload.goal ?? "",
+                        actionName: payload.actionName ?? "",
+                    },
+                }).catch(console.error);
+            } else if (type === "agent-done" && payload?.requestId) {
+                setResult({
+                    requestId: payload.requestId as Id<"pageControlRequests">,
+                    contactSessionId,
+                    result: { success: payload.success, data: payload.data ?? "" },
+                }).catch(console.error);
             }
         };
         window.addEventListener("message", handler);
         return () => window.removeEventListener("message", handler);
-    }, []);
+    }, [contactSessionId, addStep, setResult]);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const storeAttachment = useAction(api.public.messages.storeAttachment);
 
@@ -292,88 +310,77 @@ export const WidgetChatScreen = () => {
                         onLoadMore={handleLoadMore}
                         ref={topElementRef}
                     />
-                    {(() => {
-                        const uiMessages = toUIMessages(messages.results ?? []);
-                        const showControl = !!(pendingPageControlRequest || agentExecution) && !!contactSessionId;
-                        const lastMsg = uiMessages[uiMessages.length - 1];
-                        const mergeIntoLast = showControl && lastMsg?.role === "assistant";
-                        const controlProps = {
-                            pendingRequest: pendingPageControlRequest ?? null,
-                            agentExecution,
-                            contactSessionId: contactSessionId!,
-                            onApproved: (action: string) => setAgentExecution({ action, phase: "running", steps: [] }),
-                            onDismiss: () => setAgentExecution(null),
-                        };
-
-                        return (
-                            <>
-                                {uiMessages.map((message, index) => {
-                                    const isLast = index === uiMessages.length - 1;
-                                    const parsed = parseMessageAttachments(message.content);
-                                    const inlineCard = mergeIntoLast && isLast;
-
+                    {toUIMessages(messages.results ?? [])?.map((message) => {
+                        // Detect page control marker
+                        const markerMatch = message.content.match(/^\[PAGE_CONTROL_REQUEST:(\{.*\})\]$/);
+                        if (markerMatch?.[1] && contactSessionId) {
+                            try {
+                                const { id } = JSON.parse(markerMatch[1]) as { id: string };
+                                const request = requestsById.get(id);
+                                if (request) {
                                     return (
-                                        <AIMessage
-                                            from={message.role === "user" ? "user" : "assistant"}
+                                        <WidgetRequestControlCard
                                             key={message.id}
-                                        >
-                                            <div className="flex flex-col gap-2">
-                                                {parsed.attachments.map((attachment, i) => (
-                                                    attachment.isImage ? (
-                                                        <a
-                                                            key={i}
-                                                            href={attachment.url}
-                                                            rel="noreferrer"
-                                                            target="_blank"
-                                                            className="block overflow-hidden rounded-lg border bg-background transition hover:opacity-90"
-                                                        >
-                                                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                            <img
-                                                                src={attachment.url}
-                                                                alt={attachment.name}
-                                                                loading="lazy"
-                                                                className="h-auto max-h-48 w-full object-cover"
-                                                            />
-                                                            <div className="border-t px-3 py-1.5 text-xs text-muted-foreground">
-                                                                {attachment.name}
-                                                            </div>
-                                                        </a>
-                                                    ) : (
-                                                        <a
-                                                            key={i}
-                                                            href={attachment.url}
-                                                            rel="noreferrer"
-                                                            target="_blank"
-                                                            className="inline-flex w-fit items-center gap-1.5 rounded-full border bg-transparent px-2.5 py-1 text-xs font-medium text-foreground hover:opacity-90"
-                                                        >
-                                                            <FileIcon className="size-3 shrink-0 text-muted-foreground" />
-                                                            <span className="max-w-[180px] truncate">{attachment.name}</span>
-                                                        </a>
-                                                    )
-                                                ))}
-                                                {parsed.textContent && (
-                                                    <AIMessageContent>
-                                                        <AIResponse>{parsed.textContent}</AIResponse>
-                                                    </AIMessageContent>
-                                                )}
-                                                {inlineCard && (
-                                                    <AIMessageContent>
-                                                        <WidgetRequestControlCardContent {...controlProps} />
-                                                    </AIMessageContent>
-                                                )}
-                                            </div>
-                                            {message.role === "assistant" && (
-                                                <DicebearAvatar imageUrl="/logo.svg" seed="assistant" size={32} />
-                                            )}
-                                        </AIMessage>
+                                            request={request}
+                                            contactSessionId={contactSessionId}
+                                        />
                                     );
-                                })}
-                                {showControl && !mergeIntoLast && (
-                                    <WidgetRequestControlCard {...controlProps} />
+                                }
+                            } catch { /* fall through to normal render */ }
+                        }
+
+                        const parsed = parseMessageAttachments(message.content);
+                        return (
+                            <AIMessage
+                                from={message.role === "user" ? "user" : "assistant"}
+                                key={message.id}
+                            >
+                                <div className="flex flex-col gap-2">
+                                    {parsed.attachments.map((attachment, i) => (
+                                        attachment.isImage ? (
+                                            <a
+                                                key={i}
+                                                href={attachment.url}
+                                                rel="noreferrer"
+                                                target="_blank"
+                                                className="block overflow-hidden rounded-lg border bg-background transition hover:opacity-90"
+                                            >
+                                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                <img
+                                                    src={attachment.url}
+                                                    alt={attachment.name}
+                                                    loading="lazy"
+                                                    className="h-auto max-h-48 w-full object-cover"
+                                                />
+                                                <div className="border-t px-3 py-1.5 text-xs text-muted-foreground">
+                                                    {attachment.name}
+                                                </div>
+                                            </a>
+                                        ) : (
+                                            <a
+                                                key={i}
+                                                href={attachment.url}
+                                                rel="noreferrer"
+                                                target="_blank"
+                                                className="inline-flex w-fit items-center gap-1.5 rounded-full border bg-transparent px-2.5 py-1 text-xs font-medium text-foreground hover:opacity-90"
+                                            >
+                                                <FileIcon className="size-3 shrink-0 text-muted-foreground" />
+                                                <span className="max-w-[180px] truncate">{attachment.name}</span>
+                                            </a>
+                                        )
+                                    ))}
+                                    {parsed.textContent && (
+                                        <AIMessageContent>
+                                            <AIResponse>{parsed.textContent}</AIResponse>
+                                        </AIMessageContent>
+                                    )}
+                                </div>
+                                {message.role === "assistant" && (
+                                    <DicebearAvatar imageUrl="/logo.svg" seed="assistant" size={32} />
                                 )}
-                            </>
+                            </AIMessage>
                         );
-                    })()}
+                    })}
                     {isAiTyping && (
                         <AIMessage from="assistant">
                             <AIMessageContent>

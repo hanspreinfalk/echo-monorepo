@@ -76,11 +76,35 @@ export const createPageControlRequest = internalMutation({
             throw new ConvexError({ code: "NOT_FOUND", message: "Conversation not found" });
         }
 
-        await ctx.db.insert("pageControlRequests", {
+        return await ctx.db.insert("pageControlRequests", {
             conversationId: conversation._id,
             action: args.action,
             status: "pending",
         });
+    },
+});
+
+export const addPageControlStep = internalMutation({
+    args: {
+        requestId: v.id("pageControlRequests"),
+        step: v.object({ stepIndex: v.number(), goal: v.string(), actionName: v.string() }),
+    },
+    handler: async (ctx, args) => {
+        const req = await ctx.db.get(args.requestId);
+        if (!req) return;
+        await ctx.db.patch(args.requestId, {
+            steps: [...(req.steps ?? []), args.step],
+        });
+    },
+});
+
+export const setPageControlResult = internalMutation({
+    args: {
+        requestId: v.id("pageControlRequests"),
+        result: v.object({ success: v.boolean(), data: v.string() }),
+    },
+    handler: async (ctx, args) => {
+        await ctx.db.patch(args.requestId, { result: args.result });
     },
 });
 
