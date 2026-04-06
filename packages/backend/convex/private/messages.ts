@@ -1,4 +1,4 @@
-import { components } from "../_generated/api";
+import { components, internal } from "../_generated/api";
 import { query, mutation, action } from "../_generated/server";
 import { ConvexError, v } from "convex/values";
 import { supportAgent } from "../system/ai/agents/supportAgent";
@@ -62,6 +62,20 @@ export const enhanceResponse = action({
                 code: "UNAUTHORIZED",
                 message: "Organization not found"
             })
+        }
+
+        const subscription = await ctx.runQuery(
+            internal.system.subscriptions.getByOrganizationId,
+            {
+                organizationId: orgId,
+            },
+        );
+    
+        if (subscription?.status !== "active") {
+            throw new ConvexError({
+                code: "BAD_REQUEST",
+                message: "Missing subscription"
+            });
         }
 
         const response = await generateText({

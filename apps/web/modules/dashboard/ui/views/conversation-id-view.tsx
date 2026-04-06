@@ -35,6 +35,7 @@ import { DicebearAvatar } from "@workspace/ui/components/dicebear-avatar";
 import { ConversationStatusButton } from "../components/conversation-status-button";
 import { cn } from "@workspace/ui/lib/utils";
 import { Skeleton } from "@workspace/ui/components/skeleton";
+import { toast } from "sonner";
 
 const MAX_ATTACHMENT_SIZE = 5 * 1024 * 1024; // 5 MB
 
@@ -126,6 +127,7 @@ export function ConversationIdView({ conversationId }: { conversationId: Id<"con
 
             form.setValue('message', response);
         } catch (error) {
+            toast.error("Something went wrong");
             console.error(error)
         } finally {
             setIsEnhancing(false);
