@@ -37,7 +37,7 @@ import {
 import { AIResponse } from "@workspace/ui/components/ai/response";
 import { cn } from "@workspace/ui/lib/utils";
 import { useRef, useState, useMemo, useEffect } from "react";
-import { WidgetRequestControlCard, WidgetRequestControlCardContent } from "@/modules/widget/ui/components/widget-request-control-card";
+import { PageControlCard } from "@workspace/ui/components/ai/page-control-card";
 
 const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024; // 10 MB
 
@@ -165,6 +165,7 @@ export const WidgetChatScreen = () => {
 
     const addStep = useMutation(api.public.conversations.addPageControlStep);
     const setResult = useMutation(api.public.conversations.setPageControlResult);
+    const resolvePageControlRequest = useMutation(api.public.conversations.resolvePageControlRequest);
 
     useEffect(() => {
         if (!contactSessionId) return;
@@ -318,11 +319,43 @@ export const WidgetChatScreen = () => {
                                 const { id } = JSON.parse(markerMatch[1]) as { id: string };
                                 const request = requestsById.get(id);
                                 if (request) {
+                                    const phase =
+                                        request.status === "denied" ? "done"
+                                        : request.status === "approved" && request.result ? "done"
+                                        : request.status === "approved" ? "running"
+                                        : "pending";
+                                    const result =
+                                        request.status === "denied"
+                                            ? { success: false, data: "Denied by user" }
+                                            : request.result ?? undefined;
+                                    const onAllow = request.status === "pending" ? async () => {
+                                        await resolvePageControlRequest({
+                                            requestId: request._id,
+                                            contactSessionId,
+                                            decision: "approved",
+                                        });
+                                        window.parent.postMessage(
+                                            { type: "page-agent-execute", payload: { action: request.action, requestId: request._id } },
+                                            "*"
+                                        );
+                                    } : undefined;
+                                    const onDeny = request.status === "pending" ? async () => {
+                                        await resolvePageControlRequest({
+                                            requestId: request._id,
+                                            contactSessionId,
+                                            decision: "denied",
+                                        });
+                                    } : undefined;
                                     return (
-                                        <WidgetRequestControlCard
+                                        <PageControlCard
                                             key={message.id}
-                                            request={request}
-                                            contactSessionId={contactSessionId}
+                                            action={request.action}
+                                            phase={phase}
+                                            steps={request.steps}
+                                            result={result}
+                                            onAllow={onAllow}
+                                            onDeny={onDeny}
+                                            avatar={<DicebearAvatar imageUrl="/logo.svg" seed="assistant" size={32} />}
                                         />
                                     );
                                 }

@@ -9,7 +9,7 @@ import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "@workspace/backend/_generated/api";
 import { Button } from "@workspace/ui/components/button";
 import { FileIcon, Loader2Icon, MoreHorizontalIcon, PaperclipIcon, Wand2Icon, XIcon } from "lucide-react";
-import { PageControlCardContent } from "@workspace/ui/components/ai/page-control-card";
+import { PageControlCard } from "@workspace/ui/components/ai/page-control-card";
 import {
     AIConversation,
     AIConversationContent,
@@ -304,16 +304,20 @@ export function ConversationIdView({ conversationId }: { conversationId: Id<"con
                                             ? { success: false, data: "Denied by user" }
                                             : req.result ?? undefined;
                                     return (
-                                        <AIMessage from="user" key={message.id}>
-                                            <div className="border bg-background text-foreground px-4 py-3 rounded-lg">
-                                                <PageControlCardContent
-                                                    action={req.action}
-                                                    phase={phase}
-                                                    steps={req.steps}
-                                                    result={result}
-                                                />
-                                            </div>
-                                        </AIMessage>
+                                        <PageControlCard
+                                            key={message.id}
+                                            from="user"
+                                            action={req.action}
+                                            phase={phase}
+                                            steps={req.steps}
+                                            result={result}
+                                            colors={{
+                                                text: "text-white",
+                                                mutedText: "text-white/70",
+                                                icon: "text-white",
+                                                stepDot: "bg-white/50",
+                                            }}
+                                        />
                                     );
                                 }
                             } catch { /* fall through */ }
