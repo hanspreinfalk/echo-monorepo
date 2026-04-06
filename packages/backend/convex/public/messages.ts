@@ -7,6 +7,7 @@ import { escalateConversation } from "../system/ai/tools/escalateConversation";
 import { resolveConversation } from "../system/ai/tools/resolveConversation";
 import { saveMessage } from "@convex-dev/agent";
 import { search } from "../system/ai/tools/search";
+import { readAttachment } from "../system/ai/tools/readAttachment";
 
 export const create = action({
   args: {
@@ -75,6 +76,7 @@ export const create = action({
             escalateConversationTool: escalateConversation,
             resolveConversationTool: resolveConversation,
             searchTool: search,
+            readAttachmentTool: readAttachment,
           }
         },
       )
@@ -84,6 +86,31 @@ export const create = action({
         prompt: args.prompt,
       });
     }
+  },
+});
+
+export const storeAttachment = action({
+  args: {
+    bytes: v.bytes(),
+    filename: v.string(),
+    mimeType: v.string(),
+    contactSessionId: v.id("contactSessions"),
+  },
+  handler: async (ctx, args) => {
+    const contactSession = await ctx.runQuery(
+      internal.system.contactSessions.getOne,
+      { contactSessionId: args.contactSessionId },
+    );
+
+    if (!contactSession || contactSession.expiresAt < Date.now()) {
+      throw new ConvexError({ code: "UNAUTHORIZED", message: "Invalid session" });
+    }
+
+    const blob = new Blob([args.bytes], { type: args.mimeType || "application/octet-stream" });
+    const storageId = await ctx.storage.store(blob);
+    const url = await ctx.storage.getUrl(storageId);
+
+    return { storageId: storageId as string, url };
   },
 });
 
@@ -109,66 +136,5 @@ export const getMany = query({
     });
 
     return paginated;
-  },
-});
-
-export const storeAttachment = action({
-  args: {
-    bytes: v.bytes(),
-    filename: v.string(),
-    mimeType: v.string(),
-    threadId: v.string(),
-    contactSessionId: v.id("contactSessions"),
-  },
-  handler: async (ctx, args) => {
-    const contactSession = await ctx.runQuery(
-      internal.system.contactSessions.getOne,
-      {
-        contactSessionId: args.contactSessionId,
-      },
-    );
-
-    if (!contactSession || contactSession.expiresAt < Date.now()) {
-      throw new ConvexError({
-        code: "UNAUTHORIZED",
-        message: "Invalid session",
-      });
-    }
-
-    const conversation = await ctx.runQuery(
-      internal.system.conversations.getByThreadId,
-      {
-        threadId: args.threadId,
-      },
-    );
-
-    if (!conversation) {
-      throw new ConvexError({
-        code: "NOT_FOUND",
-        message: "Conversation not found",
-      });
-    }
-
-    if (conversation.contactSessionId !== args.contactSessionId) {
-      throw new ConvexError({
-        code: "UNAUTHORIZED",
-        message: "Incorrect session",
-      });
-    }
-
-    if (conversation.status === "resolved") {
-      throw new ConvexError({
-        code: "BAD_REQUEST",
-        message: "Conversation resolved",
-      });
-    }
-
-    const blob = new Blob([args.bytes], {
-      type: args.mimeType || "application/octet-stream",
-    });
-    const storageId = await ctx.storage.store(blob);
-    const url = await ctx.storage.getUrl(storageId);
-
-    return { storageId: storageId as string, url };
   },
 });
