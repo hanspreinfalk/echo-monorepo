@@ -98,6 +98,15 @@
       <button onclick="hideWidget()">Hide Widget</button>
       <button onclick="destroyWidget()">Destroy Widget</button>
     </div>
+
+    <div style="margin-top: 40px;">
+      <h2>Counter</h2>
+      <div style="display: flex; align-items: center; gap: 16px; margin-top: 12px;">
+        <button onclick="decrement()" style="width: 44px; height: 44px; padding: 0; font-size: 22px; border-radius: 50%;">−</button>
+        <span id="counter-value" style="font-size: 32px; font-weight: 600; min-width: 48px; text-align: center;">0</span>
+        <button onclick="increment()" style="width: 44px; height: 44px; padding: 0; font-size: 22px; border-radius: 50%;">+</button>
+      </div>
+    </div>
   </div>
   
   <!-- Load the widget with default config -->
@@ -141,6 +150,16 @@
         window.EchoWidget.destroy();
         console.log('Widget destroyed');
       }
+    }
+
+    let count = 0;
+    window.increment = function() {
+      count++;
+      document.getElementById('counter-value').textContent = count;
+    }
+    window.decrement = function() {
+      count--;
+      document.getElementById('counter-value').textContent = count;
     }
     
   </script>

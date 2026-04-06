@@ -61,6 +61,29 @@ export const getByThreadId = internalQuery({
     },
 });
 
+export const createPageControlRequest = internalMutation({
+    args: {
+        threadId: v.string(),
+        action: v.string(),
+    },
+    handler: async (ctx, args) => {
+        const conversation = await ctx.db
+            .query("conversations")
+            .withIndex("by_thread_id", (q) => q.eq("threadId", args.threadId))
+            .unique();
+
+        if (!conversation) {
+            throw new ConvexError({ code: "NOT_FOUND", message: "Conversation not found" });
+        }
+
+        await ctx.db.insert("pageControlRequests", {
+            conversationId: conversation._id,
+            action: args.action,
+            status: "pending",
+        });
+    },
+});
+
 export const updateIsAiTyping = internalMutation({
     args: {
         conversationId: v.id("conversations"),

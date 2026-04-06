@@ -28,6 +28,10 @@ importers:
         version: 5.9.3
 
   apps/embed:
+    dependencies:
+      page-agent:
+        specifier: ^1.7.1
+        version: 1.7.1(zod@3.25.76)
     devDependencies:
       '@types/node':
         specifier: ^20
@@ -2281,6 +2285,22 @@ packages:
     peerDependencies:
       '@opentelemetry/api': ^1.1.0
 
+  '@page-agent/core@1.7.1':
+    resolution: {integrity: sha512-wMyW+E8zxxmbgajgcPMvuSPv4cHxUGizMXW+d+1JZJTg25++VIfDEp38qhbNpD1ee9r1bbFHiurt5kpVEK2k5Q==}
+    peerDependencies:
+      zod: ^3.25.0 || ^4.0.0
+
+  '@page-agent/llms@1.7.1':
+    resolution: {integrity: sha512-HJ5DuSQw6Q89UMjFEx0LbubQHYUeDgtxv0JLWfLN6DB/YxdSwdjTI2LKDNtkMg7JhPIIbxpuU+9L+zpP3UGOVA==}
+    peerDependencies:
+      zod: ^3.25.0 || ^4.0.0
+
+  '@page-agent/page-controller@1.7.1':
+    resolution: {integrity: sha512-8Ciqsqv46gRUV4t8R1lQdl+hIK3cOpU522zvP5xwFpsbPFYTzu8EnITfxqOjVkPIBqhuVH10N7xC38J2gXupCA==}
+
+  '@page-agent/ui@1.7.1':
+    resolution: {integrity: sha512-XRtsfanf4sThXSNWzvtIrzSlO/WK8rhVVq5OHj4TYAV11CqfjuQm8w34/bwk7Afw/mBkoYNKX6lFFzRARURfGA==}
+
   '@prisma/instrumentation@6.11.1':
     resolution: {integrity: sha512-mrZOev24EDhnefmnZX7WVVT7v+r9LttPRqf54ONvj6re4XMF7wFTpK2tLJi4XHB7fFp/6xhYbgRel8YV7gQiyA==}
     peerDependencies:
@@ -3954,6 +3974,9 @@ packages:
   aggregate-error@3.1.0:
     resolution: {integrity: sha512-4I7Td01quW/RpocfNayFdFVk1qSuoh0E7JrbRJ16nH01HhKFQ88INq9Sd+nd72zqRySlr9BmDA8xlEJ6vJMrYA==}
     engines: {node: '>=8'}
+
+  ai-motion@0.4.8:
+    resolution: {integrity: sha512-9nQVjf8lrYQWSW0sZdb9bES4x8Ei1w9C0S62po2KvRbMjslmjm0WMeszyW771SEauDnu4YGWqurLZ/gCkCTosQ==}
 
   ai@4.3.19:
     resolution: {integrity: sha512-dIE2bfNpqHN3r6IINp9znguYdhIOheKW2LDigAMrgt/upT3B8eBGPSCblENvaZGoq+hxaN9fSMzjWpbqloP+7Q==}
@@ -6180,6 +6203,11 @@ packages:
 
   package-manager-detector@1.6.0:
     resolution: {integrity: sha512-61A5ThoTiDG/C8s8UMZwSorAGwMJ0ERVGj2OjoW5pAalsNOg15+iQiPzrLJ4jhZ1HJzmC2PIHT2oEiH3R5fzNA==}
+
+  page-agent@1.7.1:
+    resolution: {integrity: sha512-fB3qKZod5lrX3uJeCiVy6KE24ubom8ynWKQ8EzhbMwUMmChsbaWgJWwgC606FUTIOSnE1rdhCptKSaSrLEcWfQ==}
+    peerDependencies:
+      zod: ^3.25.0 || ^4.0.0
 
   param-case@2.1.1:
     resolution: {integrity: sha512-eQE845L6ot89sk2N8liD8HAuH4ca6Vvr7VWAWwt7+kvvG5aBcPmmphQ68JsEG2qa9n1TykS2DLeMt363AAH8/w==}
@@ -9519,6 +9547,24 @@ snapshots:
       '@opentelemetry/api': 1.9.0
       '@opentelemetry/core': 1.30.1(@opentelemetry/api@1.9.0)
 
+  '@page-agent/core@1.7.1(zod@3.25.76)':
+    dependencies:
+      '@page-agent/llms': 1.7.1(zod@3.25.76)
+      '@page-agent/page-controller': 1.7.1
+      chalk: 5.6.2
+      zod: 3.25.76
+
+  '@page-agent/llms@1.7.1(zod@3.25.76)':
+    dependencies:
+      chalk: 5.6.2
+      zod: 3.25.76
+
+  '@page-agent/page-controller@1.7.1':
+    dependencies:
+      ai-motion: 0.4.8
+
+  '@page-agent/ui@1.7.1': {}
+
   '@prisma/instrumentation@6.11.1(@opentelemetry/api@1.9.0)':
     dependencies:
       '@opentelemetry/api': 1.9.0
@@ -11422,6 +11468,8 @@ snapshots:
     dependencies:
       clean-stack: 2.2.0
       indent-string: 4.0.0
+
+  ai-motion@0.4.8: {}
 
   ai@4.3.19(react@19.2.4)(zod@3.25.67):
     dependencies:
@@ -14051,6 +14099,15 @@ snapshots:
       netmask: 2.0.2
 
   package-manager-detector@1.6.0: {}
+
+  page-agent@1.7.1(zod@3.25.76):
+    dependencies:
+      '@page-agent/core': 1.7.1(zod@3.25.76)
+      '@page-agent/llms': 1.7.1(zod@3.25.76)
+      '@page-agent/page-controller': 1.7.1
+      '@page-agent/ui': 1.7.1
+      chalk: 5.6.2
+      zod: 3.25.76
 
   param-case@2.1.1:
     dependencies:
