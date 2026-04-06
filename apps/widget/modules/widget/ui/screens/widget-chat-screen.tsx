@@ -229,6 +229,15 @@ export const WidgetChatScreen = () => {
         });
     };
 
+    const isAiTyping = useQuery(
+        api.public.conversations.getIsAiTyping,
+        conversationId
+            ? {
+                conversationId,
+            }
+            : "skip"
+    );
+
     return (
         <>
             <WidgetHeader className="flex items-center justify-between">
@@ -314,6 +323,22 @@ export const WidgetChatScreen = () => {
                             </AIMessage>
                         )
                     })}
+                    {isAiTyping && (
+                        <AIMessage from="assistant">
+                            <AIMessageContent>
+                                <div className="flex items-center gap-1 py-0.5">
+                                    <span className="size-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.3s]" />
+                                    <span className="size-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.15s]" />
+                                    <span className="size-1.5 animate-bounce rounded-full bg-current" />
+                                </div>
+                            </AIMessageContent>
+                            <DicebearAvatar
+                                imageUrl="/logo.svg"
+                                seed="assistant"
+                                size={32}
+                            />
+                        </AIMessage>
+                    )}
                 </AIConversationContent>
                 <AIConversationScrollButton />
             </AIConversation>
