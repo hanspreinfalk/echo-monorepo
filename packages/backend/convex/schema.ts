@@ -71,7 +71,7 @@ export default defineSchema({
         }))),
         result: v.optional(v.object({
             success: v.boolean(),
-            data: v.string(),
+            data: v.string(), 
         })),
     }).index("by_conversation_id", ["conversationId"]),
 });
