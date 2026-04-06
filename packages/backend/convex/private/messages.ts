@@ -8,6 +8,39 @@ import { generateText } from "ai"
 import { openai } from "@ai-sdk/openai";
 import { OPERATOR_MESSAGE_ENHANCEMENT_PROMPT } from "../system/ai/constants";
 
+export const storeAttachment = action({
+    args: {
+        bytes: v.bytes(),
+        filename: v.string(),
+        mimeType: v.string(),
+    },
+    handler: async (ctx, args) => {
+        const identity = await ctx.auth.getUserIdentity();
+
+        if (identity === null) {
+            throw new ConvexError({
+                code: "UNAUTHORIZED",
+                message: "Identity not found"
+            })
+        }
+
+        const orgId = identity.orgId as string;
+
+        if (!orgId) {
+            throw new ConvexError({
+                code: "UNAUTHORIZED",
+                message: "Organization not found"
+            })
+        }
+
+        const blob = new Blob([args.bytes], { type: args.mimeType || "application/octet-stream" });
+        const storageId = await ctx.storage.store(blob);
+        const url = await ctx.storage.getUrl(storageId);
+
+        return { storageId: storageId as string, url };
+    },
+})
+
 export const enhanceResponse = action({
     args: {
         prompt: v.string(),
