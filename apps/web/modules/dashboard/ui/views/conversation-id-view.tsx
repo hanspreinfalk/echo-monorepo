@@ -2,13 +2,13 @@
 
 import { useInfiniteScroll } from "@workspace/ui/hooks/use-infinite-scroll";
 import { InfiniteScrollTrigger } from "@workspace/ui/components/infinite-scroll-trigger";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useThreadMessages, toUIMessages } from "@convex-dev/agent/react";
 import { Id } from "@workspace/backend/_generated/dataModel";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "@workspace/backend/_generated/api";
 import { Button } from "@workspace/ui/components/button";
-import { MoreHorizontalIcon, Wand2Icon } from "lucide-react";
+import { FileIcon, Loader2Icon, MoreHorizontalIcon, PaperclipIcon, Wand2Icon, XIcon } from "lucide-react";
 import {
     AIConversation,
     AIConversationContent,
@@ -36,8 +36,59 @@ import { ConversationStatusButton } from "../components/conversation-status-butt
 import { cn } from "@workspace/ui/lib/utils";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 
+const MAX_ATTACHMENT_SIZE = 5 * 1024 * 1024; // 5 MB
+
+interface AttachedFile {
+    id: string;
+    name: string;
+    mimeType: string;
+    size: number;
+    storageId?: string;
+    url?: string | null;
+    uploading: boolean;
+    error?: string;
+}
+
+interface ParsedAttachment {
+    name: string;
+    url: string;
+    isImage: boolean;
+}
+
+const IMAGE_MIME_TYPE_PREFIX = "image/";
+const IMAGE_FILE_EXTENSION_REGEX = /\.(png|jpe?g|webp|gif|bmp|svg)$/i;
+
+function isImageAttachment(fileName: string, mimeType?: string) {
+    if (mimeType?.startsWith(IMAGE_MIME_TYPE_PREFIX)) {
+        return true;
+    }
+    return IMAGE_FILE_EXTENSION_REGEX.test(fileName);
+}
+
+function parseMessageAttachments(content: string): {
+    textContent: string;
+    attachments: ParsedAttachment[];
+} {
+    const attachmentRegex = /\[📎\s*([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;
+    const attachments: ParsedAttachment[] = [];
+
+    const textContent = content
+        .replace(attachmentRegex, (_match, name: string, url: string) => {
+            attachments.push({
+                name,
+                url,
+                isImage: isImageAttachment(name),
+            });
+            return "";
+        })
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
+
+    return { textContent, attachments };
+}
+
 const formSchema = z.object({
-    message: z.string().min(1, "Message is required"),
+    message: z.string(),
 })
 
 export function ConversationIdView({ conversationId }: { conversationId: Id<"conversations"> }) {
@@ -81,15 +132,83 @@ export function ConversationIdView({ conversationId }: { conversationId: Id<"con
         }
     }
 
+    const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const storeAttachment = useAction(api.private.messages.storeAttachment);
+
+    const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(e.target.files ?? []);
+        e.target.value = '';
+        if (!files.length) return;
+
+        for (const file of files) {
+            if (file.size > MAX_ATTACHMENT_SIZE) {
+                console.warn(`File "${file.name}" exceeds the 5 MB limit.`);
+                continue;
+            }
+
+            const localId = crypto.randomUUID();
+            setAttachedFiles(prev => [...prev, {
+                id: localId,
+                name: file.name,
+                mimeType: file.type || 'application/octet-stream',
+                size: file.size,
+                uploading: true,
+            }]);
+
+            try {
+                const bytes = await file.arrayBuffer();
+                const result = await storeAttachment({
+                    bytes,
+                    filename: file.name,
+                    mimeType: file.type || 'application/octet-stream',
+                });
+                setAttachedFiles(prev => prev.map(f =>
+                    f.id === localId
+                        ? { ...f, storageId: result.storageId, url: result.url, uploading: false }
+                        : f
+                ));
+            } catch (error) {
+                console.error(error);
+                setAttachedFiles(prev => prev.map(f =>
+                    f.id === localId
+                        ? { ...f, uploading: false, error: 'Upload failed' }
+                        : f
+                ));
+            }
+        }
+    };
+
+    const handleRemoveAttachment = (id: string) => {
+        setAttachedFiles(prev => prev.filter(f => f.id !== id));
+    };
+
+    const messageValue = form.watch('message');
+    const isUploadingFiles = attachedFiles.some(f => f.uploading);
+    const validAttachments = attachedFiles.filter(f => f.url && !f.error);
+    const canSubmit = (messageValue.trim().length > 0 || validAttachments.length > 0) && !isUploadingFiles;
+
     const createMessage = useMutation(api.private.messages.create)
     const onSubmit = async (values: z.infer<typeof formSchema>) => {
+        if (!canSubmit) return;
+
+        let prompt = values.message.trim();
+
+        if (validAttachments.length > 0) {
+            const attachmentText = validAttachments
+                .map(f => `[📎 ${f.name}](${f.url})`)
+                .join('\n');
+            prompt = prompt ? `${prompt}\n\n${attachmentText}` : attachmentText;
+        }
+
         try {
             await createMessage({
-                conversationId, 
-                prompt: values.message 
-            })
+                conversationId,
+                prompt,
+            });
 
             form.reset();
+            setAttachedFiles([]);
         } catch (error) {
             console.error(error);
         }
@@ -156,29 +275,176 @@ export function ConversationIdView({ conversationId }: { conversationId: Id<"con
                         ref={topElementRef}
                     />
                     {toUIMessages(messages.results ?? [])?.map((message) => (
-                        <AIMessage
-                            // In reverse, because we are watching from "assistant" perspective
-                            from={message.role === "user" ? "assistant" : "user"}
-                            key={message.id}
-                        >
-                            <AIMessageContent>
-                                <AIResponse>
-                                    {message.content}
-                                </AIResponse>
-                            </AIMessageContent>
-                            {message.role === "user" && (
-                                <DicebearAvatar 
-                                    seed={conversation?.contactSessionId ?? "user"}
-                                    size={32}
-                                />
-                            )}
-                        </AIMessage>
+                        (() => {
+                            const parsedMessage = parseMessageAttachments(message.content);
+                            const hasTextContent = parsedMessage.textContent.length > 0;
+                            const hasOnlyImageAttachments =
+                                !hasTextContent &&
+                                parsedMessage.attachments.length > 0 &&
+                                parsedMessage.attachments.every((attachment) => attachment.isImage);
+
+                            return (
+                                <AIMessage
+                                    // In reverse, because we are watching from "assistant" perspective
+                                    from={message.role === "user" ? "assistant" : "user"}
+                                    key={message.id}
+                                >
+                                    {hasOnlyImageAttachments ? (
+                                        <div className="flex flex-col gap-2">
+                                            {parsedMessage.attachments.map((attachment, index) => (
+                                                <a
+                                                    key={`${message.id}-attachment-${index}`}
+                                                    href={attachment.url}
+                                                    rel="noreferrer"
+                                                    target="_blank"
+                                                    className="block overflow-hidden rounded-lg border bg-background transition hover:opacity-90"
+                                                >
+                                                    {/* eslint-disable-next-line @next/next/no-img-element -- dynamic Convex storage URLs */}
+                                                    <img
+                                                        src={attachment.url}
+                                                        alt={attachment.name}
+                                                        loading="lazy"
+                                                        className="h-auto max-h-64 w-full object-cover"
+                                                    />
+                                                    <div className="border-t px-3 py-1.5 text-xs text-muted-foreground">
+                                                        {attachment.name}
+                                                    </div>
+                                                </a>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <AIMessageContent>
+                                            {hasTextContent ? (
+                                                <AIResponse>
+                                                    {parsedMessage.textContent}
+                                                </AIResponse>
+                                            ) : null}
+                                            {parsedMessage.attachments.length > 0 ? (
+                                                <div className="mt-2 flex flex-col gap-2">
+                                                    {parsedMessage.attachments.map((attachment, index) => (
+                                                        attachment.isImage ? (
+                                                            <a
+                                                                key={`${message.id}-attachment-${index}`}
+                                                                href={attachment.url}
+                                                                rel="noreferrer"
+                                                                target="_blank"
+                                                                className="block overflow-hidden rounded-lg border bg-background transition hover:opacity-90"
+                                                            >
+                                                                {/* eslint-disable-next-line @next/next/no-img-element -- dynamic Convex storage URLs */}
+                                                                <img
+                                                                    src={attachment.url}
+                                                                    alt={attachment.name}
+                                                                    loading="lazy"
+                                                                    className="h-auto max-h-64 w-full object-cover"
+                                                                />
+                                                                <div className="border-t px-3 py-1.5 text-xs text-muted-foreground">
+                                                                    {attachment.name}
+                                                                </div>
+                                                            </a>
+                                                        ) : (
+                                                            <a
+                                                                key={`${message.id}-attachment-${index}`}
+                                                                href={attachment.url}
+                                                                rel="noreferrer"
+                                                                target="_blank"
+                                                                className="inline-flex w-fit items-center gap-1.5 rounded-full border bg-transparent px-2.5 py-1 text-xs font-medium text-foreground hover:opacity-90"
+                                                            >
+                                                                <FileIcon className="size-3 shrink-0 text-muted-foreground" />
+                                                                <span className="max-w-[220px] truncate">{attachment.name}</span>
+                                                            </a>
+                                                        )
+                                                    ))}
+                                                </div>
+                                            ) : null}
+                                        </AIMessageContent>
+                                    )}
+                                    {message.role === "user" && (
+                                        <DicebearAvatar 
+                                            seed={conversation?.contactSessionId ?? "user"}
+                                            size={32}
+                                        />
+                                    )}
+                                </AIMessage>
+                            );
+                        })()
                     ))}
                 </AIConversationContent>
                 <AIConversationScrollButton />
             </AIConversation>
 
-            <div className="p-2">
+            <div className="relative p-2">
+                <input
+                    accept=".pdf,.txt,.csv,.doc,.docx,.png,.jpg,.jpeg,.webp"
+                    className="hidden"
+                    multiple
+                    onChange={handleFileSelect}
+                    ref={fileInputRef}
+                    type="file"
+                />
+                {attachedFiles.length > 0 && (
+                    <div className="pointer-events-none absolute bottom-[calc(100%+0.005rem)] left-2 right-2 z-10">
+                        <div className="pointer-events-auto flex flex-wrap gap-1.5 rounded-md border bg-background/95 p-2 shadow-sm backdrop-blur-sm">
+                            {attachedFiles.map(file => (
+                                <div
+                                    key={file.id}
+                                    className={cn(
+                                        "overflow-hidden rounded-md border text-xs font-medium",
+                                        file.error
+                                            ? "border-destructive/40 bg-destructive/10 text-destructive"
+                                            : "bg-transparent text-foreground"
+                                    )}
+                                >
+                                    {isImageAttachment(file.name, file.mimeType) && !file.error ? (
+                                        <div className="relative">
+                                            {file.url ? (
+                                                // eslint-disable-next-line @next/next/no-img-element -- local attachment preview
+                                                <img
+                                                    src={file.url}
+                                                    alt={file.name}
+                                                    className="h-18 w-18 object-cover"
+                                                    loading="lazy"
+                                                />
+                                            ) : (
+                                                <div className="flex h-18 w-18 items-center justify-center bg-muted/50">
+                                                    <Loader2Icon className="size-4 animate-spin text-muted-foreground" />
+                                                </div>
+                                            )}
+                                            {!file.uploading && (
+                                                <button
+                                                    className="absolute right-1 top-1 rounded-full bg-background/90 p-0.5 hover:text-destructive"
+                                                    onClick={() => handleRemoveAttachment(file.id)}
+                                                    type="button"
+                                                >
+                                                    <XIcon className="size-3" />
+                                                </button>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-1.5 px-2.5 py-1">
+                                            {file.uploading ? (
+                                                <Loader2Icon className="size-3 animate-spin text-muted-foreground" />
+                                            ) : (
+                                                <FileIcon className="size-3 shrink-0 text-muted-foreground" />
+                                            )}
+                                            <span className="max-w-[140px] truncate">
+                                                {file.error ? `${file.name} (failed)` : file.name}
+                                            </span>
+                                            {!file.uploading && (
+                                                <button
+                                                    className="ml-0.5 rounded-full hover:text-destructive"
+                                                    onClick={() => handleRemoveAttachment(file.id)}
+                                                    type="button"
+                                                >
+                                                    <XIcon className="size-3" />
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
                 <Form {...form}>
                     <AIInput onSubmit={form.handleSubmit(onSubmit)}>
                         <FormField 
@@ -208,12 +474,20 @@ export function ConversationIdView({ conversationId }: { conversationId: Id<"con
                         />
                         <AIInputToolbar>
                             <AIInputTools>
+                                <AIInputButton
+                                    disabled={conversation?.status === "resolved" || form.formState.isSubmitting}
+                                    onClick={() => fileInputRef.current?.click()}
+                                    type="button"
+                                >
+                                    <PaperclipIcon />
+                                    Attach
+                                </AIInputButton>
                                 <AIInputButton 
                                     onClick={handleEnhanceResponse}
                                     disabled={
                                         conversation?.status === "resolved" || 
                                         isEnhancing || 
-                                        !form.formState.isValid
+                                        !messageValue.trim()
                                     }
                                 >
                                     <Wand2Icon />
@@ -224,7 +498,7 @@ export function ConversationIdView({ conversationId }: { conversationId: Id<"con
                                 disabled={
                                     conversation?.status === "resolved" || 
                                     form.formState.isSubmitting || 
-                                    !form.formState.isValid ||
+                                    !canSubmit ||
                                     isEnhancing
                                 }
                                 status="ready"
