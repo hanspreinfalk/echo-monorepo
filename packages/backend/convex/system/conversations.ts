@@ -60,3 +60,15 @@ export const getByThreadId = internalQuery({
         return conversation;
     },
 });
+
+export const updateIsAiTyping = internalMutation({
+    args: {
+        conversationId: v.id("conversations"),
+        isAiTyping: v.boolean(),
+    },
+    handler: async (ctx, args) => {
+        await ctx.db.patch(args.conversationId, {
+            isAiTyping: args.isAiTyping,
+        });
+    },
+});

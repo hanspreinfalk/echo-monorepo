@@ -5,6 +5,23 @@ import { supportAgent } from "../system/ai/agents/supportAgent";
 import { MessageDoc, saveMessage } from "@convex-dev/agent";
 import { paginationOptsValidator } from "convex/server";
 
+export const getIsAiTyping = query({
+    args: {
+        conversationId: v.id("conversations"),
+    },
+    handler: async (ctx, args) => {
+        const conversation = await ctx.db.get(args.conversationId);
+        if (!conversation) {
+            throw new ConvexError({
+                code: "NOT_FOUND",
+                message: "Conversation not found",
+            });
+        }
+
+        return conversation.isAiTyping;
+    },
+});
+
 export const getMany = query({
     args: {
         contactSessionId: v.id("contactSessions"),

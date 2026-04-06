@@ -67,11 +67,21 @@ export const create = action({
       conversation.status === "unresolved" && subscription?.status === "active"
 
     if (shouldTriggerAgent) {
+      const { messageId } = await saveMessage(ctx, components.agent, {
+        threadId: args.threadId,
+        prompt: args.prompt,
+      });
+
+      await ctx.runMutation(internal.system.conversations.updateIsAiTyping, {
+        conversationId: conversation._id,
+        isAiTyping: true,
+      });
+
       await supportAgent.generateText(
         ctx,
         { threadId: args.threadId },
         {
-          prompt: args.prompt,
+          promptMessageId: messageId,
           tools: {
             escalateConversationTool: escalateConversation,
             resolveConversationTool: resolveConversation,
@@ -80,6 +90,11 @@ export const create = action({
           }
         },
       )
+
+      await ctx.runMutation(internal.system.conversations.updateIsAiTyping, {
+        conversationId: conversation._id,
+        isAiTyping: false,
+      });
     } else {
       await saveMessage(ctx, components.agent, {
         threadId: args.threadId,
