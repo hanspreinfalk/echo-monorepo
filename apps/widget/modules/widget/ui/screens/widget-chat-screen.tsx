@@ -35,7 +35,8 @@ import {
 } from "@workspace/ui/components/ai/message";
 import { AIResponse } from "@workspace/ui/components/ai/response";
 import { cn } from "@workspace/ui/lib/utils";
-import { useRef, useState, useMemo } from "react";
+import { useRef, useState, useMemo, useEffect } from "react";
+import { WidgetRequestControlCard, WidgetRequestControlCardContent, type AgentStep, type AgentExecution } from "@/modules/widget/ui/components/widget-request-control-card";
 
 const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024; // 10 MB
 
@@ -78,6 +79,7 @@ function parseMessageAttachments(content: string): { textContent: string; attach
 
     return { textContent, attachments };
 }
+
 
 const formSchema = z.object({
     message: z.string(),
@@ -147,6 +149,30 @@ export const WidgetChatScreen = () => {
 
     const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
     const [attachmentError, setAttachmentError] = useState<string | null>(null);
+    const [agentExecution, setAgentExecution] = useState<AgentExecution | null>(null);
+
+    const pendingPageControlRequest = useQuery(
+        api.public.conversations.getPendingPageControlRequest,
+        conversationId && contactSessionId
+            ? { conversationId, contactSessionId }
+            : "skip"
+    );
+
+    useEffect(() => {
+        const handler = (event: MessageEvent) => {
+            if (event.data.type === "agent-start") {
+                // phase already set to running on approve
+            } else if (event.data.type === "agent-step") {
+                const { stepIndex, goal, actionName } = event.data.payload as AgentStep;
+                setAgentExecution(prev => prev ? { ...prev, steps: [...prev.steps, { stepIndex, goal, actionName }] } : prev);
+            } else if (event.data.type === "agent-done") {
+                const result = event.data.payload as { success: boolean; data: string };
+                setAgentExecution(prev => prev ? { ...prev, phase: "done", result } : prev);
+            }
+        };
+        window.addEventListener("message", handler);
+        return () => window.removeEventListener("message", handler);
+    }, []);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const storeAttachment = useAction(api.public.messages.storeAttachment);
 
@@ -266,63 +292,88 @@ export const WidgetChatScreen = () => {
                         onLoadMore={handleLoadMore}
                         ref={topElementRef}
                     />
-                    {toUIMessages(messages.results ?? [])?.map((message) => {
-                        const parsed = parseMessageAttachments(message.content);
+                    {(() => {
+                        const uiMessages = toUIMessages(messages.results ?? []);
+                        const showControl = !!(pendingPageControlRequest || agentExecution) && !!contactSessionId;
+                        const lastMsg = uiMessages[uiMessages.length - 1];
+                        const mergeIntoLast = showControl && lastMsg?.role === "assistant";
+                        const controlProps = {
+                            pendingRequest: pendingPageControlRequest ?? null,
+                            agentExecution,
+                            contactSessionId: contactSessionId!,
+                            onApproved: (action: string) => setAgentExecution({ action, phase: "running", steps: [] }),
+                            onDismiss: () => setAgentExecution(null),
+                        };
+
                         return (
-                            <AIMessage
-                                from={message.role === "user" ? "user" : "assistant"}
-                                key={message.id}
-                            >
-                                <div className="flex flex-col gap-2">
-                                    {parsed.attachments.map((attachment, index) => (
-                                        attachment.isImage ? (
-                                            <a
-                                                key={index}
-                                                href={attachment.url}
-                                                rel="noreferrer"
-                                                target="_blank"
-                                                className="block overflow-hidden rounded-lg border bg-background transition hover:opacity-90"
-                                            >
-                                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                <img
-                                                    src={attachment.url}
-                                                    alt={attachment.name}
-                                                    loading="lazy"
-                                                    className="h-auto max-h-48 w-full object-cover"
-                                                />
-                                                <div className="border-t px-3 py-1.5 text-xs text-muted-foreground">
-                                                    {attachment.name}
-                                                </div>
-                                            </a>
-                                        ) : (
-                                            <a
-                                                key={index}
-                                                href={attachment.url}
-                                                rel="noreferrer"
-                                                target="_blank"
-                                                className="inline-flex w-fit items-center gap-1.5 rounded-full border bg-transparent px-2.5 py-1 text-xs font-medium text-foreground hover:opacity-90"
-                                            >
-                                                <FileIcon className="size-3 shrink-0 text-muted-foreground" />
-                                                <span className="max-w-[180px] truncate">{attachment.name}</span>
-                                            </a>
-                                        )
-                                    ))}
-                                    {parsed.textContent && (
-                                        <AIMessageContent>
-                                            <AIResponse>{parsed.textContent}</AIResponse>
-                                        </AIMessageContent>
-                                    )}
-                                </div>
-                                {message.role === "assistant" && (
-                                    <DicebearAvatar
-                                        imageUrl="/logo.svg"
-                                        seed="assistant"
-                                        size={32}
-                                    />
+                            <>
+                                {uiMessages.map((message, index) => {
+                                    const isLast = index === uiMessages.length - 1;
+                                    const parsed = parseMessageAttachments(message.content);
+                                    const inlineCard = mergeIntoLast && isLast;
+
+                                    return (
+                                        <AIMessage
+                                            from={message.role === "user" ? "user" : "assistant"}
+                                            key={message.id}
+                                        >
+                                            <div className="flex flex-col gap-2">
+                                                {parsed.attachments.map((attachment, i) => (
+                                                    attachment.isImage ? (
+                                                        <a
+                                                            key={i}
+                                                            href={attachment.url}
+                                                            rel="noreferrer"
+                                                            target="_blank"
+                                                            className="block overflow-hidden rounded-lg border bg-background transition hover:opacity-90"
+                                                        >
+                                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                            <img
+                                                                src={attachment.url}
+                                                                alt={attachment.name}
+                                                                loading="lazy"
+                                                                className="h-auto max-h-48 w-full object-cover"
+                                                            />
+                                                            <div className="border-t px-3 py-1.5 text-xs text-muted-foreground">
+                                                                {attachment.name}
+                                                            </div>
+                                                        </a>
+                                                    ) : (
+                                                        <a
+                                                            key={i}
+                                                            href={attachment.url}
+                                                            rel="noreferrer"
+                                                            target="_blank"
+                                                            className="inline-flex w-fit items-center gap-1.5 rounded-full border bg-transparent px-2.5 py-1 text-xs font-medium text-foreground hover:opacity-90"
+                                                        >
+                                                            <FileIcon className="size-3 shrink-0 text-muted-foreground" />
+                                                            <span className="max-w-[180px] truncate">{attachment.name}</span>
+                                                        </a>
+                                                    )
+                                                ))}
+                                                {parsed.textContent && (
+                                                    <AIMessageContent>
+                                                        <AIResponse>{parsed.textContent}</AIResponse>
+                                                    </AIMessageContent>
+                                                )}
+                                                {inlineCard && (
+                                                    <AIMessageContent>
+                                                        <WidgetRequestControlCardContent {...controlProps} />
+                                                    </AIMessageContent>
+                                                )}
+                                            </div>
+                                            {message.role === "assistant" && (
+                                                <DicebearAvatar imageUrl="/logo.svg" seed="assistant" size={32} />
+                                            )}
+                                        </AIMessage>
+                                    );
+                                })}
+                                {showControl && !mergeIntoLast && (
+                                    <WidgetRequestControlCard {...controlProps} />
                                 )}
-                            </AIMessage>
-                        )
-                    })}
+                            </>
+                        );
+                    })()}
                     {isAiTyping && (
                         <AIMessage from="assistant">
                             <AIMessageContent>

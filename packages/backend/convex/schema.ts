@@ -60,4 +60,9 @@ export default defineSchema({
     users: defineTable({
         name: v.string(),
     }),
+    pageControlRequests: defineTable({
+        conversationId: v.id("conversations"),
+        action: v.string(),
+        status: v.union(v.literal("pending"), v.literal("approved"), v.literal("denied")),
+    }).index("by_conversation_id", ["conversationId"]),
 });

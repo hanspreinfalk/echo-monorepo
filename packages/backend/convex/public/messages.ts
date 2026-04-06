@@ -8,6 +8,7 @@ import { resolveConversation } from "../system/ai/tools/resolveConversation";
 import { saveMessage } from "@convex-dev/agent";
 import { search } from "../system/ai/tools/search";
 import { readAttachment } from "../system/ai/tools/readAttachment";
+import { requestPageControl } from "../system/ai/tools/requestPageControl";
 
 export const create = action({
   args: {
@@ -87,6 +88,7 @@ export const create = action({
             resolveConversationTool: resolveConversation,
             searchTool: search,
             readAttachmentTool: readAttachment,
+            requestPageControlTool: requestPageControl,
           }
         },
       )
