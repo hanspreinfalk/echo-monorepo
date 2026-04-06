@@ -105,9 +105,9 @@ export function PageControlCardContent({
             {/* Running / done: step log */}
             {(phase === "running" || phase === "done") && steps && steps.length > 0 && (
                 <div className="flex flex-col gap-1 pt-0.5">
-                    {steps.map((step) => (
+                    {steps.map((step, i) => (
                         <div
-                            key={step.stepIndex}
+                            key={i}
                             className={cn("flex items-start gap-1.5 text-xs", c.mutedText)}
                         >
                             <span className={cn("mt-1 size-1.5 shrink-0 rounded-full", c.stepDot)} />

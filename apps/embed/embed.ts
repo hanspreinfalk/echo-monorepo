@@ -177,6 +177,13 @@ import { PageAgent } from 'page-agent';
       agent.panel.hide();
       agent.panel.show = () => {}; // prevent execute() from re-showing the panel
     }
+    // const enhancedAction = `
+    // To create a new patient make sure to have the patient item selected in the sidebar.
+    // Then click on the add patient button and fill in the form.
+    // The form is: Name, Last Name, Date of Birth, Gender, Contact Number.
+    // Lastly click on the save button.
+    // Do this: ${action}`;
+    // await agent.execute(enhancedAction);
     await agent.execute(action);
   }
 
