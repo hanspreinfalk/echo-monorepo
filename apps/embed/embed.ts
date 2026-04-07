@@ -2,6 +2,8 @@ import { EMBED_CONFIG } from './config';
 import { chatBubbleIcon, closeIcon } from './icons';
 import { PageAgent } from 'page-agent';
 
+// cd apps/embed && VITE_WIDGET_URL=https://echo-monorepo-widget.vercel.app pnpm build
+
 (function() {
   let iframe: HTMLIFrameElement | null = null;
   let container: HTMLDivElement | null = null;
