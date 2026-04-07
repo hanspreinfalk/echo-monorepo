@@ -180,4 +180,10 @@
     letter-spacing: var(--tracking-normal);
     font-weight: 500;
   }
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+      scroll-padding-top: 5.5rem;
+    }
+  }
 }

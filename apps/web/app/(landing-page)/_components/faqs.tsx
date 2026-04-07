@@ -1,0 +1,150 @@
+'use client'
+
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@workspace/ui/components/accordion'
+import Link from 'next/link'
+
+const faqCategories = [
+    {
+        title: 'Product overview',
+        items: [
+            {
+                id: 'overview-1',
+                question: 'How do you turn conversations into engineering work?',
+                answer:
+                    'We capture support and user conversations, extract concrete problems and requests, and draft structured work items your team can act on—so nothing important gets lost in chat threads.',
+            },
+            {
+                id: 'overview-2',
+                question: 'What happens after a user issue is captured?',
+                answer:
+                    'Each issue is normalized into a clear description with context from the thread. Your team can triage, assign owners, and move items into your existing workflow without retyping or copy-pasting.',
+            },
+            {
+                id: 'overview-3',
+                question: 'How does prioritization decide what to ship first?',
+                answer:
+                    'Signals from the conversation—severity, frequency, customer impact, and strategic fit—are combined into a transparent score so engineering sees a ranked backlog aligned with what matters most to users.',
+            },
+            {
+                id: 'overview-4',
+                question: 'Who typically uses this day to day?',
+                answer:
+                    'Support and success teams capture issues at the source; PMs refine scope and priority; engineering gets ready-made tickets with full context. Everyone stays aligned without extra meetings.',
+            },
+        ],
+    },
+    {
+        title: 'Integrations',
+        items: [
+            {
+                id: 'integrations-1',
+                question: 'Which chat platforms do you support?',
+                answer:
+                    'We connect to the channels where your users already talk to you—team chat, in-app messaging, and common helpdesk chat surfaces—so capture happens where the conversation lives.',
+            },
+            {
+                id: 'integrations-2',
+                question: 'Can I sync with Jira, Linear, or GitHub Issues?',
+                answer:
+                    'Yes. Push prioritized items straight into the tools your engineers already use, keep statuses in sync, and avoid duplicate tracking across systems.',
+            },
+            {
+                id: 'integrations-3',
+                question: 'Do you work with our existing help desk or CRM?',
+                answer:
+                    'We complement your stack: pull context from tickets and accounts where you already store customer history, and push outcomes back so records stay complete.',
+            },
+        ],
+    },
+    {
+        title: 'Automation & AI',
+        items: [
+            {
+                id: 'automation-1',
+                question: 'How does the AI identify engineering tasks from messy conversations?',
+                answer:
+                    'Models detect actionable problems, feature requests, and bugs from natural language, then propose titles, descriptions, and labels you can edit—automation speeds you up without removing human judgment.',
+            },
+            {
+                id: 'automation-2',
+                question: 'Can I review tasks before they hit the backlog?',
+                answer:
+                    'Absolutely. Every suggestion can be approved, merged, or rejected. You control what becomes real work and how much automation you want at each stage.',
+            },
+            {
+                id: 'automation-3',
+                question: 'How does the prioritization algorithm work?',
+                answer:
+                    'Ranking combines configurable rules with learned patterns from your product and team—urgency, user segments, recurring themes, and roadmap alignment—so the queue reflects both data and your strategy.',
+            },
+            {
+                id: 'automation-4',
+                question: 'Is conversation data used to train public models?',
+                answer:
+                    'Your workspace data is processed to deliver the product, with strict isolation and retention controls. We do not use your customer conversations to train third-party or shared foundation models unless you explicitly opt in.',
+            },
+        ],
+    },
+]
+
+export default function FAQs() {
+    return (
+        <section
+            id="faqs"
+            className="bg-muted/50 py-16 md:py-24">
+            <div className="mx-auto max-w-5xl px-6">
+                <div className="grid gap-12 md:grid-cols-5 md:gap-16 lg:gap-20">
+                    <div className="md:col-span-2">
+                        <h2 className="text-foreground text-balance text-5xl max-md:font-semibold md:font-normal">FAQs</h2>
+                        <p className="text-muted-foreground mt-4 text-balance text-lg">
+                            From live conversations to a prioritized backlog, so your team ships what matters.
+                        </p>
+                        <p className="text-muted-foreground mt-6 hidden md:block text-pretty">
+                            Still unsure?{' '}
+                            <Link
+                                href="#"
+                                className="text-primary font-medium hover:underline">
+                                Talk to our team
+                            </Link>
+                        </p>
+                    </div>
+
+                    <div className="flex flex-col gap-12 md:col-span-3">
+                        {faqCategories.map((category) => (
+                            <div key={category.title}>
+                                <h3 className="text-foreground mb-4 text-lg font-semibold">{category.title}</h3>
+                                <Accordion
+                                    type="single"
+                                    collapsible
+                                    className="w-full">
+                                    {category.items.map((item) => (
+                                        <AccordionItem
+                                            key={item.id}
+                                            value={item.id}
+                                            className="border-border">
+                                            <AccordionTrigger className="text-foreground cursor-pointer py-5 text-left text-base font-medium hover:no-underline [&>svg]:text-muted-foreground">
+                                                {item.question}
+                                            </AccordionTrigger>
+                                            <AccordionContent>
+                                                <p className="text-muted-foreground pb-2 text-base leading-relaxed">{item.answer}</p>
+                                            </AccordionContent>
+                                        </AccordionItem>
+                                    ))}
+                                </Accordion>
+                            </div>
+                        ))}
+                    </div>
+
+                    <p className="text-muted-foreground md:col-span-2 md:hidden text-pretty">
+                        Still unsure?{' '}
+                        <Link
+                            href="#"
+                            className="text-primary font-medium hover:underline">
+                            Talk to our team
+                        </Link>
+                    </p>
+                </div>
+            </div>
+        </section>
+    )
+}

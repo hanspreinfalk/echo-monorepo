@@ -2,6 +2,7 @@ import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
 
 const isPublicRoute = createRouteMatcher([
+    '/',
     '/sign-in(.*)',
     '/sign-up(.*)',
 ])
@@ -10,6 +11,7 @@ const isOrgFreeRoute = createRouteMatcher([
     '/sign-in(.*)',
     '/sign-up(.*)',
     '/org-selection(.*)',
+    '/'
 ])
 
 export default clerkMiddleware(async (auth, req) => {
@@ -17,6 +19,11 @@ export default clerkMiddleware(async (auth, req) => {
 
     if (!isPublicRoute(req)) {
         await auth.protect()
+    }
+
+    // Redirect authenticated users with an org away from the landing page
+    if (userId && orgId && req.nextUrl.pathname === '/') {
+        return NextResponse.redirect(new URL('/conversations', req.url))
     }
 
     if (userId && !orgId && !isOrgFreeRoute(req)) {
