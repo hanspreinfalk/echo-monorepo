@@ -4,12 +4,24 @@ import type { WebhookEvent } from "@clerk/backend";
 import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
+import { embedOpenaiCors, embedOpenaiProxy } from "./embedOpenai";
 
 const clerkClient = createClerkClient({
   secretKey: process.env.CLERK_SECRET_KEY || "",
 });
 
 const http = httpRouter();
+
+http.route({
+  path: "/embed/openai/v1/chat/completions",
+  method: "OPTIONS",
+  handler: embedOpenaiCors,
+});
+http.route({
+  path: "/embed/openai/v1/chat/completions",
+  method: "POST",
+  handler: embedOpenaiProxy,
+});
 
 http.route({
   path: "/clerk-webhook",

@@ -17,6 +17,6 @@ export default defineConfig({
   },
   server: {
     port: 3002,
-    open: "/hms.html"
+    open: "/demo.html"
   },
 });

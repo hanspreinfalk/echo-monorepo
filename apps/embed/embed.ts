@@ -151,9 +151,9 @@ import { PageAgent } from 'page-agent';
   async function executePageAction(action: string, requestId?: string) {
     if (!agent) {
       agent = new PageAgent({
-        model: 'qwen3.5-plus',
-        baseURL: 'https://page-ag-testing-ohftxirgbn.cn-shanghai.fcapp.run',
-        apiKey: 'NA',
+        model: 'gpt-5.1',
+        baseURL: `https://wandering-beagle-503.convex.site/embed/openai/v1`,
+        apiKey: organizationId!,
         language: 'en-US',
         onAfterStep: (_agentInstance, history) => {
           const last = history[history.length - 1];

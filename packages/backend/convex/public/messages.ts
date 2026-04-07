@@ -85,8 +85,10 @@ export const create = action({
             resolveConversationTool: resolveConversation,
             searchTool: search,
             readAttachmentTool: readAttachment,
-            requestPageControlTool: requestPageControl,
-          }
+            ...(subscription?.status === "active"
+              ? { requestPageControlTool: requestPageControl }
+              : {}),
+          },
         },
       )
 
