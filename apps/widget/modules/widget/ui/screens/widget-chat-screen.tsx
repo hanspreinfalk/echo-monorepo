@@ -50,8 +50,13 @@ import {
 } from "@workspace/ui/components/ai/message";
 import { AIResponse } from "@workspace/ui/components/ai/response";
 import { cn } from "@workspace/ui/lib/utils";
+import { motion } from "motion/react";
 import { useRef, useState, useMemo, useEffect } from "react";
-import { PageControlCard } from "@workspace/ui/components/ai/page-control-card";
+import {
+    PageControlAgentStepsPanel,
+    PageControlRequestCardContent,
+    PageControlRunningBar,
+} from "@workspace/ui/components/ai/page-control-card";
 
 const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024; // 10 MB
 
@@ -95,6 +100,14 @@ function parseMessageAttachments(content: string): { textContent: string; attach
     return { textContent, attachments };
 }
 
+/** Convex `_creationTime` is exposed on UI messages as `createdAt` via `toUIMessages`. */
+function formatMessageTime(createdAt: Date) {
+    return createdAt.toLocaleTimeString(undefined, {
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+    });
+}
 
 const formSchema = z.object({
     message: z.string(),
@@ -427,18 +440,86 @@ export const WidgetChatScreen = () => {
                                                 );
                                             }
                                             : undefined;
+                                    const confirmationText =
+                                        result?.data ??
+                                        (result?.success ? "Completed" : "Failed");
+                                    const avatar = (
+                                        <DicebearAvatar imageUrl="/logo.svg" seed="assistant" size={32} />
+                                    );
+                                    const pageControlTime =
+                                        message.createdAt != null ? (
+                                            <p className="mt-0.5 w-max max-w-full shrink-0 grow-0 basis-auto self-end text-right text-[10px] leading-none text-muted-foreground tabular-nums">
+                                                {formatMessageTime(message.createdAt)}
+                                            </p>
+                                        ) : null;
                                     return (
-                                        <PageControlCard
+                                        <motion.div
                                             key={message.id}
-                                            action={request.action}
-                                            phase={phase}
-                                            steps={request.steps}
-                                            result={result}
-                                            onAllow={onAllow}
-                                            onDeny={onDeny}
-                                            onStop={onStop}
-                                            avatar={<DicebearAvatar imageUrl="/logo.svg" seed="assistant" size={32} />}
-                                        />
+                                            className="w-full"
+                                            initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                                            transition={{
+                                                type: "spring",
+                                                stiffness: 420,
+                                                damping: 32,
+                                                mass: 0.85,
+                                            }}
+                                        >
+                                            {phase === "pending" ? (
+                                                <AIMessage from="assistant">
+                                                    <div className="flex flex-col gap-1">
+                                                        <AIMessageContent>
+                                                            <PageControlRequestCardContent
+                                                                action={request.action}
+                                                                allowLabel="Confirm"
+                                                                denyLabel="Deny"
+                                                                interactive
+                                                                onAllow={onAllow}
+                                                                onDeny={onDeny}
+                                                            />
+                                                        </AIMessageContent>
+                                                        {pageControlTime}
+                                                    </div>
+                                                    {avatar}
+                                                </AIMessage>
+                                            ) : phase === "running" ? (
+                                                <AIMessage from="assistant">
+                                                    <div className="flex min-w-0 w-fit max-w-[80%] flex-col items-start gap-1">
+                                                        {request.steps && request.steps.length > 0 ? (
+                                                            <PageControlAgentStepsPanel
+                                                                expandWhileRunning
+                                                                phase="running"
+                                                                steps={request.steps}
+                                                            />
+                                                        ) : null}
+                                                        <div className="flex min-w-0 w-fit max-w-full flex-col gap-1">
+                                                            <PageControlRunningBar onStop={onStop} />
+                                                            {pageControlTime}
+                                                        </div>
+                                                    </div>
+                                                    {avatar}
+                                                </AIMessage>
+                                            ) : (
+                                                <AIMessage from="assistant">
+                                                    <div className="flex min-w-0 w-fit max-w-[80%] flex-col items-start gap-1">
+                                                        {request.steps && request.steps.length > 0 ? (
+                                                            <PageControlAgentStepsPanel
+                                                                expandWhileRunning
+                                                                phase="done"
+                                                                steps={request.steps}
+                                                            />
+                                                        ) : null}
+                                                        <div className="flex min-w-0 w-fit max-w-full flex-col gap-1">
+                                                            <AIMessageContent className="min-w-0 w-fit max-w-full">
+                                                                <AIResponse>{confirmationText}</AIResponse>
+                                                            </AIMessageContent>
+                                                            {pageControlTime}
+                                                        </div>
+                                                    </div>
+                                                    {avatar}
+                                                </AIMessage>
+                                            )}
+                                        </motion.div>
                                     );
                                 }
                             } catch { /* fall through to normal render */ }
@@ -488,6 +569,11 @@ export const WidgetChatScreen = () => {
                                         <AIMessageContent>
                                             <AIResponse>{parsed.textContent}</AIResponse>
                                         </AIMessageContent>
+                                    )}
+                                    {message.createdAt != null && (
+                                        <p className="mt-0.5 w-max max-w-full shrink-0 self-end text-right text-[10px] leading-none text-muted-foreground tabular-nums">
+                                            {formatMessageTime(message.createdAt)}
+                                        </p>
                                     )}
                                 </div>
                                 {message.role === "assistant" && (

@@ -8,8 +8,16 @@ const defaultColors: Required<CardColors> = {
     text: "text-foreground",
     mutedText: "text-muted-foreground",
     icon: "text-primary",
-    stepDot: "bg-primary/50",
 };
+
+function stepRowIsDone(
+    index: number,
+    total: number,
+    phase: "running" | "done"
+): boolean {
+    if (phase === "done") return true;
+    return total > 1 && index < total - 1;
+}
 
 export interface AgentStepsCardProps {
     steps?: PageControlAgentStep[];
@@ -31,16 +39,24 @@ export function AgentStepsCard({ steps, phase, result, avatar, from = "assistant
             <AIMessageContent>
                 <div className="flex flex-col gap-2 py-1">
                     {steps && steps.length > 0 && (
-                        <div className="flex flex-col gap-1">
-                            {steps.map((step) => (
-                                <div
-                                    key={step.stepIndex}
-                                    className={cn("flex items-start gap-1.5 text-xs", c.mutedText)}
-                                >
-                                    <span className={cn("mt-1 size-1.5 shrink-0 rounded-full", c.stepDot)} />
-                                    <span>{step.goal || step.actionName}</span>
-                                </div>
-                            ))}
+                        <div className="flex flex-col gap-1.5">
+                            {steps.map((step, i) => {
+                                const done = stepRowIsDone(i, steps.length, phase);
+                                return (
+                                    <div
+                                        key={step.stepIndex}
+                                        className={cn("text-xs leading-relaxed", c.mutedText)}
+                                    >
+                                        {step.goal || step.actionName}
+                                        {done && (
+                                            <CheckIcon
+                                                aria-hidden
+                                                className="ml-1 inline-block size-3 align-[-0.15em] opacity-90"
+                                            />
+                                        )}
+                                    </div>
+                                );
+                            })}
                         </div>
                     )}
                     {phase === "running" && (

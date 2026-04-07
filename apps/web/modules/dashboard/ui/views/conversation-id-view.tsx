@@ -344,7 +344,6 @@ export function ConversationIdView({ conversationId }: { conversationId: Id<"con
                                                 text: "text-white",
                                                 mutedText: "text-white/70",
                                                 icon: "text-white",
-                                                stepDot: "bg-white/50",
                                             }}
                                         />
                                     );
