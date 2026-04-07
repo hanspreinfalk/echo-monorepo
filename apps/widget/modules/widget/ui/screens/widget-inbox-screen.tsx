@@ -12,6 +12,7 @@ import { api } from "@workspace/backend/_generated/api"
 import { ConversationStatusIcon } from "@workspace/ui/components/conversation-status-icon"
 import { useInfiniteScroll } from "@workspace/ui/hooks/use-infinite-scroll"
 import { InfiniteScrollTrigger } from "@workspace/ui/components/infinite-scroll-trigger"
+import { formatConversationLastMessagePreview } from "@workspace/ui/lib/conversation-last-message-preview"
 
 export function WidgetInboxScreen() {
     const setScreen = useSetAtom(screenAtom)
@@ -73,7 +74,9 @@ export function WidgetInboxScreen() {
 
                             <div className="flex w-full items-center justify-between gap-x-2">
                                 <p className="truncate text-sm">
-                                    {conversation.lastMessage?.text}
+                                    {formatConversationLastMessagePreview(
+                                        conversation.lastMessage?.text,
+                                    )}
                                 </p>
                                 <ConversationStatusIcon status={conversation.status} className="shrink-0" />
                             </div>

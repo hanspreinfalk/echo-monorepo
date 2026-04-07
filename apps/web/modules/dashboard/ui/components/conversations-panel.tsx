@@ -22,6 +22,7 @@ import { useAtomValue, useSetAtom } from "jotai"
 import { statusFilterAtom } from "../../atoms"
 import { useInfiniteScroll } from "@workspace/ui/hooks/use-infinite-scroll"
 import { InfiniteScrollTrigger } from "@workspace/ui/components/infinite-scroll-trigger"
+import { formatConversationLastMessagePreview } from "@workspace/ui/lib/conversation-last-message-preview"
 import { Skeleton } from "@workspace/ui/components/skeleton"
 
 export const ConversationsPanel = () => {
@@ -143,7 +144,9 @@ export const ConversationsPanel = () => {
                                                             !isLastMessageFromOperator && "font-bold text-black"
                                                         )}
                                                     >
-                                                        {conversation.lastMessage?.text}
+                                                        {formatConversationLastMessagePreview(
+                                                            conversation.lastMessage?.text,
+                                                        )}
                                                     </span>
                                                 </div>
                                                 <ConversationStatusIcon status={conversation.status} />
