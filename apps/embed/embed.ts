@@ -4,12 +4,20 @@ import { PageAgent } from 'page-agent';
 
 // cd apps/embed && VITE_WIDGET_URL=https://echo-monorepo-widget.vercel.app pnpm build
 
+/** Above page-agent SimulatorMask (z-index 2147483641) so the chat iframe and Stop stay clickable. */
+const WIDGET_Z_PANEL = 2147483646;
+const WIDGET_Z_BUTTON = 2147483647;
+
 (function() {
   let iframe: HTMLIFrameElement | null = null;
   let container: HTMLDivElement | null = null;
   let button: HTMLButtonElement | null = null;
   let isOpen = false;
   let agent: InstanceType<typeof PageAgent> | null = null;
+  /** Current `page-agent-execute` / `execute()` correlation id (Convex pageControlRequests id). */
+  let activePageControlRequestId: string | undefined;
+  let suppressNextAgentDone = false;
+  const widgetMessageTarget = new URL(EMBED_CONFIG.WIDGET_URL).origin;
 
   // Get configuration from script tag
   let organizationId: string | null = null;
@@ -63,7 +71,7 @@ import { PageAgent } from 'page-agent';
       color: white;
       border: none;
       cursor: pointer;
-      z-index: 999999;
+      z-index: ${WIDGET_Z_BUTTON};
       display: flex;
       align-items: center;
       justify-content: center;
@@ -92,7 +100,7 @@ import { PageAgent } from 'page-agent';
       height: 600px;
       max-width: calc(100vw - 40px);
       max-height: calc(100vh - 110px);
-      z-index: 999998;
+      z-index: ${WIDGET_Z_PANEL};
       border-radius: 16px;
       overflow: hidden;
       box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
@@ -145,6 +153,20 @@ import { PageAgent } from 'page-agent';
           executePageAction(payload.action, payload.requestId);
         }
         break;
+      case 'page-agent-stop': {
+        const rid = payload?.requestId as string | undefined;
+        if (!rid || rid !== activePageControlRequestId || !agent) break;
+        suppressNextAgentDone = true;
+        agent.stop();
+        iframe?.contentWindow?.postMessage(
+          {
+            type: 'agent-done',
+            payload: { requestId: rid, success: false, data: 'Stopped by user' },
+          },
+          widgetMessageTarget,
+        );
+        break;
+      }
     }
   }
 
@@ -156,37 +178,50 @@ import { PageAgent } from 'page-agent';
         apiKey: organizationId!,
         language: 'en-US',
         onAfterStep: (_agentInstance, history) => {
+          const rid = activePageControlRequestId;
+          if (!rid) return;
           const last = history[history.length - 1];
           if (last?.type === 'step') {
-            iframe?.contentWindow?.postMessage({
-              type: 'agent-step',
-              payload: {
-                requestId,
-                stepIndex: last.stepIndex,
-                goal: last.reflection?.next_goal ?? '',
-                actionName: last.action?.name ?? '',
+            iframe?.contentWindow?.postMessage(
+              {
+                type: 'agent-step',
+                payload: {
+                  requestId: rid,
+                  stepIndex: last.stepIndex,
+                  goal: last.reflection?.next_goal ?? '',
+                  actionName: last.action?.name ?? '',
+                },
               },
-            }, '*');
+              widgetMessageTarget,
+            );
           }
         },
         onAfterTask: (_agentInstance, result) => {
-          iframe?.contentWindow?.postMessage({
-            type: 'agent-done',
-            payload: { requestId, success: result.success, data: result.data },
-          }, '*');
+          if (suppressNextAgentDone) {
+            suppressNextAgentDone = false;
+            return;
+          }
+          const rid = activePageControlRequestId;
+          if (!rid) return;
+          iframe?.contentWindow?.postMessage(
+            {
+              type: 'agent-done',
+              payload: { requestId: rid, success: result.success, data: result.data },
+            },
+            widgetMessageTarget,
+          );
         },
       });
       agent.panel.hide();
       agent.panel.show = () => {}; // prevent execute() from re-showing the panel
     }
-    // const enhancedAction = `
-    // To create a new patient make sure to have the patient item selected in the sidebar.
-    // Then click on the add patient button and fill in the form.
-    // The form is: Name, Last Name, Date of Birth, Gender, Contact Number.
-    // Lastly click on the save button.
-    // Do this: ${action}`;
-    // await agent.execute(enhancedAction);
-    await agent.execute(action);
+    activePageControlRequestId = requestId;
+    try {
+      await agent.execute(action);
+    } finally {
+      activePageControlRequestId = undefined;
+      suppressNextAgentDone = false;
+    }
   }
 
   function toggleWidget() {

@@ -1,4 +1,4 @@
-import { CheckIcon, Loader2Icon, MonitorIcon, XIcon } from "lucide-react";
+import { CheckIcon, Loader2Icon, MonitorIcon, SquareIcon, XIcon } from "lucide-react";
 import { cn } from "@workspace/ui/lib/utils";
 import { AIMessage, AIMessageContent } from "@workspace/ui/components/ai/message";
 import type { ReactNode } from "react";
@@ -31,6 +31,8 @@ export interface PageControlCardProps {
     /** If omitted the card is read-only (observer / dashboard mode). */
     onAllow?: () => Promise<void> | void;
     onDeny?: () => Promise<void> | void;
+    /** Shown while `phase === "running"` (e.g. parent PageAgent — call `postMessage` to stop). */
+    onStop?: () => void;
     onDismiss?: () => void;
     colors?: CardColors;
 }
@@ -43,6 +45,7 @@ export function PageControlCardContent({
     result,
     onAllow,
     onDeny,
+    onStop,
     onDismiss,
     colors,
 }: PageControlCardProps) {
@@ -118,9 +121,21 @@ export function PageControlCardContent({
             )}
 
             {phase === "running" && (
-                <div className={cn("flex items-center gap-1.5 text-xs", c.mutedText)}>
-                    <Loader2Icon className="size-3 animate-spin" />
-                    <span>Working…</span>
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
+                    <div className={cn("flex items-center gap-1.5 text-xs", c.mutedText)}>
+                        <Loader2Icon className="size-3 animate-spin" />
+                        <span>Working…</span>
+                    </div>
+                    {onStop && (
+                        <button
+                            type="button"
+                            onClick={() => onStop()}
+                            className="flex shrink-0 items-center gap-1 rounded-md border border-destructive/50 px-2.5 py-1 text-xs font-medium text-destructive transition hover:bg-destructive/10"
+                        >
+                            <SquareIcon className="size-2.5 fill-current" />
+                            Stop
+                        </button>
+                    )}
                 </div>
             )}
 

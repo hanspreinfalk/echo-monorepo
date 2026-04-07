@@ -415,6 +415,18 @@ export const WidgetChatScreen = () => {
                                             decision: "denied",
                                         });
                                     } : undefined;
+                                    const onStop =
+                                        phase === "running"
+                                            ? () => {
+                                                window.parent.postMessage(
+                                                    {
+                                                        type: "page-agent-stop",
+                                                        payload: { requestId: request._id },
+                                                    },
+                                                    "*",
+                                                );
+                                            }
+                                            : undefined;
                                     return (
                                         <PageControlCard
                                             key={message.id}
@@ -424,6 +436,7 @@ export const WidgetChatScreen = () => {
                                             result={result}
                                             onAllow={onAllow}
                                             onDeny={onDeny}
+                                            onStop={onStop}
                                             avatar={<DicebearAvatar imageUrl="/logo.svg" seed="assistant" size={32} />}
                                         />
                                     );
