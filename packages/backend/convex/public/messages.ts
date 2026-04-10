@@ -9,6 +9,10 @@ import { saveMessage } from "@convex-dev/agent";
 import { search } from "../system/ai/tools/search";
 import { readAttachment } from "../system/ai/tools/readAttachment";
 import { requestPageControl } from "../system/ai/tools/requestPageControl";
+import { createIssue } from "../system/ai/tools/createIssue";
+import { readConsoleLogs } from "../system/ai/tools/readConsoleLogs";
+import { formatVisitorContextForAgent } from "../system/ai/visitorContext";
+import { supportAgentSystemWithVisitorContext } from "../system/ai/constants";
 
 export const create = action({
   args: {
@@ -70,6 +74,20 @@ export const create = action({
         prompt: args.prompt,
       });
 
+      const contactSession = await ctx.runQuery(
+        internal.system.contactSessions.getOne,
+        { contactSessionId: conversation.contactSessionId },
+      );
+
+      const visitorContext =
+        contactSession !== null
+          ? formatVisitorContextForAgent(contactSession)
+          : "";
+      const system =
+        visitorContext.trim().length > 0
+          ? supportAgentSystemWithVisitorContext(visitorContext)
+          : undefined;
+
       await ctx.runMutation(internal.system.conversations.updateIsAiTyping, {
         conversationId: conversation._id,
         isAiTyping: true,
@@ -80,11 +98,14 @@ export const create = action({
         { threadId: args.threadId },
         {
           promptMessageId: messageId,
+          ...(system !== undefined ? { system } : {}),
           tools: {
             escalateConversationTool: escalateConversation,
             resolveConversationTool: resolveConversation,
             searchTool: search,
             readAttachmentTool: readAttachment,
+            readConsoleLogsTool: readConsoleLogs,
+            createIssueTool: createIssue,
             ...(subscription?.status === "active"
               ? { requestPageControlTool: requestPageControl }
               : {}),

@@ -9,6 +9,130 @@ const WIDGET_Z_PANEL = 2147483646;
 const WIDGET_Z_BUTTON = 2147483647;
 
 (function() {
+  const HOST_CONSOLE_MAX = 120;
+  const hostConsoleLogs: string[] = [];
+  let scheduleHostContextFlush: () => void = () => {};
+
+  function pushHostLogLine(line: string) {
+    hostConsoleLogs.push(line);
+    if (hostConsoleLogs.length > HOST_CONSOLE_MAX) {
+      hostConsoleLogs.splice(0, hostConsoleLogs.length - HOST_CONSOLE_MAX);
+    }
+    scheduleHostContextFlush();
+  }
+
+  /**
+   * Single-line text DevTools would show for one console call (args joined with a space).
+   * Avoids `[log]` prefixes and raw JSON.stringify-only formatting so the AI sees lines
+   * closer to what appears in the browser console.
+   */
+  function formatConsoleArg(value: unknown): string {
+    if (value === null) return 'null';
+    if (value === undefined) return 'undefined';
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
+      return String(value);
+    }
+    if (typeof value === 'symbol') return String(value);
+    if (value instanceof Error) {
+      return typeof value.stack === 'string' ? value.stack : value.toString();
+    }
+    if (typeof value === 'function') {
+      const s = Function.prototype.toString.call(value as (...args: unknown[]) => unknown);
+      return s.length > 500 ? `${s.slice(0, 497)}…` : s;
+    }
+    if (typeof value === 'object') {
+      if (value instanceof Date) return value.toISOString();
+      try {
+        return JSON.stringify(value);
+      } catch {
+        return Object.prototype.toString.call(value);
+      }
+    }
+    return String(value);
+  }
+
+  function formatConsoleCallLine(args: unknown[]): string {
+    return args.map(formatConsoleArg).join(' ');
+  }
+
+  /** First `at …` frame from a stack string (Chromium-style). */
+  function firstAtFrameFromStack(stack: string): string {
+    for (const raw of stack.split('\n')) {
+      const line = raw.trim();
+      const m = line.match(/^at\s+(.+)/);
+      if (m?.[1]) return m[1];
+    }
+    return '';
+  }
+
+  /**
+   * DevTools shows uncaught errors, but they often never go through `console.error`,
+   * so the console patch alone misses them. This shape matches what we want in
+   * createIssue `consoleLogs` when the embed forwards host console lines.
+   */
+  function formatUncaughtErrorLine(ev: ErrorEvent): string {
+    const message =
+      (ev.error && typeof ev.error.message === 'string' && ev.error.message) ||
+      ev.message ||
+      'Unknown error';
+    let atPart = '';
+    if (ev.error && typeof ev.error.stack === 'string') {
+      const site = firstAtFrameFromStack(ev.error.stack);
+      if (site) {
+        const display = site.replace(/^window\./, 'Window.');
+        atPart = ` at ${display}`;
+      }
+    }
+    if (!atPart && ev.filename) {
+      atPart = ` at ${ev.filename}:${ev.lineno}:${ev.colno}`;
+    }
+    return `uncaught error: ${message}${atPart}`;
+  }
+
+  function formatUnhandledRejectionLine(reason: unknown): string {
+    if (reason instanceof Error) {
+      const at =
+        typeof reason.stack === 'string'
+          ? firstAtFrameFromStack(reason.stack)
+          : '';
+      const atPart = at ? ` at ${at.replace(/^window\./, 'Window.')}` : '';
+      return `unhandled rejection: ${reason.message}${atPart}`;
+    }
+    return `unhandled rejection: ${String(reason)}`;
+  }
+
+  function onWindowError(ev: ErrorEvent) {
+    try {
+      pushHostLogLine(formatUncaughtErrorLine(ev));
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function onUnhandledRejection(ev: PromiseRejectionEvent) {
+    try {
+      pushHostLogLine(formatUnhandledRejectionLine(ev.reason));
+    } catch {
+      /* ignore */
+    }
+  }
+
+  window.addEventListener('error', onWindowError);
+  window.addEventListener('unhandledrejection', onUnhandledRejection);
+
+  (['log', 'warn', 'error', 'info', 'debug'] as const).forEach((method) => {
+    const original = console[method].bind(console);
+    console[method] = (...args: unknown[]) => {
+      try {
+        pushHostLogLine(formatConsoleCallLine(args));
+      } catch {
+        /* ignore */
+      }
+      return original(...args);
+    };
+  });
+
   let iframe: HTMLIFrameElement | null = null;
   let container: HTMLDivElement | null = null;
   let button: HTMLButtonElement | null = null;
@@ -123,6 +247,37 @@ const WIDGET_Z_BUTTON = 2147483647;
 
     container.appendChild(iframe);
     document.body.appendChild(container);
+
+    let flushHostContextTimer: ReturnType<typeof setTimeout> | null = null;
+    function flushHostContextToWidget() {
+      if (!iframe?.contentWindow) return;
+      try {
+        iframe.contentWindow.postMessage(
+          {
+            type: 'echo-host-context',
+            payload: {
+              hostPageUrl: window.location.href,
+              hostConsoleLogs: hostConsoleLogs.slice(),
+            },
+          },
+          new URL(EMBED_CONFIG.WIDGET_URL).origin,
+        );
+      } catch {
+        /* ignore */
+      }
+    }
+    function scheduleHostContextFlushInner() {
+      if (flushHostContextTimer) return;
+      flushHostContextTimer = setTimeout(() => {
+        flushHostContextTimer = null;
+        flushHostContextToWidget();
+      }, 1500);
+    }
+    scheduleHostContextFlush = scheduleHostContextFlushInner;
+
+    iframe.addEventListener('load', () => {
+      flushHostContextToWidget();
+    });
 
     // Handle messages from widget
     window.addEventListener('message', handleMessage);
@@ -295,6 +450,8 @@ Final message examples:
   }
 
   function destroy() {
+    window.removeEventListener('error', onWindowError);
+    window.removeEventListener('unhandledrejection', onUnhandledRejection);
     window.removeEventListener('message', handleMessage);
     if (container) {
       container.remove();

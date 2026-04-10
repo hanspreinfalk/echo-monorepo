@@ -107,6 +107,18 @@
         <button onclick="increment()" style="width: 44px; height: 44px; padding: 0; font-size: 22px; border-radius: 50%;">+</button>
       </div>
     </div>
+
+    <div style="margin-top: 40px;">
+      <h2>Error demo</h2>
+      <p style="margin-top: 8px; color: #555; font-size: 14px;">
+        Throws a deliberate error (check the browser console and any error capture).
+      </p>
+      <div class="controls" style="margin-top: 12px;">
+        <button type="button" onclick="throwWeakNetWorkError()" style="background: #dc2626;">
+          Throw “Network connection is weak”
+        </button>
+      </div>
+    </div>
   </div>
   
   <!-- Load the widget with default config -->
@@ -161,6 +173,12 @@
       count--;
       document.getElementById('counter-value').textContent = count;
     }
+
+    /** Name and message chosen so host-console capture matches QA copy for createIssue consoleLogs. */
+    window.throwWeakNetWorkError = function() {
+      console.log('Error test console');
+      throw new Error('netowrk connection is weak');
+    };
     
   </script>
 </body>

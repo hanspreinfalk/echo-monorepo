@@ -17,3 +17,13 @@ export const loadingMessageAtom = atom<string | null>(null)
 export const conversationIdAtom = atom<Id<"conversations"> | null>(null)
 
 export const widgetSettingsAtom = atom<Doc<"widgetSettings"> | null>(null);
+
+export type PendingHostContext = {
+  hostPageUrl?: string;
+  hostConsoleLogs?: string[];
+};
+
+/** Host-page telemetry received before a contact session exists */
+export const pendingHostContextAtomFamily = atomFamily((_organizationId: string) =>
+  atom<PendingHostContext | null>(null),
+);

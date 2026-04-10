@@ -31,6 +31,11 @@ import {
     TrashIcon,
 } from "lucide-react";
 import { Fragment, useCallback, useMemo, useState } from "react";
+import { usePaginatedQuery, useMutation } from "convex/react";
+import { api } from "@workspace/backend/_generated/api";
+import type { Doc, Id } from "@workspace/backend/_generated/dataModel";
+import { useInfiniteScroll } from "@workspace/ui/hooks/use-infinite-scroll";
+import { InfiniteScrollTrigger } from "@workspace/ui/components/infinite-scroll-trigger";
 import { DeleteIssueDialog } from "../components/delete-issue-dialog";
 
 type IssueCategory =
@@ -54,27 +59,26 @@ type AffectedSession = {
     region?: string;
 };
 
-type IssueScreenshot = {
-    label: string;
+type IssueAttachment = {
     url: string;
+    filename?: string;
+    mimeType?: string;
 };
 
 type ProductIssue = {
-    id: string;
+    id: Id<"issues">;
     title: string;
     description: string;
+    stepsToReproduce?: string;
     category: IssueCategory;
     criticality: IssueCriticality;
-    occurrences: number;
+    /** Length of stored affectedSessions id list */
+    affectedSessionsCount: number;
     /** ISO 8601 — first report in this aggregate */
     date: string;
     resolved: boolean;
-    /** Short line describing what end users see */
-    userImpact?: string;
-    errorMessage?: string;
-    stackTrace?: string;
     consoleLogs?: string[];
-    screenshots?: IssueScreenshot[];
+    attachments?: IssueAttachment[];
     affectedSessions?: AffectedSession[];
     pageUrl?: string;
 };
@@ -109,181 +113,93 @@ function formatIssueDateTime(iso: string) {
     return format(new Date(iso), "MMM d, yyyy · HH:mm");
 }
 
-const INITIAL_ISSUES: ProductIssue[] = [
-    {
-        id: "1",
-        title: "Login form shows a generic error on network failure",
-        description:
-            "When the auth API times out, users only see a vague message with no retry or offline guidance.",
-        category: "UX",
-        criticality: "Medium",
-        occurrences: 47,
-        date: "2026-04-02T09:41:00.000Z",
-        resolved: false,
-        userImpact:
-            "Users see “Something went wrong” with no way to retry; several abandoned sign‑ins per day.",
-        errorMessage: "AuthError: Network request failed after 30000ms",
-        stackTrace: `AuthError: Network request failed after 30000ms
-    at signIn (webpack-internal:///(app-pages-browser)/./lib/auth.ts:112:14)
-    at async handleSubmit (webpack-internal:///(app-pages-browser)/./components/login-form.tsx:44:9)`,
-        consoleLogs: [
-            "[info] LoginForm mounted",
-            "[warn] auth: preflight to /api/session slow (2.1s)",
-            "[error] POST /api/auth/login net::ERR_TIMED_OUT",
-            "[error] AuthError: Network request failed after 30000ms",
-        ],
-        screenshots: [
-            {
-                label: "Generic error toast after timeout",
-                url: "https://placehold.co/720x400/0f172a/94a3b8/png?text=Login+%E2%80%94+Something+went+wrong",
-            },
-            {
-                label: "Network tab — stalled request",
-                url: "https://placehold.co/720x400/1e293b/64748b/png?text=DevTools+%E2%80%94+login+pending",
-            },
-        ],
-        affectedSessions: [
-            {
-                id: "sess_…a3f9",
-                email: "lena.mueller@example.com",
-                lastSeen: "2026-04-02T10:55:00.000Z",
-                browser: "Chrome 134",
-                os: "macOS 15",
-                region: "DE",
-            },
-            {
-                id: "sess_…91c2",
-                email: "jordan.park@example.com",
-                lastSeen: "2026-04-02T09:12:00.000Z",
-                browser: "Safari 18",
-                os: "iOS 18",
-                region: "US",
-            },
-            {
-                id: "sess_…7e01",
-                email: "sam.oconnor@example.com",
-                lastSeen: "2026-04-01T22:40:00.000Z",
-                browser: "Firefox 136",
-                os: "Windows 11",
-                region: "CA",
-            },
-        ],
-        pageUrl: "https://app.example.com/login",
-    },
-    {
-        id: "2",
-        title: "Large file uploads block the UI thread",
-        description:
-            "Uploading multi‑MB documents freezes the tab until processing finishes; progress is unclear.",
-        category: "Performance",
-        criticality: "High",
-        occurrences: 128,
-        date: "2026-04-03T18:05:00.000Z",
-        resolved: false,
-        userImpact:
-            "The page becomes unresponsive for 5–20s; users think the upload failed and submit again.",
-        errorMessage: "Long task detected: 18420ms (main thread)",
-        stackTrace: `Long task detected: 18420ms
-    at processFileChunk (webpack-internal:///(app-pages-browser)/./lib/upload.ts:88:21)
-    at async onFileSelect (webpack-internal:///(app-pages-browser)/./components/file-upload.tsx:31:5)`,
-        consoleLogs: [
-            "[info] FileUpload: selected file.pdf (8.2 MB)",
-            "[warn] Long task: 18420ms — possible main-thread block",
-            "[info] FileUpload: processing complete",
-        ],
-        screenshots: [
-            {
-                label: "Frozen UI during upload",
-                url: "https://placehold.co/720x400/0f172a/94a3b8/png?text=Upload+spinner+frozen",
-            },
-        ],
-        affectedSessions: [
-            {
-                id: "sess_…b221",
-                email: "priya.shah@example.com",
-                lastSeen: "2026-04-03T18:58:00.000Z",
-                browser: "Edge 134",
-                os: "Windows 11",
-                region: "UK",
-            },
-            {
-                id: "sess_…4d88",
-                email: "chris.rivera@example.com",
-                lastSeen: "2026-04-03T17:10:00.000Z",
-                browser: "Chrome 134",
-                os: "ChromeOS",
-            },
-        ],
-        pageUrl: "https://app.example.com/inbox/upload",
-    },
-    {
-        id: "3",
-        title: "Focus is lost after closing the delete confirmation",
-        description:
-            "Keyboard users cannot return to the row action menu without tabbing from the top of the page.",
-        category: "Accessibility",
-        criticality: "Low",
-        occurrences: 9,
-        date: "2026-03-19T16:30:00.000Z",
-        resolved: false,
-        userImpact:
-            "After Escape or Confirm, focus drops to `<body>`; screen reader users lose context.",
-        consoleLogs: [
-            "[debug] Dialog closed, restoreFocus target missing",
-            "[info] focus moved to document.body",
-        ],
-        affectedSessions: [
-            {
-                id: "sess_…c100",
-                email: "noah.devries@example.com",
-                lastSeen: "2026-03-19T15:02:00.000Z",
-                browser: "Safari 18",
-                os: "macOS 15",
-                region: "NL",
-            },
-        ],
-        pageUrl: "https://app.example.com/issues",
-    },
-    {
-        id: "4",
-        title: "Exported CSV includes unsanitized user input",
-        description:
-            "Cells that start with '=' may be interpreted as formulas when opened in spreadsheet apps.",
-        category: "Security",
-        criticality: "Critical",
-        occurrences: 3,
-        date: "2026-03-29T14:12:00.000Z",
-        resolved: false,
-        userImpact:
-            "Opening exports in Excel can trigger formula injection warnings; one enterprise user flagged IT.",
-        errorMessage: "SecurityWarning: CSV cell begins with formula prefix '='",
-        stackTrace: `SecurityWarning: CSV cell begins with formula prefix '='
-    at exportRowsToCsv (webpack-internal:///(app-pages-browser)/./lib/csv.ts:56:11)
-    at handleExport (webpack-internal:///(app-pages-browser)/./views/data-table.tsx:203:7)`,
-        consoleLogs: [
-            "[info] Export started: 1,240 rows",
-            "[warn] csv: cell at row 882 escaped as formula risk",
-            "[info] Export complete",
-        ],
-        screenshots: [
-            {
-                label: "Excel security warning on open",
-                url: "https://placehold.co/720x400/450a0a/fca5a5/png?text=Excel+security+notice",
-            },
-        ],
-        affectedSessions: [
-            {
-                id: "sess_…e900",
-                email: "alex.kim@example.com",
-                lastSeen: "2026-03-29T14:12:00.000Z",
-                browser: "Chrome 134",
-                os: "Windows 11",
-                region: "US",
-            },
-        ],
-        pageUrl: "https://app.example.com/reports/export",
-    },
-];
+/** Compact date/time for dense tables (e.g. reporter sessions). */
+function formatShortCapturedAt(iso: string) {
+    return new Date(iso).toLocaleString(undefined, {
+        dateStyle: "short",
+        timeStyle: "short",
+    });
+}
+
+function formatBrowserLine(userAgent: string | undefined): string {
+    if (!userAgent?.trim()) {
+        return "—";
+    }
+    const u = userAgent.trim();
+    const edge = u.match(/Edg(?:e)?\/([\d.]+)/);
+    if (edge) {
+        return `Edge ${edge[1]}`;
+    }
+    const chrome = u.match(/Chrome\/([\d.]+)/);
+    if (chrome) {
+        return `Chrome ${chrome[1]}`;
+    }
+    const firefox = u.match(/Firefox\/([\d.]+)/);
+    if (firefox) {
+        return `Firefox ${firefox[1]}`;
+    }
+    const safari = u.match(/Version\/([\d.]+).*Safari/);
+    if (safari && /Safari\//.test(u) && !/Chrome/.test(u)) {
+        return `Safari ${safari[1]}`;
+    }
+    return u.length > 72 ? `${u.slice(0, 69)}…` : u;
+}
+
+function attachmentDisplayKind(
+    mimeType: string | undefined,
+    filename: string | undefined,
+): "image" | "video" | "other" {
+    const m = (mimeType ?? "").toLowerCase();
+    if (m.startsWith("image/")) {
+        return "image";
+    }
+    if (m.startsWith("video/")) {
+        return "video";
+    }
+    const name = filename ?? "";
+    if (/\.(png|jpe?g|webp|gif|bmp|svg)$/i.test(name)) {
+        return "image";
+    }
+    if (/\.(mp4|webm|mov|m4v|ogg)$/i.test(name)) {
+        return "video";
+    }
+    return "other";
+}
+
+type IssueListRow = Doc<"issues"> & {
+    resolvedContactSessions?: Doc<"contactSessions">[];
+};
+
+function docToProductIssue(row: IssueListRow): ProductIssue {
+    const reportedMs = row.firstReported ?? row._creationTime;
+    const capturedIso = new Date(reportedMs).toISOString();
+    return {
+        id: row._id,
+        title: row.title ?? "(Untitled)",
+        description: row.description ?? "",
+        stepsToReproduce: row.stepsToReproduce,
+        category: (row.category ?? "Bug") as IssueCategory,
+        criticality: (row.criticality ?? "Medium") as IssueCriticality,
+        affectedSessionsCount: row.affectedSessions?.length ?? 0,
+        date: capturedIso,
+        resolved: row.resolved ?? false,
+        consoleLogs: row.consoleLogs,
+        pageUrl: row.pageUrl,
+        attachments: row.attachments?.map((a) => ({
+            url: a.url,
+            filename: a.filename,
+            mimeType: a.mimeType,
+        })),
+        affectedSessions: row.resolvedContactSessions?.map((s) => ({
+            id: s._id,
+            email: s.email,
+            lastSeen: capturedIso,
+            browser: formatBrowserLine(s.metadata?.userAgent),
+            os: s.metadata?.platform?.trim() ? s.metadata.platform : "—",
+            region: s.metadata?.timezone,
+        })),
+    };
+}
 
 function buildFixPrompt(issue: ProductIssue): string {
     const lines = [
@@ -292,8 +208,8 @@ function buildFixPrompt(issue: ProductIssue): string {
         `Status: ${issue.resolved ? "Resolved" : "Open"}`,
         `Category: ${issue.category}`,
         `Criticality: ${issue.criticality}`,
-        `Occurrences (reported): ${issue.occurrences}`,
-        `Date: ${formatIssueDate(issue.date)}`,
+        `Affected sessions (count): ${issue.affectedSessionsCount}`,
+        `First reported: ${formatIssueDateTime(issue.date)}`,
     ];
     if (issue.pageUrl) {
         lines.push(`Page: ${issue.pageUrl}`);
@@ -305,17 +221,21 @@ function buildFixPrompt(issue: ProductIssue): string {
         "Details:",
         issue.description,
     );
-    if (issue.userImpact) {
-        lines.push("", "User impact:", issue.userImpact);
-    }
-    if (issue.errorMessage) {
-        lines.push("", "Error:", issue.errorMessage);
-    }
-    if (issue.stackTrace) {
-        lines.push("", "Stack trace:", issue.stackTrace);
+    if (issue.stepsToReproduce?.trim()) {
+        lines.push("", "Steps to reproduce:", issue.stepsToReproduce);
     }
     if (issue.consoleLogs?.length) {
         lines.push("", "Console:", ...issue.consoleLogs.map((l) => `  ${l}`));
+    }
+    if (issue.attachments?.length) {
+        lines.push(
+            "",
+            "Attachments:",
+            ...issue.attachments.map(
+                (a, i) =>
+                    `  ${i + 1}. ${a.filename ?? "file"} — ${a.url}${a.mimeType ? ` (${a.mimeType})` : ""}`,
+            ),
+        );
     }
     if (issue.affectedSessions?.length) {
         lines.push(
@@ -335,16 +255,43 @@ function buildFixPrompt(issue: ProductIssue): string {
 }
 
 export const IssuesView = () => {
-    const [issues, setIssues] = useState<ProductIssue[]>(INITIAL_ISSUES);
+    const issuesPage = usePaginatedQuery(
+        api.private.issues.list,
+        {},
+        { initialNumItems: 15 },
+    );
+
+    const {
+        topElementRef,
+        handleLoadMore,
+        canLoadMore,
+        isLoadingFirstPage,
+        isLoadingMore,
+    } = useInfiniteScroll({
+        status: issuesPage.status,
+        loadMore: issuesPage.loadMore,
+        loadSize: 15,
+    });
+
+    const issues = useMemo(
+        () => issuesPage.results.map(docToProductIssue),
+        [issuesPage.results],
+    );
+
+    const setResolvedMutation = useMutation(api.private.issues.setResolved);
+
     const [criticalitySort, setCriticalitySort] = useState<"asc" | "desc">(
         "desc",
     );
-    const [copiedId, setCopiedId] = useState<string | null>(null);
+    const [copiedId, setCopiedId] = useState<Id<"issues"> | null>(null);
+    const [copiedSessionKey, setCopiedSessionKey] = useState<string | null>(
+        null,
+    );
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [selectedIssue, setSelectedIssue] = useState<ProductIssue | null>(
         null,
     );
-    const [expandedIssueId, setExpandedIssueId] = useState<string | null>(
+    const [expandedIssueId, setExpandedIssueId] = useState<Id<"issues"> | null>(
         null,
     );
     const [statusFilter, setStatusFilter] = useState<"open" | "resolved">(
@@ -382,24 +329,44 @@ export const IssuesView = () => {
         }
     }, []);
 
+    const copyContactSessionId = useCallback(
+        async (sessionId: string, rowKey: string) => {
+            try {
+                await navigator.clipboard.writeText(sessionId);
+                setCopiedSessionKey(rowKey);
+                window.setTimeout(() => setCopiedSessionKey(null), 2000);
+            } catch {
+                /* clipboard unavailable */
+            }
+        },
+        [],
+    );
+
     const handleDeleteClick = (issue: ProductIssue) => {
         setSelectedIssue(issue);
         setDeleteDialogOpen(true);
     };
 
-    const setIssueResolved = useCallback((id: string, resolved: boolean) => {
-        setIssues((prev) =>
-            prev.map((i) => (i.id === id ? { ...i, resolved } : i)),
-        );
-        setExpandedIssueId((cur) => (cur === id ? null : cur));
-    }, []);
+    const setIssueResolved = useCallback(
+        async (id: Id<"issues">, resolved: boolean) => {
+            try {
+                await setResolvedMutation({
+                    issueId: id,
+                    resolved,
+                });
+                setExpandedIssueId((cur) => (cur === id ? null : cur));
+            } catch (error) {
+                console.error(error);
+            }
+        },
+        [setResolvedMutation],
+    );
 
     const handleIssueDeleted = useCallback(() => {
         if (!selectedIssue) {
             return;
         }
         const id = selectedIssue.id;
-        setIssues((prev) => prev.filter((i) => i.id !== id));
         setExpandedIssueId((cur) => (cur === id ? null : cur));
         setSelectedIssue(null);
     }, [selectedIssue]);
@@ -411,24 +378,27 @@ export const IssuesView = () => {
             <DeleteIssueDialog
                 issue={
                     selectedIssue
-                        ? { id: selectedIssue.id, title: selectedIssue.title }
+                        ? {
+                              id: selectedIssue.id,
+                              title: selectedIssue.title,
+                          }
                         : null
                 }
                 onDeleted={handleIssueDeleted}
                 onOpenChange={setDeleteDialogOpen}
                 open={deleteDialogOpen}
             />
-            <div className="flex min-h-screen flex-col bg-muted p-8">
-                <div className="mx-auto w-full max-w-5xl">
+            <div className="flex min-h-screen min-w-0 flex-col bg-muted p-8">
+                <div className="mx-auto w-full min-w-0 max-w-3xl">
                     <div className="space-y-2">
                         <h1 className="text-2xl md:text-4xl">Product Issues</h1>
                         <p className="text-muted-foreground">
-                            Expand a row for logs, screenshots, stack traces, and
+                            Expand a row for console logs, attachments, and
                             affected sessions. Copy prompts for your assistant.
                         </p>
                     </div>
 
-                    <div className="mt-8 rounded-lg border bg-background">
+                    <div className="mt-8 min-w-0 overflow-hidden rounded-lg border bg-background">
                         <div className="flex flex-wrap items-center gap-2 border-b px-6 py-4">
                             <Button
                                 onClick={() => switchStatusFilter("open")}
@@ -451,13 +421,13 @@ export const IssuesView = () => {
                                 Resolved
                             </Button>
                         </div>
-                        <Table>
+                        <Table className="table-fixed">
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead className="px-6 py-4 font-medium min-w-0">
+                                    <TableHead className="w-[45%] min-w-0 px-6 py-4 font-medium">
                                         Issue
                                     </TableHead>
-                                    <TableHead className="px-6 py-4 font-medium whitespace-nowrap">
+                                    <TableHead className="w-[22%] px-6 py-4 font-medium whitespace-nowrap">
                                         <button
                                             aria-label={`Sort by criticality, ${
                                                 criticalitySort === "desc"
@@ -485,7 +455,25 @@ export const IssuesView = () => {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {visibleIssues.length === 0 ? (
+                                {isLoadingFirstPage ? (
+                                    <TableRow>
+                                        <TableCell
+                                            className="h-24 text-center text-muted-foreground"
+                                            colSpan={colCount}
+                                        >
+                                            Loading issues...
+                                        </TableCell>
+                                    </TableRow>
+                                ) : issues.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell
+                                            className="h-24 text-center text-muted-foreground"
+                                            colSpan={colCount}
+                                        >
+                                            No issues recorded yet
+                                        </TableCell>
+                                    </TableRow>
+                                ) : visibleIssues.length === 0 ? (
                                     <TableRow>
                                         <TableCell
                                             className="h-24 text-center text-muted-foreground"
@@ -512,7 +500,7 @@ export const IssuesView = () => {
                                                             : `hover:bg-muted/50 ${rowTone}`
                                                     }
                                                 >
-                                                    <TableCell className="px-6 py-4 align-middle">
+                                                    <TableCell className="min-w-0 max-w-full px-6 py-4 align-middle whitespace-normal">
                                                         <button
                                                             aria-expanded={
                                                                 isExpanded
@@ -543,7 +531,7 @@ export const IssuesView = () => {
                                                                 )}
                                                             </span>
                                                             <span
-                                                                className={`min-w-0 flex-1 font-medium leading-snug ${
+                                                                className={`min-w-0 flex-1 break-words font-medium leading-snug ${
                                                                     issue.resolved
                                                                         ? "line-through decoration-muted-foreground/70"
                                                                         : ""
@@ -655,30 +643,40 @@ export const IssuesView = () => {
                                                         className={`bg-muted/20 hover:bg-muted/25 border-t border-border/60 ${rowTone}`}
                                                     >
                                                         <TableCell
-                                                            className="px-6 py-4 align-top"
+                                                            className="min-w-0 max-w-full px-6 py-4 align-top whitespace-normal"
                                                             colSpan={colCount}
                                                         >
-                                                            <div className="space-y-6 pl-7">
-                                                                {issue.userImpact ? (
-                                                                    <div>
-                                                                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                                                                            What users see
-                                                                        </p>
-                                                                        <p className="mt-1.5 text-sm text-foreground leading-relaxed">
-                                                                            {
-                                                                                issue.userImpact
-                                                                            }
-                                                                        </p>
-                                                                    </div>
-                                                                ) : null}
-                                                                <div>
+                                                            <div className="min-w-0 max-w-full space-y-6 pl-7 pr-1">
+                                                                <div className="min-w-0">
                                                                     <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                                                                         Description
                                                                     </p>
-                                                                    <p className="mt-1.5 text-sm text-foreground leading-relaxed">
-                                                                        {
-                                                                            issue.description
-                                                                        }
+                                                                    <p
+                                                                        className={`mt-1.5 break-words text-sm leading-relaxed [overflow-wrap:anywhere] ${
+                                                                            issue.description.trim()
+                                                                                ? "text-foreground"
+                                                                                : "text-muted-foreground italic"
+                                                                        }`}
+                                                                    >
+                                                                        {issue.description.trim()
+                                                                            ? issue.description
+                                                                            : "Not provided"}
+                                                                    </p>
+                                                                </div>
+                                                                <div className="min-w-0">
+                                                                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                                                        Steps to reproduce
+                                                                    </p>
+                                                                    <p
+                                                                        className={`mt-1.5 break-words text-sm leading-relaxed [overflow-wrap:anywhere] ${
+                                                                            issue.stepsToReproduce?.trim()
+                                                                                ? "text-foreground"
+                                                                                : "text-muted-foreground italic"
+                                                                        }`}
+                                                                    >
+                                                                        {issue.stepsToReproduce?.trim()
+                                                                            ? issue.stepsToReproduce
+                                                                            : "Not provided"}
                                                                     </p>
                                                                 </div>
                                                                 <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 text-sm">
@@ -696,66 +694,47 @@ export const IssuesView = () => {
                                                                     </div>
                                                                     <div>
                                                                         <dt className="text-muted-foreground">
-                                                                            Occurrences
+                                                                            Affected
+                                                                            sessions
                                                                         </dt>
                                                                         <dd className="mt-1.5 tabular-nums font-medium">
-                                                                            {issue.occurrences.toLocaleString()}
+                                                                            {issue.affectedSessionsCount.toLocaleString()}
                                                                         </dd>
                                                                     </div>
                                                                     <div>
                                                                         <dt className="text-muted-foreground">
                                                                             First reported
                                                                         </dt>
-                                                                        <dd className="mt-1.5 tabular-nums text-foreground">
-                                                                            {formatIssueDate(
+                                                                        <dd className="mt-1.5 whitespace-normal text-foreground">
+                                                                            {formatIssueDateTime(
                                                                                 issue.date,
                                                                             )}
                                                                         </dd>
                                                                     </div>
-                                                                    {issue.pageUrl ? (
-                                                                        <div className="sm:col-span-2 lg:col-span-3">
-                                                                            <dt className="text-muted-foreground">
-                                                                                Page URL
-                                                                            </dt>
-                                                                            <dd className="mt-1.5 break-all font-mono text-xs text-foreground">
-                                                                                {
-                                                                                    issue.pageUrl
-                                                                                }
-                                                                            </dd>
-                                                                        </div>
-                                                                    ) : null}
-                                                                </dl>
-                                                                {issue.errorMessage ||
-                                                                issue.stackTrace ? (
-                                                                    <div className="space-y-3">
-                                                                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                                                                            Error & stack
-                                                                        </p>
-                                                                        {issue.errorMessage ? (
-                                                                            <p className="rounded-md border bg-background px-3 py-2 font-mono text-xs text-destructive leading-relaxed">
-                                                                                {
-                                                                                    issue.errorMessage
-                                                                                }
-                                                                            </p>
-                                                                        ) : null}
-                                                                        {issue.stackTrace ? (
-                                                                            <ScrollArea className="max-h-40 rounded-md border bg-background">
-                                                                                <pre className="p-3 font-mono text-xs text-foreground leading-relaxed whitespace-pre-wrap break-all">
-                                                                                    {
-                                                                                        issue.stackTrace
-                                                                                    }
-                                                                                </pre>
-                                                                            </ScrollArea>
-                                                                        ) : null}
+                                                                    <div className="sm:col-span-2 lg:col-span-3">
+                                                                        <dt className="text-muted-foreground">
+                                                                            Page URL
+                                                                        </dt>
+                                                                        <dd
+                                                                            className={`mt-1.5 break-all font-mono text-xs ${
+                                                                                issue.pageUrl?.trim()
+                                                                                    ? "text-foreground"
+                                                                                    : "text-muted-foreground italic"
+                                                                            }`}
+                                                                        >
+                                                                            {issue.pageUrl?.trim()
+                                                                                ? issue.pageUrl
+                                                                                : "Not provided"}
+                                                                        </dd>
                                                                     </div>
-                                                                ) : null}
-                                                                {issue.consoleLogs &&
-                                                                issue.consoleLogs.length >
-                                                                    0 ? (
-                                                                    <div>
-                                                                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                                                                            Console logs
-                                                                        </p>
+                                                                </dl>
+                                                                <div>
+                                                                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                                                        Console logs
+                                                                    </p>
+                                                                    {issue.consoleLogs &&
+                                                                    issue.consoleLogs.length >
+                                                                        0 ? (
                                                                         <ScrollArea className="mt-1.5 max-h-48 rounded-md border bg-background">
                                                                             <ul className="space-y-1 p-3 font-mono text-xs leading-relaxed">
                                                                                 {issue.consoleLogs.map(
@@ -775,139 +754,254 @@ export const IssuesView = () => {
                                                                                 )}
                                                                             </ul>
                                                                         </ScrollArea>
-                                                                    </div>
-                                                                ) : null}
-                                                                {issue.screenshots &&
-                                                                issue.screenshots
+                                                                    ) : (
+                                                                        <p className="mt-1.5 text-sm text-muted-foreground italic">
+                                                                            Not provided
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                                {issue.attachments &&
+                                                                issue.attachments
                                                                     .length > 0 ? (
                                                                     <div>
                                                                         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                                                                            Screenshots
+                                                                            Attachments
                                                                         </p>
                                                                         <div className="mt-3 grid gap-4 sm:grid-cols-2">
-                                                                            {issue.screenshots.map(
+                                                                            {issue.attachments.map(
                                                                                 (
-                                                                                    shot,
+                                                                                    att,
                                                                                     i,
-                                                                                ) => (
-                                                                                    <figure
-                                                                                        key={`${issue.id}-shot-${i}`}
-                                                                                        className="overflow-hidden rounded-lg border bg-background"
-                                                                                    >
-                                                                                        {/* eslint-disable-next-line @next/next/no-img-element -- external demo URLs */}
-                                                                                        <img
-                                                                                            alt={
-                                                                                                shot.label
-                                                                                            }
-                                                                                            className="h-auto w-full object-cover"
-                                                                                            height={
-                                                                                                400
-                                                                                            }
-                                                                                            loading="lazy"
-                                                                                            src={
-                                                                                                shot.url
-                                                                                            }
-                                                                                            width={
-                                                                                                720
-                                                                                            }
-                                                                                        />
-                                                                                        <figcaption className="border-t px-3 py-2 text-xs text-muted-foreground">
-                                                                                            {
-                                                                                                shot.label
-                                                                                            }
-                                                                                        </figcaption>
-                                                                                    </figure>
-                                                                                ),
+                                                                                ) => {
+                                                                                    const kind =
+                                                                                        attachmentDisplayKind(
+                                                                                            att.mimeType,
+                                                                                            att.filename,
+                                                                                        );
+                                                                                    const caption =
+                                                                                        att.filename ??
+                                                                                        `Attachment ${i + 1}`;
+                                                                                    return (
+                                                                                        <figure
+                                                                                            key={`${issue.id}-att-${i}`}
+                                                                                            className="overflow-hidden rounded-lg border bg-background"
+                                                                                        >
+                                                                                            {kind ===
+                                                                                            "image" ? (
+                                                                                                <a
+                                                                                                    className="block cursor-pointer outline-none ring-offset-background transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                                                                                    href={
+                                                                                                        att.url
+                                                                                                    }
+                                                                                                    rel="noopener noreferrer"
+                                                                                                    target="_blank"
+                                                                                                >
+                                                                                                    {/* eslint-disable-next-line @next/next/no-img-element -- Convex / user URLs */}
+                                                                                                    <img
+                                                                                                        alt={
+                                                                                                            caption
+                                                                                                        }
+                                                                                                        className="h-auto max-h-80 w-full object-contain bg-muted/30"
+                                                                                                        loading="lazy"
+                                                                                                        src={
+                                                                                                            att.url
+                                                                                                        }
+                                                                                                    />
+                                                                                                </a>
+                                                                                            ) : null}
+                                                                                            {kind ===
+                                                                                            "video" ? (
+                                                                                                <div>
+                                                                                                    <div className="flex justify-end border-b bg-muted/20 px-2 py-1.5">
+                                                                                                        <Button
+                                                                                                            asChild
+                                                                                                            size="sm"
+                                                                                                            variant="ghost"
+                                                                                                            className="h-8 text-xs"
+                                                                                                        >
+                                                                                                            <a
+                                                                                                                href={
+                                                                                                                    att.url
+                                                                                                                }
+                                                                                                                rel="noopener noreferrer"
+                                                                                                                target="_blank"
+                                                                                                            >
+                                                                                                                Open
+                                                                                                                in new
+                                                                                                                tab
+                                                                                                            </a>
+                                                                                                        </Button>
+                                                                                                    </div>
+                                                                                                    <video
+                                                                                                        className="max-h-80 w-full bg-black"
+                                                                                                        controls
+                                                                                                        preload="metadata"
+                                                                                                        src={
+                                                                                                            att.url
+                                                                                                        }
+                                                                                                    />
+                                                                                                </div>
+                                                                                            ) : null}
+                                                                                            {kind ===
+                                                                                            "other" ? (
+                                                                                                <div className="flex flex-col gap-2 p-4">
+                                                                                                    <p className="text-sm text-foreground">
+                                                                                                        {
+                                                                                                            caption
+                                                                                                        }
+                                                                                                    </p>
+                                                                                                    <Button
+                                                                                                        asChild
+                                                                                                        size="sm"
+                                                                                                        variant="outline"
+                                                                                                    >
+                                                                                                        <a
+                                                                                                            href={
+                                                                                                                att.url
+                                                                                                            }
+                                                                                                            rel="noopener noreferrer"
+                                                                                                            target="_blank"
+                                                                                                        >
+                                                                                                            Open
+                                                                                                            file
+                                                                                                        </a>
+                                                                                                    </Button>
+                                                                                                </div>
+                                                                                            ) : null}
+                                                                                            <figcaption className="border-t px-3 py-2 text-xs text-muted-foreground break-all">
+                                                                                                {caption}
+                                                                                                {att.mimeType
+                                                                                                    ? ` · ${att.mimeType}`
+                                                                                                    : ""}
+                                                                                            </figcaption>
+                                                                                        </figure>
+                                                                                    );
+                                                                                },
                                                                             )}
                                                                         </div>
                                                                     </div>
                                                                 ) : null}
-                                                                {issue.affectedSessions &&
-                                                                issue
-                                                                    .affectedSessions
-                                                                    .length > 0 ? (
-                                                                    <div>
-                                                                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                                                                            Affected sessions
-                                                                            (sample)
-                                                                        </p>
-                                                                        <p className="mt-1 text-xs text-muted-foreground">
-                                                                            Session id and
-                                                                            account email
-                                                                            as captured when
-                                                                            the error was
-                                                                            reported.
-                                                                        </p>
-                                                                        <div className="mt-3 overflow-hidden rounded-lg border">
-                                                                            <Table>
-                                                                                <TableHeader>
-                                                                                    <TableRow className="hover:bg-transparent">
-                                                                                        <TableHead className="h-10 px-3 text-xs font-medium">
-                                                                                            Session
-                                                                                        </TableHead>
-                                                                                        <TableHead className="h-10 px-3 text-xs font-medium">
-                                                                                            Email
-                                                                                        </TableHead>
-                                                                                        <TableHead className="h-10 px-3 text-xs font-medium">
-                                                                                            Last
-                                                                                            seen
-                                                                                        </TableHead>
-                                                                                        <TableHead className="h-10 px-3 text-xs font-medium">
-                                                                                            Browser
-                                                                                        </TableHead>
-                                                                                        <TableHead className="h-10 px-3 text-xs font-medium">
-                                                                                            OS
-                                                                                        </TableHead>
-                                                                                        <TableHead className="h-10 px-3 text-xs font-medium">
-                                                                                            Region
-                                                                                        </TableHead>
-                                                                                    </TableRow>
-                                                                                </TableHeader>
-                                                                                <TableBody>
-                                                                                    {issue.affectedSessions.map(
+                                                                <div>
+                                                                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                                                        Reporter sessions
+                                                                    </p>
+                                                                    <div className="mt-3 overflow-hidden rounded-lg border">
+                                                                        <Table>
+                                                                            <TableHeader>
+                                                                                <TableRow className="hover:bg-transparent">
+                                                                                    <TableHead className="h-10 max-w-[140px] px-3 text-xs font-medium">
+                                                                                        Session
+                                                                                    </TableHead>
+                                                                                    <TableHead className="h-10 px-3 text-xs font-medium">
+                                                                                        Email
+                                                                                    </TableHead>
+                                                                                    <TableHead className="h-10 px-3 text-xs font-medium whitespace-nowrap">
+                                                                                        Captured
+                                                                                    </TableHead>
+                                                                                    <TableHead className="h-10 px-3 text-xs font-medium">
+                                                                                        Browser
+                                                                                    </TableHead>
+                                                                                    <TableHead className="h-10 px-3 text-xs font-medium">
+                                                                                        OS
+                                                                                    </TableHead>
+                                                                                    <TableHead className="h-10 px-3 text-xs font-medium">
+                                                                                        Region
+                                                                                    </TableHead>
+                                                                                </TableRow>
+                                                                            </TableHeader>
+                                                                            <TableBody>
+                                                                                {issue
+                                                                                    .affectedSessions &&
+                                                                                issue
+                                                                                    .affectedSessions
+                                                                                    .length >
+                                                                                    0 ? (
+                                                                                    issue.affectedSessions.map(
                                                                                         (
                                                                                             s,
                                                                                         ) => (
                                                                                             <TableRow
                                                                                                 key={`${issue.id}-${s.id}`}
                                                                                             >
-                                                                                                <TableCell className="px-3 py-2 font-mono text-xs">
-                                                                                                    {
-                                                                                                        s.id
-                                                                                                    }
+                                                                                                <TableCell className="px-3 py-2 whitespace-normal">
+                                                                                                    <Button
+                                                                                                        className="h-8 gap-1.5 px-2"
+                                                                                                        onClick={() =>
+                                                                                                            void copyContactSessionId(
+                                                                                                                s.id,
+                                                                                                                `${issue.id}:${s.id}`,
+                                                                                                            )
+                                                                                                        }
+                                                                                                        size="sm"
+                                                                                                        type="button"
+                                                                                                        variant="outline"
+                                                                                                    >
+                                                                                                        {copiedSessionKey ===
+                                                                                                        `${issue.id}:${s.id}` ? (
+                                                                                                            <>
+                                                                                                                <CheckIcon className="size-3.5 shrink-0" />
+                                                                                                                Copied
+                                                                                                            </>
+                                                                                                        ) : (
+                                                                                                            <>
+                                                                                                                <CopyIcon className="size-3.5 shrink-0" />
+                                                                                                                Copy ID
+                                                                                                            </>
+                                                                                                        )}
+                                                                                                    </Button>
                                                                                                 </TableCell>
                                                                                                 <TableCell className="max-w-[200px] px-3 py-2 break-all text-xs">
                                                                                                     {
                                                                                                         s.email
                                                                                                     }
                                                                                                 </TableCell>
-                                                                                                <TableCell className="px-3 py-2 tabular-nums text-xs whitespace-nowrap">
-                                                                                                    {formatIssueDateTime(
+                                                                                                <TableCell className="px-3 py-2 tabular-nums text-xs whitespace-normal">
+                                                                                                    {formatShortCapturedAt(
                                                                                                         s.lastSeen,
                                                                                                     )}
                                                                                                 </TableCell>
-                                                                                                <TableCell className="px-3 py-2 text-xs">
+                                                                                                <TableCell className="max-w-[min(12rem,100%)] px-3 py-2 text-xs break-words whitespace-normal">
                                                                                                     {
                                                                                                         s.browser
                                                                                                     }
                                                                                                 </TableCell>
-                                                                                                <TableCell className="px-3 py-2 text-xs">
+                                                                                                <TableCell className="px-3 py-2 text-xs whitespace-normal">
                                                                                                     {
                                                                                                         s.os
                                                                                                     }
                                                                                                 </TableCell>
-                                                                                                <TableCell className="px-3 py-2 text-xs text-muted-foreground">
+                                                                                                <TableCell className="px-3 py-2 text-xs text-muted-foreground whitespace-normal">
                                                                                                     {s.region ??
                                                                                                         "—"}
                                                                                                 </TableCell>
                                                                                             </TableRow>
                                                                                         ),
-                                                                                    )}
-                                                                                </TableBody>
-                                                                            </Table>
-                                                                        </div>
+                                                                                    )
+                                                                                ) : (
+                                                                                    <TableRow>
+                                                                                        <TableCell
+                                                                                            className="px-3 py-6 text-center text-sm text-muted-foreground italic"
+                                                                                            colSpan={
+                                                                                                6
+                                                                                            }
+                                                                                        >
+                                                                                            No
+                                                                                            session
+                                                                                            snapshot
+                                                                                            on
+                                                                                            file
+                                                                                            (older
+                                                                                            issues
+                                                                                            or
+                                                                                            manual
+                                                                                            data)
+                                                                                        </TableCell>
+                                                                                    </TableRow>
+                                                                                )}
+                                                                            </TableBody>
+                                                                        </Table>
                                                                     </div>
-                                                                ) : null}
+                                                                </div>
                                                             </div>
                                                         </TableCell>
                                                     </TableRow>
@@ -918,6 +1012,16 @@ export const IssuesView = () => {
                                 )}
                             </TableBody>
                         </Table>
+                        {!isLoadingFirstPage && issues.length > 0 ? (
+                            <div className="border-t">
+                                <InfiniteScrollTrigger
+                                    canLoadMore={canLoadMore}
+                                    isLoadingMore={isLoadingMore}
+                                    onLoadMore={handleLoadMore}
+                                    ref={topElementRef}
+                                />
+                            </div>
+                        ) : null}
                     </div>
                 </div>
             </div>

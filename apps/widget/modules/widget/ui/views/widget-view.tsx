@@ -3,6 +3,7 @@
 import { WidgetAuthScreen } from "../screens/widget-auth-screen";
 import { useAtomValue } from "jotai";
 import { screenAtom } from "@/modules/widget/atoms/widget-atoms";
+import { useHostContextBridge } from "@/modules/widget/hooks/use-host-context-bridge";
 import { WidgetErrorScreen } from "../screens/widget-error-screen";
 import { WidgetLoadingScreen } from "../screens/widget-loading-screen";
 import { WidgetSelectionScreen } from "../screens/widget-selection-screen";
@@ -15,6 +16,7 @@ interface Props {
 
 export function WidgetView({ organizationId }: Props) {
   const screen = useAtomValue(screenAtom)
+  useHostContextBridge();
 
   const screenComponents = {
     loading: <WidgetLoadingScreen organizationId={organizationId}/>,

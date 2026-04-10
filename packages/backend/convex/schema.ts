@@ -2,6 +2,49 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
 export default defineSchema({
+    issues: defineTable({
+        organizationId: v.string(),
+        conversationId: v.optional(v.id("conversations")),
+        resolved: v.optional(v.boolean()),
+        criticality: v.optional(
+            v.union(
+                v.literal("Critical"),
+                v.literal("High"),
+                v.literal("Medium"),
+                v.literal("Low"),
+            ),
+        ),
+        title: v.optional(v.string()),
+        description: v.optional(v.string()),
+        stepsToReproduce: v.optional(v.string()),
+        category: v.optional(
+            v.union(
+                v.literal("Bug"),
+                v.literal("UX"),
+                v.literal("Performance"),
+                v.literal("Accessibility"),
+                v.literal("Security"),
+                v.literal("Data"),
+            ),
+        ),
+        firstReported: v.optional(v.number()),
+        pageUrl: v.optional(v.string()),
+        consoleLogs: v.optional(v.array(v.string())),
+        attachments: v.optional(
+            v.array(
+                v.object({
+                    url: v.string(),
+                    filename: v.optional(v.string()),
+                    mimeType: v.optional(v.string()),
+                    storageId: v.optional(v.id("_storage")),
+                }),
+            ),
+        ),
+        /** Contact sessions linked when the issue was filed */
+        affectedSessions: v.optional(v.array(v.id("contactSessions"))),
+    })
+        .index("by_organization_id", ["organizationId"])
+    ,
     subscriptions: defineTable({
         organizationId: v.string(),
         status: v.string(),
@@ -52,7 +95,11 @@ export default defineSchema({
             timezoneOffset: v.optional(v.number()),
             cookieEnabled: v.optional(v.boolean()),
             referrer: v.optional(v.string()),
-            currentUrl: v.optional(v.string())
+            currentUrl: v.optional(v.string()),
+            /** Parent page when the widget runs inside an embed iframe */
+            hostPageUrl: v.optional(v.string()),
+            /** Recent console lines from the parent page (embed script) */
+            hostConsoleLogs: v.optional(v.array(v.string())),
         })),
     })
     .index("by_organization_id", ["organizationId"])
