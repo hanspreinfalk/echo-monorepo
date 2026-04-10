@@ -1,0 +1,1351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HMS – Hospital Management System</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            sidebar: '#1a1f2e',
+            'sidebar-hover': '#252b3b',
+            'sidebar-active': '#2d3549',
+            accent: '#3b82f6',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+    .nav-item { transition: background 0.15s; }
+    .nav-item:hover { background: #252b3b; }
+    .nav-item.active { background: #2d3549; border-right: 3px solid #3b82f6; }
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 50; align-items: center; justify-content: center; }
+    .modal-overlay.open { display: flex; }
+    .badge-active { background: #d1fae5; color: #065f46; }
+    .badge-inactive { background: #fee2e2; color: #991b1b; }
+    .badge-pending { background: #fef3c7; color: #92400e; }
+    .badge-scheduled { background: #dbeafe; color: #1e40af; }
+    .badge-completed { background: #d1fae5; color: #065f46; }
+    .badge-cancelled { background: #fee2e2; color: #991b1b; }
+    tr:hover td { background: #f9fafb; }
+    .stat-card { transition: transform 0.2s, box-shadow 0.2s; }
+    .stat-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.12); }
+    .sidebar-collapsed .nav-label { display: none; }
+    .sidebar-collapsed .nav-item { justify-content: center; }
+    .sidebar-collapsed { width: 64px !important; }
+    .sidebar-collapsed .brand-text { display: none; }
+    .sidebar-collapsed .user-info { display: none; }
+    .chart-bar { transition: height 0.5s ease; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+<!-- Layout -->
+<div class="flex h-screen overflow-hidden">
+
+  <!-- Sidebar -->
+  <aside id="sidebar" class="bg-sidebar text-white flex flex-col transition-all duration-300" style="width:240px; min-width:240px;">
+    <!-- Brand -->
+    <div class="flex items-center gap-3 px-5 py-5 border-b border-white/10">
+      <div class="w-8 h-8 bg-accent rounded-lg flex items-center justify-center flex-shrink-0">
+        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+        </svg>
+      </div>
+      <span class="brand-text font-bold text-lg tracking-tight">HMS</span>
+    </div>
+
+    <!-- Nav -->
+    <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+      <a onclick="navigate('dashboard')" class="nav-item active flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer" data-page="dashboard">
+        <svg class="w-5 h-5 flex-shrink-0 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+        <span class="nav-label text-sm">Dashboard</span>
+      </a>
+      <a onclick="navigate('patients')" class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer" data-page="patients">
+        <svg class="w-5 h-5 flex-shrink-0 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        <span class="nav-label text-sm">Patients</span>
+      </a>
+      <a onclick="navigate('appointments')" class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer" data-page="appointments">
+        <svg class="w-5 h-5 flex-shrink-0 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+        <span class="nav-label text-sm">Appointments</span>
+      </a>
+      <a onclick="navigate('records')" class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer" data-page="records">
+        <svg class="w-5 h-5 flex-shrink-0 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        <span class="nav-label text-sm">Medical Records</span>
+      </a>
+      <a onclick="navigate('billing')" class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer" data-page="billing">
+        <svg class="w-5 h-5 flex-shrink-0 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <span class="nav-label text-sm">Billing</span>
+      </a>
+      <a onclick="navigate('inventory')" class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer" data-page="inventory">
+        <svg class="w-5 h-5 flex-shrink-0 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+        <span class="nav-label text-sm">Inventory</span>
+      </a>
+      <a onclick="navigate('staff')" class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer" data-page="staff">
+        <svg class="w-5 h-5 flex-shrink-0 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+        <span class="nav-label text-sm">Staff</span>
+      </a>
+      <a onclick="navigate('departments')" class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer" data-page="departments">
+        <svg class="w-5 h-5 flex-shrink-0 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+        <span class="nav-label text-sm">Departments</span>
+      </a>
+    </nav>
+
+    <!-- User profile -->
+    <div class="px-3 py-4 border-t border-white/10">
+      <div class="flex items-center gap-3 px-2">
+        <div class="w-8 h-8 rounded-full bg-accent flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">HP</div>
+        <div class="user-info min-w-0">
+          <p class="text-sm font-medium text-white truncate">Hans Preinfalk</p>
+          <p class="text-xs text-gray-400 truncate">Administrator</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Collapse button -->
+    <button onclick="toggleSidebar()" class="flex items-center justify-center py-3 border-t border-white/10 text-gray-400 hover:text-white hover:bg-sidebar-hover transition-colors">
+      <svg id="collapse-icon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"/></svg>
+    </button>
+  </aside>
+
+  <!-- Main content -->
+  <main class="flex-1 flex flex-col overflow-hidden">
+    <!-- Topbar -->
+    <header class="bg-white border-b border-gray-200 px-8 py-4 flex items-center justify-between flex-shrink-0">
+      <p id="topbar-welcome" class="text-sm text-gray-500">Welcome back, <span class="font-semibold text-gray-800">Hans Preinfalk Dávila</span></p>
+      <div class="flex items-center gap-4">
+        <span id="topbar-page" class="text-sm font-semibold text-gray-700">Dashboard</span>
+        <div class="w-8 h-8 rounded-full bg-accent flex items-center justify-center text-white text-sm font-semibold">HP</div>
+      </div>
+    </header>
+
+    <!-- Page content -->
+    <div class="flex-1 overflow-y-auto">
+
+      <!-- ===== DASHBOARD PAGE ===== -->
+      <div id="page-dashboard" class="p-8">
+        <div class="mb-6">
+          <h1 class="text-2xl font-bold text-gray-900">Dashboard</h1>
+          <p class="text-sm text-gray-500 mt-1">Hospital overview and key metrics</p>
+        </div>
+
+        <!-- Stat cards -->
+        <div class="grid grid-cols-4 gap-5 mb-8">
+          <div class="stat-card bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+            <div class="flex items-center justify-between mb-3">
+              <p class="text-sm text-gray-500 font-medium">Total Patients</p>
+              <div class="w-9 h-9 bg-blue-50 rounded-lg flex items-center justify-center">
+                <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+              </div>
+            </div>
+            <p class="text-3xl font-bold text-gray-900" id="stat-patients">1,284</p>
+            <p class="text-xs text-green-600 mt-1">↑ 12% from last month</p>
+          </div>
+          <div class="stat-card bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+            <div class="flex items-center justify-between mb-3">
+              <p class="text-sm text-gray-500 font-medium">Today's Appointments</p>
+              <div class="w-9 h-9 bg-purple-50 rounded-lg flex items-center justify-center">
+                <svg class="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+              </div>
+            </div>
+            <p class="text-3xl font-bold text-gray-900">48</p>
+            <p class="text-xs text-green-600 mt-1">↑ 8 more than yesterday</p>
+          </div>
+          <div class="stat-card bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+            <div class="flex items-center justify-between mb-3">
+              <p class="text-sm text-gray-500 font-medium">Active Staff</p>
+              <div class="w-9 h-9 bg-green-50 rounded-lg flex items-center justify-center">
+                <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+              </div>
+            </div>
+            <p class="text-3xl font-bold text-gray-900">93</p>
+            <p class="text-xs text-gray-500 mt-1">Across 8 departments</p>
+          </div>
+          <div class="stat-card bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+            <div class="flex items-center justify-between mb-3">
+              <p class="text-sm text-gray-500 font-medium">Monthly Revenue</p>
+              <div class="w-9 h-9 bg-amber-50 rounded-lg flex items-center justify-center">
+                <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              </div>
+            </div>
+            <p class="text-3xl font-bold text-gray-900">$248k</p>
+            <p class="text-xs text-green-600 mt-1">↑ 18% from last month</p>
+          </div>
+        </div>
+
+        <!-- Charts row -->
+        <div class="grid grid-cols-3 gap-5 mb-8">
+          <!-- Bar chart -->
+          <div class="col-span-2 bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+            <div class="flex items-center justify-between mb-5">
+              <div>
+                <h3 class="font-semibold text-gray-900">Patient Admissions</h3>
+                <p class="text-xs text-gray-400 mt-0.5">Last 7 months</p>
+              </div>
+              <span class="text-xs bg-blue-50 text-blue-600 px-3 py-1 rounded-full font-medium">2026</span>
+            </div>
+            <div class="flex items-end gap-3 h-36">
+              <div class="flex flex-col items-center gap-1 flex-1">
+                <div class="chart-bar bg-blue-200 w-full rounded-t" style="height:55%"></div>
+                <span class="text-xs text-gray-400">Oct</span>
+              </div>
+              <div class="flex flex-col items-center gap-1 flex-1">
+                <div class="chart-bar bg-blue-300 w-full rounded-t" style="height:70%"></div>
+                <span class="text-xs text-gray-400">Nov</span>
+              </div>
+              <div class="flex flex-col items-center gap-1 flex-1">
+                <div class="chart-bar bg-blue-400 w-full rounded-t" style="height:60%"></div>
+                <span class="text-xs text-gray-400">Dec</span>
+              </div>
+              <div class="flex flex-col items-center gap-1 flex-1">
+                <div class="chart-bar bg-blue-500 w-full rounded-t" style="height:80%"></div>
+                <span class="text-xs text-gray-400">Jan</span>
+              </div>
+              <div class="flex flex-col items-center gap-1 flex-1">
+                <div class="chart-bar bg-blue-400 w-full rounded-t" style="height:75%"></div>
+                <span class="text-xs text-gray-400">Feb</span>
+              </div>
+              <div class="flex flex-col items-center gap-1 flex-1">
+                <div class="chart-bar bg-blue-500 w-full rounded-t" style="height:90%"></div>
+                <span class="text-xs text-gray-400">Mar</span>
+              </div>
+              <div class="flex flex-col items-center gap-1 flex-1">
+                <div class="chart-bar bg-accent w-full rounded-t" style="height:100%"></div>
+                <span class="text-xs text-gray-400">Apr</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Department distribution -->
+          <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+            <h3 class="font-semibold text-gray-900 mb-1">Dept. Occupancy</h3>
+            <p class="text-xs text-gray-400 mb-5">Current occupancy rate</p>
+            <div class="space-y-4">
+              <div>
+                <div class="flex justify-between text-xs mb-1"><span class="text-gray-600">Cardiology</span><span class="font-medium">87%</span></div>
+                <div class="h-2 bg-gray-100 rounded-full"><div class="h-2 bg-red-400 rounded-full" style="width:87%"></div></div>
+              </div>
+              <div>
+                <div class="flex justify-between text-xs mb-1"><span class="text-gray-600">Emergency</span><span class="font-medium">94%</span></div>
+                <div class="h-2 bg-gray-100 rounded-full"><div class="h-2 bg-orange-400 rounded-full" style="width:94%"></div></div>
+              </div>
+              <div>
+                <div class="flex justify-between text-xs mb-1"><span class="text-gray-600">Pediatrics</span><span class="font-medium">62%</span></div>
+                <div class="h-2 bg-gray-100 rounded-full"><div class="h-2 bg-blue-400 rounded-full" style="width:62%"></div></div>
+              </div>
+              <div>
+                <div class="flex justify-between text-xs mb-1"><span class="text-gray-600">Neurology</span><span class="font-medium">71%</span></div>
+                <div class="h-2 bg-gray-100 rounded-full"><div class="h-2 bg-purple-400 rounded-full" style="width:71%"></div></div>
+              </div>
+              <div>
+                <div class="flex justify-between text-xs mb-1"><span class="text-gray-600">Orthopedics</span><span class="font-medium">55%</span></div>
+                <div class="h-2 bg-gray-100 rounded-full"><div class="h-2 bg-green-400 rounded-full" style="width:55%"></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recent activity -->
+        <div class="grid grid-cols-2 gap-5">
+          <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+            <h3 class="font-semibold text-gray-900 mb-4">Recent Admissions</h3>
+            <div class="space-y-3">
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 text-xs font-semibold">MG</div>
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-medium text-gray-800">Maria Garcia</p>
+                  <p class="text-xs text-gray-400">Cardiology · Apr 6, 2026</p>
+                </div>
+                <span class="text-xs badge-active px-2 py-0.5 rounded-full font-medium">Active</span>
+              </div>
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center text-green-600 text-xs font-semibold">JW</div>
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-medium text-gray-800">James Wilson</p>
+                  <p class="text-xs text-gray-400">Emergency · Apr 5, 2026</p>
+                </div>
+                <span class="text-xs badge-active px-2 py-0.5 rounded-full font-medium">Active</span>
+              </div>
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 text-xs font-semibold">EC</div>
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-medium text-gray-800">Emily Chen</p>
+                  <p class="text-xs text-gray-400">Pediatrics · Apr 4, 2026</p>
+                </div>
+                <span class="text-xs badge-pending px-2 py-0.5 rounded-full font-medium">Pending</span>
+              </div>
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center text-amber-600 text-xs font-semibold">RJ</div>
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-medium text-gray-800">Robert Johnson</p>
+                  <p class="text-xs text-gray-400">Orthopedics · Apr 3, 2026</p>
+                </div>
+                <span class="text-xs badge-completed px-2 py-0.5 rounded-full font-medium">Discharged</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+            <h3 class="font-semibold text-gray-900 mb-4">Today's Schedule</h3>
+            <div class="space-y-3">
+              <div class="flex items-start gap-3 p-3 bg-blue-50 rounded-lg">
+                <div class="text-center min-w-[40px]">
+                  <p class="text-xs font-semibold text-blue-600">09:00</p>
+                  <p class="text-xs text-blue-400">AM</p>
+                </div>
+                <div>
+                  <p class="text-sm font-medium text-gray-800">Dr. Sarah Lee – Checkup</p>
+                  <p class="text-xs text-gray-500">Maria Garcia · Cardiology</p>
+                </div>
+              </div>
+              <div class="flex items-start gap-3 p-3 bg-purple-50 rounded-lg">
+                <div class="text-center min-w-[40px]">
+                  <p class="text-xs font-semibold text-purple-600">11:30</p>
+                  <p class="text-xs text-purple-400">AM</p>
+                </div>
+                <div>
+                  <p class="text-sm font-medium text-gray-800">Dr. Mike Torres – Surgery</p>
+                  <p class="text-xs text-gray-500">James Wilson · Emergency</p>
+                </div>
+              </div>
+              <div class="flex items-start gap-3 p-3 bg-green-50 rounded-lg">
+                <div class="text-center min-w-[40px]">
+                  <p class="text-xs font-semibold text-green-600">02:00</p>
+                  <p class="text-xs text-green-400">PM</p>
+                </div>
+                <div>
+                  <p class="text-sm font-medium text-gray-800">Dr. Amy Park – Consultation</p>
+                  <p class="text-xs text-gray-500">Emily Chen · Pediatrics</p>
+                </div>
+              </div>
+              <div class="flex items-start gap-3 p-3 bg-amber-50 rounded-lg">
+                <div class="text-center min-w-[40px]">
+                  <p class="text-xs font-semibold text-amber-600">04:30</p>
+                  <p class="text-xs text-amber-400">PM</p>
+                </div>
+                <div>
+                  <p class="text-sm font-medium text-gray-800">Dr. John Smith – Follow-up</p>
+                  <p class="text-xs text-gray-500">Luis Santiago · Neurology</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== PATIENTS PAGE ===== -->
+      <div id="page-patients" class="p-8 hidden">
+        <div class="mb-6">
+          <h1 class="text-2xl font-bold text-gray-900">Patients</h1>
+          <p class="text-sm text-gray-500 mt-1">Manage patient records and information</p>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+            <div class="relative">
+              <svg class="absolute left-3 top-2.5 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+              <input id="patient-search" oninput="filterPatients()" type="text" placeholder="Search patients..." class="pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg w-64 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400">
+            </div>
+            <button onclick="openModal('add-patient-modal')" class="flex items-center gap-2 bg-accent text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+              Add Patient
+            </button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="bg-gray-50 text-left">
+                  <th class="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Name</th>
+                  <th class="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">DOB</th>
+                  <th class="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Gender</th>
+                  <th class="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Contact</th>
+                  <th class="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                  <th class="px-6 py-3"></th>
+                </tr>
+              </thead>
+              <tbody id="patients-table-body" class="divide-y divide-gray-50"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== APPOINTMENTS PAGE ===== -->
+      <div id="page-appointments" class="p-8 hidden">
+        <div class="mb-6">
+          <h1 class="text-2xl font-bold text-gray-900">Appointments</h1>
+          <p class="text-sm text-gray-500 mt-1">Manage and schedule patient appointments</p>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+            <div class="relative">
+              <svg class="absolute left-3 top-2.5 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+              <input id="appt-search" oninput="filterAppointments()" type="text" placeholder="Search appointments..." class="pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg w-64 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400">
+            </div>
+            <button onclick="openModal('add-appointment-modal')" class="flex items-center gap-2 bg-accent text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+              New Appointment
+            </button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="bg-gray-50 text-left">
+                  <th class="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Patient</th>
+                  <th class="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Doctor</th>
+                  <th class="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Date & Time</th>
+                  <th class="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Department</th>
+                  <th class="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Type</th>
+                  <th class="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                  <th class="px-6 py-3"></th>
+                </tr>
+              </thead>
+              <tbody id="appointments-table-body" class="divide-y divide-gray-50"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== MEDICAL RECORDS PAGE ===== -->
+      <div id="page-records" class="p-8 hidden">
+        <div class="mb-6">
+          <h1 class="text-2xl font-bold text-gray-900">Medical Records</h1>
+          <p class="text-sm text-gray-500 mt-1">Patient medical history and documents</p>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+            <div class="relative">
+              <svg class="absolute left-3 top-2.5 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+              <input type="text" placeholder="Search records..." class="pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg w-64 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400">
+            </div>
+            <button onclick="openModal('add-record-modal')" class="flex items-center gap-2 bg-accent text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+              Add Record
+            </button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="bg-gray-50 text-left">
+                  <th class="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Patient</th>
+                  <th class="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Record Type</th>
+                  <th class="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Diagnosis</th>
+                  <th class="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Doctor</th>
+                  <th class="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Date</th>
+                  <th class="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                  <th class="px-6 py-3"></th>
+                </tr>
+              </thead>
+              <tbody id="records-table-body" class="divide-y divide-gray-50"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== BILLING PAGE ===== -->
+      <div id="page-billing" class="p-8 hidden">
+        <div class="mb-6">
+          <h1 class="text-2xl font-bold text-gray-900">Billing</h1>
+          <p class="text-sm text-gray-500 mt-1">Invoices, payments, and financial records</p>
+        </div>
+
+        <!-- Summary cards -->
+        <div class="grid grid-cols-3 gap-5 mb-6">
+          <div class="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+            <p class="text-sm text-gray-500 mb-1">Total Revenue (MTD)</p>
+            <p class="text-2xl font-bold text-gray-900">$248,320</p>
+            <p class="text-xs text-green-600 mt-1">↑ 18% from last month</p>
+          </div>
+          <div class="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+            <p class="text-sm text-gray-500 mb-1">Outstanding Invoices</p>
+            <p class="text-2xl font-bold text-gray-900">$42,150</p>
+            <p class="text-xs text-amber-600 mt-1">12 invoices pending</p>
+          </div>
+          <div class="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+            <p class="text-sm text-gray-500 mb-1">Collected Today</p>
+            <p class="text-2xl font-bold text-gray-900">$8,940</p>
+            <p class="text-xs text-green-600 mt-1">↑ from $6,200 yesterday</p>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+            <div class="relative">
+              <svg class="absolute left-3 top-2.5 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+              <input type="text" placeholder="Search invoices..." class="pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg w-64 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400">
+            </div>
+            <button onclick="openModal('add-bill-modal')" class="flex items-center gap-2 bg-accent text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+              New Invoice
+            </button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="bg-gray-50 text-left">
+                  <th class="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Invoice #</th>
+                  <th class="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Patient</th>
+                  <th class="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Service</th>
+                  <th class="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Date</th>
+                  <th class="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Amount</th>
+                  <th class="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                  <th class="px-6 py-3"></th>
+                </tr>
+              </thead>
+              <tbody id="billing-table-body" class="divide-y divide-gray-50"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== INVENTORY PAGE ===== -->
+      <div id="page-inventory" class="p-8 hidden">
+        <div class="mb-6">
+          <h1 class="text-2xl font-bold text-gray-900">Inventory</h1>
+          <p class="text-sm text-gray-500 mt-1">Medical supplies and equipment management</p>
+        </div>
+        <div class="grid grid-cols-3 gap-5 mb-6">
+          <div class="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+            <p class="text-sm text-gray-500 mb-1">Total Items</p>
+            <p class="text-2xl font-bold text-gray-900">2,847</p>
+          </div>
+          <div class="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+            <p class="text-sm text-gray-500 mb-1">Low Stock Alerts</p>
+            <p class="text-2xl font-bold text-red-500">14</p>
+          </div>
+          <div class="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+            <p class="text-sm text-gray-500 mb-1">Expiring Soon</p>
+            <p class="text-2xl font-bold text-amber-500">7</p>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+            <div class="relative">
+              <svg class="absolute left-3 top-2.5 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+              <input type="text" placeholder="Search inventory..." class="pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg w-64 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400">
+            </div>
+            <button onclick="openModal('add-item-modal')" class="flex items-center gap-2 bg-accent text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+              Add Item
+            </button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="bg-gray-50 text-left">
+                  <th class="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Item Name</th>
+                  <th class="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Category</th>
+                  <th class="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Quantity</th>
+                  <th class="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Unit</th>
+                  <th class="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Expires</th>
+                  <th class="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                  <th class="px-6 py-3"></th>
+                </tr>
+              </thead>
+              <tbody id="inventory-table-body" class="divide-y divide-gray-50"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== STAFF PAGE ===== -->
+      <div id="page-staff" class="p-8 hidden">
+        <div class="mb-6">
+          <h1 class="text-2xl font-bold text-gray-900">Staff</h1>
+          <p class="text-sm text-gray-500 mt-1">Hospital staff management and roles</p>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+            <div class="relative">
+              <svg class="absolute left-3 top-2.5 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+              <input type="text" placeholder="Search staff..." class="pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg w-64 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400">
+            </div>
+            <button onclick="openModal('add-staff-modal')" class="flex items-center gap-2 bg-accent text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+              Add Staff
+            </button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="bg-gray-50 text-left">
+                  <th class="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Name</th>
+                  <th class="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Role</th>
+                  <th class="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Department</th>
+                  <th class="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Contact</th>
+                  <th class="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Joined</th>
+                  <th class="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                  <th class="px-6 py-3"></th>
+                </tr>
+              </thead>
+              <tbody id="staff-table-body" class="divide-y divide-gray-50"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== DEPARTMENTS PAGE ===== -->
+      <div id="page-departments" class="p-8 hidden">
+        <div class="mb-6">
+          <h1 class="text-2xl font-bold text-gray-900">Departments</h1>
+          <p class="text-sm text-gray-500 mt-1">Hospital departments and their details</p>
+        </div>
+        <div class="grid grid-cols-2 gap-5" id="departments-grid"></div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<!-- ===== MODALS ===== -->
+
+<!-- Add Patient Modal -->
+<div id="add-patient-modal" class="modal-overlay" onclick="closeModalOnOverlay(event,'add-patient-modal')">
+  <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6" onclick="event.stopPropagation()">
+    <div class="flex items-center justify-between mb-5">
+      <h2 class="text-lg font-semibold text-gray-900">Add New Patient</h2>
+      <button onclick="closeModal('add-patient-modal')" class="text-gray-400 hover:text-gray-600">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <form onsubmit="addPatient(event)" class="space-y-4">
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">First Name</label>
+          <input id="p-fname" type="text" required class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" placeholder="Maria">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Last Name</label>
+          <input id="p-lname" type="text" required class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" placeholder="Garcia">
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Date of Birth</label>
+          <input id="p-dob" type="date" required class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Gender</label>
+          <select id="p-gender" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200">
+            <option>Male</option><option>Female</option><option>Other</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">Contact Number</label>
+        <input id="p-contact" type="text" required class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" placeholder="+1 555 0000">
+      </div>
+      <div class="flex gap-3 pt-2">
+        <button type="button" onclick="closeModal('add-patient-modal')" class="flex-1 border border-gray-200 text-gray-600 text-sm font-medium py-2 rounded-lg hover:bg-gray-50">Cancel</button>
+        <button type="submit" class="flex-1 bg-accent text-white text-sm font-medium py-2 rounded-lg hover:bg-blue-600">Add Patient</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Add Appointment Modal -->
+<div id="add-appointment-modal" class="modal-overlay" onclick="closeModalOnOverlay(event,'add-appointment-modal')">
+  <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6" onclick="event.stopPropagation()">
+    <div class="flex items-center justify-between mb-5">
+      <h2 class="text-lg font-semibold text-gray-900">New Appointment</h2>
+      <button onclick="closeModal('add-appointment-modal')" class="text-gray-400 hover:text-gray-600">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <form onsubmit="addAppointment(event)" class="space-y-4">
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">Patient</label>
+        <select id="a-patient" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" id="a-patient-select"></select>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">Doctor</label>
+        <select id="a-doctor" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200">
+          <option>Dr. Sarah Lee</option><option>Dr. Mike Torres</option><option>Dr. Amy Park</option><option>Dr. John Smith</option><option>Dr. Lisa Chen</option>
+        </select>
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Date</label>
+          <input id="a-date" type="date" required class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Time</label>
+          <input id="a-time" type="time" required class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200">
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Department</label>
+          <select id="a-dept" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200">
+            <option>Cardiology</option><option>Emergency</option><option>Pediatrics</option><option>Neurology</option><option>Orthopedics</option><option>Oncology</option><option>Radiology</option><option>General</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Type</label>
+          <select id="a-type" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200">
+            <option>Checkup</option><option>Consultation</option><option>Surgery</option><option>Follow-up</option><option>Emergency</option>
+          </select>
+        </div>
+      </div>
+      <div class="flex gap-3 pt-2">
+        <button type="button" onclick="closeModal('add-appointment-modal')" class="flex-1 border border-gray-200 text-gray-600 text-sm font-medium py-2 rounded-lg hover:bg-gray-50">Cancel</button>
+        <button type="submit" class="flex-1 bg-accent text-white text-sm font-medium py-2 rounded-lg hover:bg-blue-600">Schedule</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Add Record Modal -->
+<div id="add-record-modal" class="modal-overlay" onclick="closeModalOnOverlay(event,'add-record-modal')">
+  <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6" onclick="event.stopPropagation()">
+    <div class="flex items-center justify-between mb-5">
+      <h2 class="text-lg font-semibold text-gray-900">Add Medical Record</h2>
+      <button onclick="closeModal('add-record-modal')" class="text-gray-400 hover:text-gray-600">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <form onsubmit="addRecord(event)" class="space-y-4">
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">Patient</label>
+        <select id="r-patient" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"></select>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">Record Type</label>
+        <select id="r-type" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200">
+          <option>Diagnosis</option><option>Lab Result</option><option>Prescription</option><option>Surgery Note</option><option>Discharge Summary</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">Diagnosis / Notes</label>
+        <input id="r-diagnosis" type="text" required class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" placeholder="Hypertension Stage 1">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">Attending Doctor</label>
+        <select id="r-doctor" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200">
+          <option>Dr. Sarah Lee</option><option>Dr. Mike Torres</option><option>Dr. Amy Park</option><option>Dr. John Smith</option><option>Dr. Lisa Chen</option>
+        </select>
+      </div>
+      <div class="flex gap-3 pt-2">
+        <button type="button" onclick="closeModal('add-record-modal')" class="flex-1 border border-gray-200 text-gray-600 text-sm font-medium py-2 rounded-lg hover:bg-gray-50">Cancel</button>
+        <button type="submit" class="flex-1 bg-accent text-white text-sm font-medium py-2 rounded-lg hover:bg-blue-600">Save Record</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Add Bill Modal -->
+<div id="add-bill-modal" class="modal-overlay" onclick="closeModalOnOverlay(event,'add-bill-modal')">
+  <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6" onclick="event.stopPropagation()">
+    <div class="flex items-center justify-between mb-5">
+      <h2 class="text-lg font-semibold text-gray-900">New Invoice</h2>
+      <button onclick="closeModal('add-bill-modal')" class="text-gray-400 hover:text-gray-600">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <form onsubmit="addBill(event)" class="space-y-4">
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">Patient</label>
+        <select id="b-patient" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"></select>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">Service</label>
+        <input id="b-service" type="text" required class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" placeholder="Cardiac Consultation">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">Amount ($)</label>
+        <input id="b-amount" type="number" min="0" step="0.01" required class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" placeholder="1200.00">
+      </div>
+      <div class="flex gap-3 pt-2">
+        <button type="button" onclick="closeModal('add-bill-modal')" class="flex-1 border border-gray-200 text-gray-600 text-sm font-medium py-2 rounded-lg hover:bg-gray-50">Cancel</button>
+        <button type="submit" class="flex-1 bg-accent text-white text-sm font-medium py-2 rounded-lg hover:bg-blue-600">Create Invoice</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Add Inventory Item Modal -->
+<div id="add-item-modal" class="modal-overlay" onclick="closeModalOnOverlay(event,'add-item-modal')">
+  <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6" onclick="event.stopPropagation()">
+    <div class="flex items-center justify-between mb-5">
+      <h2 class="text-lg font-semibold text-gray-900">Add Inventory Item</h2>
+      <button onclick="closeModal('add-item-modal')" class="text-gray-400 hover:text-gray-600">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <form onsubmit="addItem(event)" class="space-y-4">
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">Item Name</label>
+        <input id="i-name" type="text" required class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" placeholder="Surgical Gloves (L)">
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Category</label>
+          <select id="i-cat" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200">
+            <option>Consumables</option><option>Medication</option><option>Equipment</option><option>PPE</option><option>Lab Supplies</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Quantity</label>
+          <input id="i-qty" type="number" min="0" required class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" placeholder="500">
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Unit</label>
+          <input id="i-unit" type="text" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" placeholder="Box">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Expiry Date</label>
+          <input id="i-exp" type="date" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200">
+        </div>
+      </div>
+      <div class="flex gap-3 pt-2">
+        <button type="button" onclick="closeModal('add-item-modal')" class="flex-1 border border-gray-200 text-gray-600 text-sm font-medium py-2 rounded-lg hover:bg-gray-50">Cancel</button>
+        <button type="submit" class="flex-1 bg-accent text-white text-sm font-medium py-2 rounded-lg hover:bg-blue-600">Add Item</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Add Staff Modal -->
+<div id="add-staff-modal" class="modal-overlay" onclick="closeModalOnOverlay(event,'add-staff-modal')">
+  <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6" onclick="event.stopPropagation()">
+    <div class="flex items-center justify-between mb-5">
+      <h2 class="text-lg font-semibold text-gray-900">Add Staff Member</h2>
+      <button onclick="closeModal('add-staff-modal')" class="text-gray-400 hover:text-gray-600">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <form onsubmit="addStaff(event)" class="space-y-4">
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">First Name</label>
+          <input id="s-fname" type="text" required class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Last Name</label>
+          <input id="s-lname" type="text" required class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200">
+        </div>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">Role</label>
+        <select id="s-role" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200">
+          <option>Doctor</option><option>Nurse</option><option>Surgeon</option><option>Radiologist</option><option>Lab Technician</option><option>Pharmacist</option><option>Administrator</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">Department</label>
+        <select id="s-dept" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200">
+          <option>Cardiology</option><option>Emergency</option><option>Pediatrics</option><option>Neurology</option><option>Orthopedics</option><option>Oncology</option><option>Radiology</option><option>General</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">Contact</label>
+        <input id="s-contact" type="text" required class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" placeholder="+1 555 0000">
+      </div>
+      <div class="flex gap-3 pt-2">
+        <button type="button" onclick="closeModal('add-staff-modal')" class="flex-1 border border-gray-200 text-gray-600 text-sm font-medium py-2 rounded-lg hover:bg-gray-50">Cancel</button>
+        <button type="submit" class="flex-1 bg-accent text-white text-sm font-medium py-2 rounded-lg hover:bg-blue-600">Add Staff</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Delete Confirm Modal -->
+<div id="delete-modal" class="modal-overlay" onclick="closeModalOnOverlay(event,'delete-modal')">
+  <div class="bg-white rounded-xl shadow-xl w-full max-w-sm p-6" onclick="event.stopPropagation()">
+    <div class="flex items-center gap-4 mb-4">
+      <div class="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+        <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+      </div>
+      <div>
+        <h2 class="text-base font-semibold text-gray-900">Confirm Delete</h2>
+        <p class="text-sm text-gray-500">This action cannot be undone.</p>
+      </div>
+    </div>
+    <div class="flex gap-3">
+      <button onclick="closeModal('delete-modal')" class="flex-1 border border-gray-200 text-gray-600 text-sm font-medium py-2 rounded-lg hover:bg-gray-50">Cancel</button>
+      <button id="confirm-delete-btn" class="flex-1 bg-red-500 text-white text-sm font-medium py-2 rounded-lg hover:bg-red-600">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast notification -->
+<div id="toast" class="fixed bottom-6 right-6 bg-gray-900 text-white text-sm px-5 py-3 rounded-xl shadow-lg opacity-0 pointer-events-none transition-opacity duration-300 z-50">
+  <span id="toast-msg"></span>
+</div>
+
+<script>
+// ===== DATA =====
+let patients = [
+  { id: 1, fname:'Maria', lname:'Garcia', dob:'1985-03-14', gender:'Female', contact:'+1 555 0101', status:'Active' },
+  { id: 2, fname:'James', lname:'Wilson', dob:'1972-07-22', gender:'Male', contact:'+1 555 0202', status:'Active' },
+  { id: 3, fname:'Emily', lname:'Chen', dob:'1995-11-08', gender:'Female', contact:'+1 555 0303', status:'Active' },
+  { id: 4, fname:'Robert', lname:'Johnson', dob:'1960-01-30', gender:'Male', contact:'+1 555 0404', status:'Active' },
+  { id: 5, fname:'Luis', lname:'Santiago Lopez', dob:'1990-05-15', gender:'Male', contact:'+1 555 1234567', status:'Active' },
+  { id: 6, fname:'Hans', lname:'Patient', dob:'1990-01-01', gender:'Male', contact:'+1 555 9999', status:'Active' },
+];
+let nextPatientId = 7;
+
+let appointments = [
+  { id:1, patient:'Maria Garcia', doctor:'Dr. Sarah Lee', date:'2026-04-06', time:'09:00', dept:'Cardiology', type:'Checkup', status:'Scheduled' },
+  { id:2, patient:'James Wilson', doctor:'Dr. Mike Torres', date:'2026-04-06', time:'11:30', dept:'Emergency', type:'Surgery', status:'In Progress' },
+  { id:3, patient:'Emily Chen', doctor:'Dr. Amy Park', date:'2026-04-06', time:'14:00', dept:'Pediatrics', type:'Consultation', status:'Scheduled' },
+  { id:4, patient:'Robert Johnson', doctor:'Dr. John Smith', date:'2026-04-05', time:'10:00', dept:'Orthopedics', type:'Follow-up', status:'Completed' },
+  { id:5, patient:'Luis Santiago Lopez', doctor:'Dr. Lisa Chen', date:'2026-04-07', time:'09:30', dept:'Neurology', type:'Consultation', status:'Scheduled' },
+  { id:6, patient:'Hans Patient', doctor:'Dr. Sarah Lee', date:'2026-04-08', time:'15:00', dept:'General', type:'Checkup', status:'Scheduled' },
+];
+let nextApptId = 7;
+
+let records = [
+  { id:1, patient:'Maria Garcia', type:'Diagnosis', diagnosis:'Hypertension Stage 1', doctor:'Dr. Sarah Lee', date:'2026-04-01', status:'Active' },
+  { id:2, patient:'James Wilson', type:'Surgery Note', diagnosis:'Appendectomy', doctor:'Dr. Mike Torres', date:'2026-03-28', status:'Closed' },
+  { id:3, patient:'Emily Chen', type:'Lab Result', diagnosis:'Anemia – mild', doctor:'Dr. Amy Park', date:'2026-04-03', status:'Active' },
+  { id:4, patient:'Robert Johnson', type:'Prescription', diagnosis:'Post-op pain management', doctor:'Dr. John Smith', date:'2026-03-30', status:'Active' },
+  { id:5, patient:'Luis Santiago Lopez', type:'Discharge Summary', diagnosis:'Migraine – recurring', doctor:'Dr. Lisa Chen', date:'2026-04-02', status:'Closed' },
+];
+let nextRecordId = 6;
+
+let bills = [
+  { id:'INV-0041', patient:'Maria Garcia', service:'Cardiac Consultation', date:'2026-04-01', amount:1200, status:'Paid' },
+  { id:'INV-0042', patient:'James Wilson', service:'Emergency Surgery', date:'2026-03-28', amount:8500, status:'Paid' },
+  { id:'INV-0043', patient:'Emily Chen', service:'Pediatric Checkup', date:'2026-04-03', amount:350, status:'Pending' },
+  { id:'INV-0044', patient:'Robert Johnson', service:'Orthopedic Follow-up', date:'2026-03-30', amount:620, status:'Pending' },
+  { id:'INV-0045', patient:'Luis Santiago Lopez', service:'Neurology Consultation', date:'2026-04-02', amount:900, status:'Paid' },
+  { id:'INV-0046', patient:'Hans Patient', service:'General Checkup', date:'2026-04-05', amount:200, status:'Pending' },
+];
+let nextBillId = 47;
+
+let inventory = [
+  { id:1, name:'Surgical Gloves (L)', category:'PPE', qty:1200, unit:'Box', expires:'2027-06-01', status:'In Stock' },
+  { id:2, name:'Paracetamol 500mg', category:'Medication', qty:450, unit:'Bottle', expires:'2026-08-15', status:'In Stock' },
+  { id:3, name:'Syringe 5ml', category:'Consumables', qty:85, unit:'Pack', expires:'2028-01-01', status:'Low Stock' },
+  { id:4, name:'Surgical Mask KN95', category:'PPE', qty:320, unit:'Box', expires:'2027-03-20', status:'In Stock' },
+  { id:5, name:'Ibuprofen 400mg', category:'Medication', qty:12, unit:'Bottle', expires:'2026-05-10', status:'Low Stock' },
+  { id:6, name:'Blood Glucose Monitor', category:'Equipment', qty:18, unit:'Unit', expires:'N/A', status:'In Stock' },
+  { id:7, name:'IV Cannula 20G', category:'Consumables', qty:600, unit:'Pack', expires:'2029-01-01', status:'In Stock' },
+];
+let nextItemId = 8;
+
+let staff = [
+  { id:1, fname:'Sarah', lname:'Lee', role:'Doctor', dept:'Cardiology', contact:'+1 555 1001', joined:'2019-03-15', status:'Active' },
+  { id:2, fname:'Mike', lname:'Torres', role:'Surgeon', dept:'Emergency', contact:'+1 555 1002', joined:'2017-08-22', status:'Active' },
+  { id:3, fname:'Amy', lname:'Park', role:'Doctor', dept:'Pediatrics', contact:'+1 555 1003', joined:'2021-01-10', status:'Active' },
+  { id:4, fname:'John', lname:'Smith', role:'Doctor', dept:'Orthopedics', contact:'+1 555 1004', joined:'2015-06-01', status:'Active' },
+  { id:5, fname:'Lisa', lname:'Chen', role:'Doctor', dept:'Neurology', contact:'+1 555 1005', joined:'2020-09-30', status:'Active' },
+  { id:6, fname:'Carlos', lname:'Rivera', role:'Nurse', dept:'Emergency', contact:'+1 555 1006', joined:'2022-04-14', status:'Active' },
+  { id:7, fname:'Diana', lname:'Moore', role:'Lab Technician', dept:'Radiology', contact:'+1 555 1007', joined:'2023-02-28', status:'Active' },
+  { id:8, fname:'Kevin', lname:'Walsh', role:'Pharmacist', dept:'General', contact:'+1 555 1008', joined:'2018-11-05', status:'On Leave' },
+];
+let nextStaffId = 9;
+
+const departments = [
+  { name:'Cardiology', head:'Dr. Sarah Lee', beds:40, occupied:35, color:'red' },
+  { name:'Emergency', head:'Dr. Mike Torres', beds:25, occupied:23, color:'orange' },
+  { name:'Pediatrics', head:'Dr. Amy Park', beds:30, occupied:19, color:'blue' },
+  { name:'Neurology', head:'Dr. Lisa Chen', beds:20, occupied:14, color:'purple' },
+  { name:'Orthopedics', head:'Dr. John Smith', beds:22, occupied:12, color:'green' },
+  { name:'Oncology', head:'Dr. Nina Patel', beds:18, occupied:15, color:'pink' },
+  { name:'Radiology', head:'Dr. Greg Stone', beds:0, occupied:0, color:'yellow' },
+  { name:'General', head:'Dr. Helen Park', beds:50, occupied:28, color:'indigo' },
+];
+
+// ===== NAVIGATION =====
+const pageNames = { dashboard:'Dashboard', patients:'Patients', appointments:'Appointments', records:'Medical Records', billing:'Billing', inventory:'Inventory', staff:'Staff', departments:'Departments' };
+
+function navigate(page) {
+  document.querySelectorAll('.nav-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.page === page);
+  });
+  document.querySelectorAll('[id^="page-"]').forEach(el => el.classList.add('hidden'));
+  document.getElementById('page-' + page).classList.remove('hidden');
+  document.getElementById('topbar-page').textContent = pageNames[page];
+  renderPage(page);
+}
+
+function renderPage(page) {
+  if (page === 'patients') renderPatients(patients);
+  else if (page === 'appointments') renderAppointments(appointments);
+  else if (page === 'records') renderRecords(records);
+  else if (page === 'billing') renderBilling(bills);
+  else if (page === 'inventory') renderInventory(inventory);
+  else if (page === 'staff') renderStaff(staff);
+  else if (page === 'departments') renderDepartments();
+}
+
+// ===== SIDEBAR =====
+let sidebarCollapsed = false;
+function toggleSidebar() {
+  sidebarCollapsed = !sidebarCollapsed;
+  const sidebar = document.getElementById('sidebar');
+  sidebar.classList.toggle('sidebar-collapsed', sidebarCollapsed);
+  if (!sidebarCollapsed) sidebar.style.minWidth = '240px';
+  else sidebar.style.minWidth = '64px';
+  document.getElementById('collapse-icon').innerHTML = sidebarCollapsed
+    ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"/>'
+    : '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"/>';
+}
+
+// ===== MODALS =====
+function openModal(id) {
+  document.getElementById(id).classList.add('open');
+  if (id === 'add-appointment-modal') populatePatientSelect('a-patient');
+  if (id === 'add-record-modal') populatePatientSelect('r-patient');
+  if (id === 'add-bill-modal') populatePatientSelect('b-patient');
+}
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function closeModalOnOverlay(e, id) { if (e.target === document.getElementById(id)) closeModal(id); }
+
+function populatePatientSelect(selectId) {
+  const sel = document.getElementById(selectId);
+  sel.innerHTML = patients.map(p => `<option>${p.fname} ${p.lname}</option>`).join('');
+}
+
+// ===== TOAST =====
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  document.getElementById('toast-msg').textContent = msg;
+  t.style.opacity = '1';
+  setTimeout(() => t.style.opacity = '0', 2500);
+}
+
+// ===== DELETE =====
+let pendingDelete = null;
+function confirmDelete(fn) {
+  pendingDelete = fn;
+  document.getElementById('delete-modal').classList.add('open');
+  document.getElementById('confirm-delete-btn').onclick = () => {
+    fn();
+    closeModal('delete-modal');
+    pendingDelete = null;
+  };
+}
+
+// ===== BADGE =====
+function badge(status) {
+  const map = {
+    'Active': 'badge-active',
+    'Inactive': 'badge-inactive',
+    'Pending': 'badge-pending',
+    'On Leave': 'badge-pending',
+    'Scheduled': 'badge-scheduled',
+    'In Progress': 'badge-pending',
+    'Completed': 'badge-completed',
+    'Cancelled': 'badge-cancelled',
+    'Paid': 'badge-completed',
+    'In Stock': 'badge-active',
+    'Low Stock': 'badge-pending',
+    'Out of Stock': 'badge-inactive',
+    'Closed': 'badge-inactive',
+    'Discharged': 'badge-inactive',
+  };
+  return `<span class="text-xs ${map[status] || 'badge-inactive'} px-2.5 py-0.5 rounded-full font-medium">${status}</span>`;
+}
+
+function initials(name) {
+  return name.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
+}
+
+const avatarColors = ['bg-blue-100 text-blue-600','bg-green-100 text-green-600','bg-purple-100 text-purple-600','bg-amber-100 text-amber-600','bg-red-100 text-red-600','bg-indigo-100 text-indigo-600','bg-pink-100 text-pink-600'];
+function avatarColor(id) { return avatarColors[id % avatarColors.length]; }
+
+// ===== PATIENTS =====
+function renderPatients(list) {
+  const tbody = document.getElementById('patients-table-body');
+  if (!list.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="px-6 py-8 text-center text-gray-400 text-sm">No patients found.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = list.map(p => `
+    <tr class="cursor-pointer">
+      <td class="px-6 py-3.5 font-medium text-gray-800">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-full ${avatarColor(p.id)} flex items-center justify-center text-xs font-semibold flex-shrink-0">${initials(p.fname+' '+p.lname)}</div>
+          ${p.fname} ${p.lname}
+        </div>
+      </td>
+      <td class="px-6 py-3.5 text-gray-600">${p.dob}</td>
+      <td class="px-6 py-3.5 text-gray-600">${p.gender}</td>
+      <td class="px-6 py-3.5 text-gray-600">${p.contact}</td>
+      <td class="px-6 py-3.5">${badge(p.status)}</td>
+      <td class="px-6 py-3.5 text-right">
+        <button onclick="confirmDelete(()=>deletePatient(${p.id}))" class="text-gray-300 hover:text-red-400 transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+        </button>
+      </td>
+    </tr>`).join('');
+}
+
+function filterPatients() {
+  const q = document.getElementById('patient-search').value.toLowerCase();
+  renderPatients(patients.filter(p => (`${p.fname} ${p.lname} ${p.contact}`).toLowerCase().includes(q)));
+}
+
+function addPatient(e) {
+  e.preventDefault();
+  const p = { id: nextPatientId++, fname: document.getElementById('p-fname').value, lname: document.getElementById('p-lname').value, dob: document.getElementById('p-dob').value, gender: document.getElementById('p-gender').value, contact: document.getElementById('p-contact').value, status: 'Active' };
+  patients.push(p);
+  closeModal('add-patient-modal');
+  e.target.reset();
+  renderPatients(patients);
+  showToast('Patient added successfully');
+}
+
+function deletePatient(id) {
+  patients = patients.filter(p => p.id !== id);
+  renderPatients(patients);
+  showToast('Patient deleted');
+}
+
+// ===== APPOINTMENTS =====
+function renderAppointments(list) {
+  const tbody = document.getElementById('appointments-table-body');
+  if (!list.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="px-6 py-8 text-center text-gray-400 text-sm">No appointments found.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = list.map(a => `
+    <tr>
+      <td class="px-6 py-3.5 font-medium text-gray-800">${a.patient}</td>
+      <td class="px-6 py-3.5 text-gray-600">${a.doctor}</td>
+      <td class="px-6 py-3.5 text-gray-600">${a.date} ${a.time}</td>
+      <td class="px-6 py-3.5 text-gray-600">${a.dept}</td>
+      <td class="px-6 py-3.5 text-gray-600">${a.type}</td>
+      <td class="px-6 py-3.5">${badge(a.status)}</td>
+      <td class="px-6 py-3.5 text-right">
+        <button onclick="confirmDelete(()=>deleteAppt(${a.id}))" class="text-gray-300 hover:text-red-400 transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+        </button>
+      </td>
+    </tr>`).join('');
+}
+
+function filterAppointments() {
+  const q = document.getElementById('appt-search').value.toLowerCase();
+  renderAppointments(appointments.filter(a => (`${a.patient} ${a.doctor} ${a.dept}`).toLowerCase().includes(q)));
+}
+
+function addAppointment(e) {
+  e.preventDefault();
+  const a = { id: nextApptId++, patient: document.getElementById('a-patient').value, doctor: document.getElementById('a-doctor').value, date: document.getElementById('a-date').value, time: document.getElementById('a-time').value, dept: document.getElementById('a-dept').value, type: document.getElementById('a-type').value, status: 'Scheduled' };
+  appointments.push(a);
+  closeModal('add-appointment-modal');
+  e.target.reset();
+  renderAppointments(appointments);
+  showToast('Appointment scheduled');
+}
+
+function deleteAppt(id) {
+  appointments = appointments.filter(a => a.id !== id);
+  renderAppointments(appointments);
+  showToast('Appointment removed');
+}
+
+// ===== RECORDS =====
+function renderRecords(list) {
+  const tbody = document.getElementById('records-table-body');
+  tbody.innerHTML = list.map(r => `
+    <tr>
+      <td class="px-6 py-3.5 font-medium text-gray-800">${r.patient}</td>
+      <td class="px-6 py-3.5 text-gray-600">${r.type}</td>
+      <td class="px-6 py-3.5 text-gray-600">${r.diagnosis}</td>
+      <td class="px-6 py-3.5 text-gray-600">${r.doctor}</td>
+      <td class="px-6 py-3.5 text-gray-600">${r.date}</td>
+      <td class="px-6 py-3.5">${badge(r.status)}</td>
+      <td class="px-6 py-3.5 text-right">
+        <button onclick="confirmDelete(()=>deleteRecord(${r.id}))" class="text-gray-300 hover:text-red-400 transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+        </button>
+      </td>
+    </tr>`).join('');
+}
+
+function addRecord(e) {
+  e.preventDefault();
+  const r = { id: nextRecordId++, patient: document.getElementById('r-patient').value, type: document.getElementById('r-type').value, diagnosis: document.getElementById('r-diagnosis').value, doctor: document.getElementById('r-doctor').value, date: new Date().toISOString().split('T')[0], status: 'Active' };
+  records.push(r);
+  closeModal('add-record-modal');
+  e.target.reset();
+  renderRecords(records);
+  showToast('Medical record added');
+}
+
+function deleteRecord(id) {
+  records = records.filter(r => r.id !== id);
+  renderRecords(records);
+  showToast('Record deleted');
+}
+
+// ===== BILLING =====
+function renderBilling(list) {
+  const tbody = document.getElementById('billing-table-body');
+  tbody.innerHTML = list.map(b => `
+    <tr>
+      <td class="px-6 py-3.5 font-mono text-xs text-gray-500">${b.id}</td>
+      <td class="px-6 py-3.5 font-medium text-gray-800">${b.patient}</td>
+      <td class="px-6 py-3.5 text-gray-600">${b.service}</td>
+      <td class="px-6 py-3.5 text-gray-600">${b.date}</td>
+      <td class="px-6 py-3.5 font-semibold text-gray-800">$${b.amount.toLocaleString()}</td>
+      <td class="px-6 py-3.5">${badge(b.status)}</td>
+      <td class="px-6 py-3.5 text-right">
+        <button onclick="confirmDelete(()=>deleteBill('${b.id}'))" class="text-gray-300 hover:text-red-400 transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+        </button>
+      </td>
+    </tr>`).join('');
+}
+
+function addBill(e) {
+  e.preventDefault();
+  const b = { id: `INV-00${nextBillId++}`, patient: document.getElementById('b-patient').value, service: document.getElementById('b-service').value, date: new Date().toISOString().split('T')[0], amount: parseFloat(document.getElementById('b-amount').value), status: 'Pending' };
+  bills.push(b);
+  closeModal('add-bill-modal');
+  e.target.reset();
+  renderBilling(bills);
+  showToast('Invoice created');
+}
+
+function deleteBill(id) {
+  bills = bills.filter(b => b.id !== id);
+  renderBilling(bills);
+  showToast('Invoice deleted');
+}
+
+// ===== INVENTORY =====
+function renderInventory(list) {
+  const tbody = document.getElementById('inventory-table-body');
+  tbody.innerHTML = list.map(i => `
+    <tr>
+      <td class="px-6 py-3.5 font-medium text-gray-800">${i.name}</td>
+      <td class="px-6 py-3.5 text-gray-600">${i.category}</td>
+      <td class="px-6 py-3.5 font-semibold ${i.qty < 100 ? 'text-red-500' : 'text-gray-800'}">${i.qty}</td>
+      <td class="px-6 py-3.5 text-gray-600">${i.unit}</td>
+      <td class="px-6 py-3.5 text-gray-600">${i.expires}</td>
+      <td class="px-6 py-3.5">${badge(i.status)}</td>
+      <td class="px-6 py-3.5 text-right">
+        <button onclick="confirmDelete(()=>deleteItem(${i.id}))" class="text-gray-300 hover:text-red-400 transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+        </button>
+      </td>
+    </tr>`).join('');
+}
+
+function addItem(e) {
+  e.preventDefault();
+  const qty = parseInt(document.getElementById('i-qty').value);
+  const item = { id: nextItemId++, name: document.getElementById('i-name').value, category: document.getElementById('i-cat').value, qty, unit: document.getElementById('i-unit').value || 'Unit', expires: document.getElementById('i-exp').value || 'N/A', status: qty < 100 ? 'Low Stock' : 'In Stock' };
+  inventory.push(item);
+  closeModal('add-item-modal');
+  e.target.reset();
+  renderInventory(inventory);
+  showToast('Item added to inventory');
+}
+
+function deleteItem(id) {
+  inventory = inventory.filter(i => i.id !== id);
+  renderInventory(inventory);
+  showToast('Item removed');
+}
+
+// ===== STAFF =====
+function renderStaff(list) {
+  const tbody = document.getElementById('staff-table-body');
+  tbody.innerHTML = list.map(s => `
+    <tr>
+      <td class="px-6 py-3.5 font-medium text-gray-800">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-full ${avatarColor(s.id)} flex items-center justify-center text-xs font-semibold flex-shrink-0">${initials(s.fname+' '+s.lname)}</div>
+          ${s.fname} ${s.lname}
+        </div>
+      </td>
+      <td class="px-6 py-3.5 text-gray-600">${s.role}</td>
+      <td class="px-6 py-3.5 text-gray-600">${s.dept}</td>
+      <td class="px-6 py-3.5 text-gray-600">${s.contact}</td>
+      <td class="px-6 py-3.5 text-gray-600">${s.joined}</td>
+      <td class="px-6 py-3.5">${badge(s.status)}</td>
+      <td class="px-6 py-3.5 text-right">
+        <button onclick="confirmDelete(()=>deleteStaff(${s.id}))" class="text-gray-300 hover:text-red-400 transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+        </button>
+      </td>
+    </tr>`).join('');
+}
+
+function addStaff(e) {
+  e.preventDefault();
+  const s = { id: nextStaffId++, fname: document.getElementById('s-fname').value, lname: document.getElementById('s-lname').value, role: document.getElementById('s-role').value, dept: document.getElementById('s-dept').value, contact: document.getElementById('s-contact').value, joined: new Date().toISOString().split('T')[0], status: 'Active' };
+  staff.push(s);
+  closeModal('add-staff-modal');
+  e.target.reset();
+  renderStaff(staff);
+  showToast('Staff member added');
+}
+
+function deleteStaff(id) {
+  staff = staff.filter(s => s.id !== id);
+  renderStaff(staff);
+  showToast('Staff member removed');
+}
+
+// ===== DEPARTMENTS =====
+const deptColorMap = { red:'bg-red-500', orange:'bg-orange-500', blue:'bg-blue-500', purple:'bg-purple-500', green:'bg-green-500', pink:'bg-pink-500', yellow:'bg-yellow-500', indigo:'bg-indigo-500' };
+const deptLightMap = { red:'bg-red-50', orange:'bg-orange-50', blue:'bg-blue-50', purple:'bg-purple-50', green:'bg-green-50', pink:'bg-pink-50', yellow:'bg-yellow-50', indigo:'bg-indigo-50' };
+const deptTextMap = { red:'text-red-600', orange:'text-orange-600', blue:'text-blue-600', purple:'text-purple-600', green:'text-green-600', pink:'text-pink-600', yellow:'text-yellow-600', indigo:'text-indigo-600' };
+
+function renderDepartments() {
+  const grid = document.getElementById('departments-grid');
+  grid.innerHTML = departments.map(d => {
+    const pct = d.beds > 0 ? Math.round((d.occupied / d.beds) * 100) : 0;
+    const staffCount = staff.filter(s => s.dept === d.name).length;
+    return `
+    <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-100 stat-card">
+      <div class="flex items-start justify-between mb-4">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 ${deptLightMap[d.color]} rounded-xl flex items-center justify-center">
+            <div class="w-3 h-3 ${deptColorMap[d.color]} rounded-full"></div>
+          </div>
+          <div>
+            <h3 class="font-semibold text-gray-900">${d.name}</h3>
+            <p class="text-xs text-gray-400">${d.head}</p>
+          </div>
+        </div>
+        ${d.beds > 0 ? `<span class="text-sm font-bold ${deptTextMap[d.color]}">${pct}%</span>` : '<span class="text-xs text-gray-400">Outpatient</span>'}
+      </div>
+      <div class="grid grid-cols-3 gap-3 mb-4">
+        <div class="text-center p-2 bg-gray-50 rounded-lg">
+          <p class="text-lg font-bold text-gray-900">${d.beds || '—'}</p>
+          <p class="text-xs text-gray-400">Beds</p>
+        </div>
+        <div class="text-center p-2 bg-gray-50 rounded-lg">
+          <p class="text-lg font-bold text-gray-900">${d.occupied || '—'}</p>
+          <p class="text-xs text-gray-400">Occupied</p>
+        </div>
+        <div class="text-center p-2 bg-gray-50 rounded-lg">
+          <p class="text-lg font-bold text-gray-900">${staffCount}</p>
+          <p class="text-xs text-gray-400">Staff</p>
+        </div>
+      </div>
+      ${d.beds > 0 ? `
+      <div>
+        <div class="flex justify-between text-xs text-gray-400 mb-1"><span>Occupancy</span><span>${d.occupied}/${d.beds}</span></div>
+        <div class="h-2 bg-gray-100 rounded-full"><div class="${deptColorMap[d.color]} h-2 rounded-full transition-all" style="width:${pct}%"></div></div>
+      </div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+// ===== INIT =====
+renderPatients(patients);
+</script>
+
+<!-- <script type="module" src="/embed.ts" data-organization-id="org_3Arp0CczSlsryrsBbIqBi5WlaTJ"></script> -->
+<script src="https://echo-monorepo-widget.vercel.app/widget.js" data-organization-id="org_3Arp0CczSlsryrsBbIqBi5WlaTJ"></script>
+</body>
+</html>
