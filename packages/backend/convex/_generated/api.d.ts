@@ -15,6 +15,7 @@ import type * as lib_extractTextContent from "../lib/extractTextContent.js";
 import type * as private_contactSessions from "../private/contactSessions.js";
 import type * as private_conversations from "../private/conversations.js";
 import type * as private_files from "../private/files.js";
+import type * as private_issueFixPrompt from "../private/issueFixPrompt.js";
 import type * as private_issues from "../private/issues.js";
 import type * as private_messages from "../private/messages.js";
 import type * as private_widgetSettings from "../private/widgetSettings.js";
@@ -32,6 +33,7 @@ import type * as system_ai_tools_escalateConversation from "../system/ai/tools/e
 import type * as system_ai_tools_listOpenIssues from "../system/ai/tools/listOpenIssues.js";
 import type * as system_ai_tools_readAttachment from "../system/ai/tools/readAttachment.js";
 import type * as system_ai_tools_readConsoleLogs from "../system/ai/tools/readConsoleLogs.js";
+import type * as system_ai_tools_readOpenIssueDetails from "../system/ai/tools/readOpenIssueDetails.js";
 import type * as system_ai_tools_requestPageControl from "../system/ai/tools/requestPageControl.js";
 import type * as system_ai_tools_resolveConversation from "../system/ai/tools/resolveConversation.js";
 import type * as system_ai_tools_search from "../system/ai/tools/search.js";
@@ -56,6 +58,7 @@ declare const fullApi: ApiFromModules<{
   "private/contactSessions": typeof private_contactSessions;
   "private/conversations": typeof private_conversations;
   "private/files": typeof private_files;
+  "private/issueFixPrompt": typeof private_issueFixPrompt;
   "private/issues": typeof private_issues;
   "private/messages": typeof private_messages;
   "private/widgetSettings": typeof private_widgetSettings;
@@ -73,6 +76,7 @@ declare const fullApi: ApiFromModules<{
   "system/ai/tools/listOpenIssues": typeof system_ai_tools_listOpenIssues;
   "system/ai/tools/readAttachment": typeof system_ai_tools_readAttachment;
   "system/ai/tools/readConsoleLogs": typeof system_ai_tools_readConsoleLogs;
+  "system/ai/tools/readOpenIssueDetails": typeof system_ai_tools_readOpenIssueDetails;
   "system/ai/tools/requestPageControl": typeof system_ai_tools_requestPageControl;
   "system/ai/tools/resolveConversation": typeof system_ai_tools_resolveConversation;
   "system/ai/tools/search": typeof system_ai_tools_search;

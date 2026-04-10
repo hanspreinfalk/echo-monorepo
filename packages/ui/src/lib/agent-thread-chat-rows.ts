@@ -80,6 +80,7 @@ const AGENT_TOOL_LABELS: Record<string, string> = {
   resolveConversationTool: "Closing conversation",
   requestPageControlTool: "Requesting page control",
   listOpenIssuesTool: "Checking open issues",
+  readOpenIssueDetailsTool: "Loading issue details",
   appendSessionToIssueTool: "Linking to existing issue",
   createIssueTool: "Creating engineering issue",
 };

@@ -26,12 +26,13 @@ import {
     ChevronDownIcon,
     ChevronRightIcon,
     CopyIcon,
+    Loader2Icon,
     MoreHorizontalIcon,
     RotateCcwIcon,
     TrashIcon,
 } from "lucide-react";
 import { Fragment, useCallback, useMemo, useState } from "react";
-import { usePaginatedQuery, useMutation } from "convex/react";
+import { usePaginatedQuery, useMutation, useAction } from "convex/react";
 import { api } from "@workspace/backend/_generated/api";
 import type { Doc, Id } from "@workspace/backend/_generated/dataModel";
 import { useInfiniteScroll } from "@workspace/ui/hooks/use-infinite-scroll";
@@ -52,7 +53,7 @@ type AffectedSession = {
     /** Anonymized session or user bucket */
     id: string;
     email: string;
-    /** ISO 8601 */
+    /** ISO 8601 — when this contact session was created (per reporter) */
     lastSeen: string;
     browser: string;
     os: string;
@@ -193,7 +194,7 @@ function docToProductIssue(row: IssueListRow): ProductIssue {
         affectedSessions: row.resolvedContactSessions?.map((s) => ({
             id: s._id,
             email: s.email,
-            lastSeen: capturedIso,
+            lastSeen: new Date(s._creationTime).toISOString(),
             browser: formatBrowserLine(s.metadata?.userAgent),
             os: s.metadata?.platform?.trim() ? s.metadata.platform : "—",
             region: s.metadata?.timezone,
@@ -279,11 +280,16 @@ export const IssuesView = () => {
     );
 
     const setResolvedMutation = useMutation(api.private.issues.setResolved);
+    const generateFixPromptAction = useAction(
+        api.private.issueFixPrompt.generateFixPrompt,
+    );
 
     const [criticalitySort, setCriticalitySort] = useState<"asc" | "desc">(
         "desc",
     );
     const [copiedId, setCopiedId] = useState<Id<"issues"> | null>(null);
+    const [generatingPromptIssueId, setGeneratingPromptIssueId] =
+        useState<Id<"issues"> | null>(null);
     const [copiedSessionKey, setCopiedSessionKey] = useState<string | null>(
         null,
     );
@@ -319,15 +325,28 @@ export const IssuesView = () => {
         setCriticalitySort((prev) => (prev === "desc" ? "asc" : "desc"));
     }, []);
 
-    const copyPrompt = useCallback(async (issue: ProductIssue) => {
-        try {
-            await navigator.clipboard.writeText(buildFixPrompt(issue));
-            setCopiedId(issue.id);
-            window.setTimeout(() => setCopiedId(null), 2000);
-        } catch {
-            // Clipboard may be unavailable (permissions / non-secure context)
-        }
-    }, []);
+    const copyPrompt = useCallback(
+        async (issue: ProductIssue) => {
+            setGeneratingPromptIssueId(issue.id);
+            let text: string;
+            try {
+                text = await generateFixPromptAction({ issueId: issue.id });
+            } catch (error) {
+                console.error("generateFixPrompt failed, using local prompt", error);
+                text = buildFixPrompt(issue);
+            } finally {
+                setGeneratingPromptIssueId(null);
+            }
+            try {
+                await navigator.clipboard.writeText(text);
+                setCopiedId(issue.id);
+                window.setTimeout(() => setCopiedId(null), 2000);
+            } catch {
+                // Clipboard may be unavailable (permissions / non-secure context)
+            }
+        },
+        [generateFixPromptAction],
+    );
 
     const copyContactSessionId = useCallback(
         async (sessionId: string, rowKey: string) => {
@@ -553,6 +572,10 @@ export const IssuesView = () => {
                                                     <TableCell className="px-6 py-4 align-middle text-right">
                                                         <Button
                                                             className="gap-2"
+                                                            disabled={
+                                                                generatingPromptIssueId ===
+                                                                issue.id
+                                                            }
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
                                                                 copyPrompt(
@@ -562,7 +585,14 @@ export const IssuesView = () => {
                                                             size="sm"
                                                             variant="outline"
                                                         >
-                                                            {copiedId === issue.id ? (
+                                                            {generatingPromptIssueId ===
+                                                            issue.id ? (
+                                                                <>
+                                                                    <Loader2Icon className="size-4 animate-spin" />
+                                                                    Generating…
+                                                                </>
+                                                            ) : copiedId ===
+                                                              issue.id ? (
                                                                 <>
                                                                     <CheckIcon className="size-4" />
                                                                     Copied

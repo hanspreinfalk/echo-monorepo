@@ -24,7 +24,8 @@ const issueAttachment = v.object({
   storageId: v.optional(v.id("_storage")),
 });
 
-const DESCRIPTION_PREVIEW_MAX = 1200;
+/** Cap console lines returned in open-issue details (full list may be huge). */
+const OPEN_ISSUE_DETAILS_CONSOLE_MAX = 120;
 
 export const listUnresolvedForOrganization = internalQuery({
   args: {
@@ -46,15 +47,52 @@ export const listUnresolvedForOrganization = internalQuery({
     return unresolved.map((i) => ({
       issueId: i._id,
       title: i.title ?? "",
-      descriptionPreview: (i.description ?? "").slice(0, DESCRIPTION_PREVIEW_MAX),
-      stepsToReproducePreview: (i.stepsToReproduce ?? "").slice(0, 600),
-      pageUrl: i.pageUrl,
-      consoleLogsPreview: i.consoleLogs?.slice(0, 20),
-      category: i.category,
-      criticality: i.criticality,
-      firstReported: i.firstReported,
-      affectedSessionCount: i.affectedSessions?.length ?? 0,
     }));
+  },
+});
+
+/** Full open-issue record for duplicate detection (after listOpenIssues titles/ids). */
+export const getOpenIssueDetailsForOrganization = internalQuery({
+  args: {
+    organizationId: v.string(),
+    issueId: v.id("issues"),
+  },
+  handler: async (ctx, args) => {
+    const issue = await ctx.db.get(args.issueId);
+    if (!issue || issue.organizationId !== args.organizationId) {
+      return null;
+    }
+    if (issue.resolved === true) {
+      return null;
+    }
+
+    const logs = issue.consoleLogs ?? [];
+    const consoleLogs =
+      logs.length <= OPEN_ISSUE_DETAILS_CONSOLE_MAX
+        ? logs
+        : logs.slice(-OPEN_ISSUE_DETAILS_CONSOLE_MAX);
+
+    return {
+      issueId: issue._id,
+      title: issue.title ?? "",
+      description: issue.description ?? "",
+      stepsToReproduce: issue.stepsToReproduce,
+      category: issue.category,
+      criticality: issue.criticality,
+      pageUrl: issue.pageUrl,
+      consoleLogs,
+      consoleLogsTruncated:
+        logs.length > OPEN_ISSUE_DETAILS_CONSOLE_MAX
+          ? (logs.length - OPEN_ISSUE_DETAILS_CONSOLE_MAX)
+          : 0,
+      attachments: issue.attachments?.map((a) => ({
+        url: a.url,
+        filename: a.filename,
+        mimeType: a.mimeType,
+      })),
+      firstReported: issue.firstReported,
+      affectedSessionCount: issue.affectedSessions?.length ?? 0,
+    };
   },
 });
 
@@ -85,6 +123,7 @@ export const appendAffectedSession = internalMutation({
 
     await ctx.db.patch(args.issueId, {
       affectedSessions: [...existing, args.contactSessionId],
+      fixPrompt: undefined,
     });
     return { ok: true as const, alreadyLinked: false };
   },
@@ -121,5 +160,86 @@ export const create = internalMutation({
       affectedSessions: args.affectedSessions,
       firstReported: now,
     });
+  },
+});
+
+/** Returns stored fix prompt if present (non-empty). */
+export const getCachedFixPrompt = internalQuery({
+  args: {
+    organizationId: v.string(),
+    issueId: v.id("issues"),
+  },
+  handler: async (ctx, args) => {
+    const issue = await ctx.db.get(args.issueId);
+    if (!issue || issue.organizationId !== args.organizationId) {
+      return null;
+    }
+    const text = issue.fixPrompt?.trim();
+    return text && text.length > 0 ? text : null;
+  },
+});
+
+export const setFixPrompt = internalMutation({
+  args: {
+    organizationId: v.string(),
+    issueId: v.id("issues"),
+    fixPrompt: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const issue = await ctx.db.get(args.issueId);
+    if (!issue || issue.organizationId !== args.organizationId) {
+      return;
+    }
+    await ctx.db.patch(args.issueId, { fixPrompt: args.fixPrompt });
+  },
+});
+
+/** Full issue + linked sessions for server-side AI fix prompts (authenticated via org id). */
+export const getContextForFixPrompt = internalQuery({
+  args: {
+    organizationId: v.string(),
+    issueId: v.id("issues"),
+  },
+  handler: async (ctx, args) => {
+    const issue = await ctx.db.get(args.issueId);
+    if (!issue || issue.organizationId !== args.organizationId) {
+      return null;
+    }
+
+    const affectedContactSessions = [];
+    for (const sessionId of issue.affectedSessions ?? []) {
+      const session = await ctx.db.get(sessionId);
+      if (session && session.organizationId === args.organizationId) {
+        affectedContactSessions.push({
+          _id: session._id,
+          _creationTime: session._creationTime,
+          name: session.name,
+          email: session.email,
+          expiresAt: session.expiresAt,
+          metadata: session.metadata,
+        });
+      }
+    }
+
+    return {
+      issue: {
+        _id: issue._id,
+        _creationTime: issue._creationTime,
+        organizationId: issue.organizationId,
+        conversationId: issue.conversationId,
+        resolved: issue.resolved,
+        title: issue.title,
+        description: issue.description,
+        stepsToReproduce: issue.stepsToReproduce,
+        category: issue.category,
+        criticality: issue.criticality,
+        firstReported: issue.firstReported,
+        pageUrl: issue.pageUrl,
+        consoleLogs: issue.consoleLogs,
+        attachments: issue.attachments,
+        affectedSessionIds: issue.affectedSessions,
+      },
+      affectedContactSessions,
+    };
   },
 });

@@ -6,12 +6,12 @@ import { supportAgent } from "../agents/supportAgent";
 
 export const appendSessionToIssue = createTool({
   description:
-    "Link **this** visitor's contact session to an **existing open issue** when their report is the **same error or defect** as that issue (match using **listOpenIssuesTool**: same console error/stack line, same broken behavior and **pageUrl**, or same title/symptom). **Do not** use this for a genuinely new bug. After **listOpenIssuesTool**, if you find a match, call this **instead of** createIssueTool. Appends the current session to the issue's affected sessions for engineering visibility.",
+    "Link **this** visitor's contact session to an **existing open issue** when their report is the **same error or defect** as that issue—only after **readOpenIssueDetailsTool** confirmed the full record matches (console lines, **pageUrl**, description/steps vs the current case). **Do not** use this for a genuinely new bug. After **listOpenIssuesTool** → **readOpenIssueDetailsTool** for candidates, if one is an identical match, call this **instead of** **createIssueTool**. Appends the current session to the issue's affected sessions for engineering visibility.",
   args: z.object({
     issueId: z
       .string()
       .describe(
-        "Exact **issueId** string from listOpenIssuesTool (e.g. Convex id for issues table)",
+        "Exact **issueId** string from listOpenIssuesTool / readOpenIssueDetailsTool (Convex id for issues table)",
       ),
     duplicateMatchSummary: z
       .string()

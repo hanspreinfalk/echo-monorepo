@@ -12,6 +12,7 @@ import { requestPageControl } from "../system/ai/tools/requestPageControl";
 import { appendSessionToIssue } from "../system/ai/tools/appendSessionToIssue";
 import { createIssue } from "../system/ai/tools/createIssue";
 import { listOpenIssues } from "../system/ai/tools/listOpenIssues";
+import { readOpenIssueDetails } from "../system/ai/tools/readOpenIssueDetails";
 import { readConsoleLogs } from "../system/ai/tools/readConsoleLogs";
 import { formatVisitorContextForAgent } from "../system/ai/visitorContext";
 import { supportAgentSystemWithVisitorContext } from "../system/ai/constants";
@@ -108,6 +109,7 @@ export const create = action({
             readAttachmentTool: readAttachment,
             readConsoleLogsTool: readConsoleLogs,
             listOpenIssuesTool: listOpenIssues,
+            readOpenIssueDetailsTool: readOpenIssueDetails,
             appendSessionToIssueTool: appendSessionToIssue,
             createIssueTool: createIssue,
             ...(subscription?.status === "active"

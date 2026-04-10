@@ -42,6 +42,8 @@ export default defineSchema({
         ),
         /** Contact sessions linked when the issue was filed */
         affectedSessions: v.optional(v.array(v.id("contactSessions"))),
+        /** Cached AI-generated “copy fix prompt” text (regenerated when issue context changes). */
+        fixPrompt: v.optional(v.string()),
     })
         .index("by_organization_id", ["organizationId"])
     ,
