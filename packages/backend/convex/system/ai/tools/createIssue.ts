@@ -70,7 +70,7 @@ const createIssueArgs = z.object({
 
 export const createIssue = createTool<typeof createIssueArgs, string>({
   description:
-    "File a product issue ONLY after follow-ups across multiple turns (one question per message). **Before this tool:** if the visitor environment includes **Host page console** or the issue is a technical bug/error on an embedded page, you **must** call **readConsoleLogsTool** first and then pass **consoleLogs** with the important lines from that read (include uncaught/rejection lines and pasted stack traces there). Also set **pageUrl** from visitor environment when present; **attachments** from every 📎 link; **stepsToReproduce** from the customer's flow (numbered). Do not omit fields when data exists. Do not ask about device/browser. After enough detail, invite a screenshot in its own message if needed; when they are done, call this tool.",
+    "File a **new** product issue ONLY after follow-ups across multiple turns (one question per message). **Before this tool (same assistant turn):** (1) Call **listOpenIssuesTool** and check for an **unresolved** issue that is the **same underlying error or defect** (compare **consoleLogsPreview**, **pageUrl**, title, description). If it matches, call **appendSessionToIssueTool** instead—do **not** create a duplicate. (2) If the visitor environment includes **Host page console** or the issue is a technical bug/error on an embedded page, call **readConsoleLogsTool** first and pass **consoleLogs** with the important lines (uncaught/rejection lines, pasted stack traces). Set **pageUrl** from visitor environment when present; **attachments** from every 📎 link; **stepsToReproduce** from the customer's flow (numbered). Do not omit fields when data exists. Do not ask about device/browser. After enough detail, invite a screenshot in its own message if needed; when they are done, call this tool only when there is no matching open issue.",
   args: createIssueArgs,
   handler: async (ctx, args): Promise<string> => {
     if (!ctx.threadId) {
@@ -111,18 +111,18 @@ export const createIssue = createTool<typeof createIssueArgs, string>({
       },
     );
 
-    const customerMessage =
-      args.attachments && args.attachments.length > 0
-        ? "I've created an issue for our engineering team with the details and files you shared. They'll use it to track and fix the problem. Is there anything else I can help you with in the meantime?"
-        : "I've created an issue for our engineering team with the details you shared. They'll use it to track and fix the problem. Is there anything else I can help you with in the meantime?";
+    // const customerMessage =
+    //   args.attachments && args.attachments.length > 0
+    //     ? "I've created an issue for our engineering team with the details and files you shared. They'll use it to track and fix the problem. Is there anything else I can help you with in the meantime?"
+    //     : "I've created an issue for our engineering team with the details you shared. They'll use it to track and fix the problem. Is there anything else I can help you with in the meantime?";
 
-    await supportAgent.saveMessage(ctx, {
-      threadId: ctx.threadId,
-      message: {
-        role: "assistant",
-        content: customerMessage,
-      },
-    });
+    // await supportAgent.saveMessage(ctx, {
+    //   threadId: ctx.threadId,
+    //   message: {
+    //     role: "assistant",
+    //     content: customerMessage,
+    //   },
+    // });
 
     return `Success: issue ${issueId} created. You already posted the customer-facing reply in the thread; do not repeat it verbatim if you add another message.`;
   },

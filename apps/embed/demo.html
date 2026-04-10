@@ -113,9 +113,15 @@
       <p style="margin-top: 8px; color: #555; font-size: 14px;">
         Throws a deliberate error (check the browser console and any error capture).
       </p>
-      <div class="controls" style="margin-top: 12px;">
+      <div class="controls" style="margin-top: 12px; flex-wrap: wrap;">
         <button type="button" onclick="throwWeakNetWorkError()" style="background: #dc2626;">
           Throw “Network connection is weak”
+        </button>
+        <button type="button" onclick="throwLoginFailError()" style="background: #b91c1c;">
+          Throw “Login failed”
+        </button>
+        <button type="button" onclick="throwLoadingFailedError()" style="background: #991b1b;">
+          Throw “Loading failed”
         </button>
       </div>
     </div>
@@ -179,7 +185,17 @@
       console.log('Error test console');
       throw new Error('netowrk connection is weak');
     };
-    
+
+    window.throwLoginFailError = function() {
+      console.log('Login fail test console');
+      throw new Error('Login failed: invalid credentials');
+    };
+
+    window.throwLoadingFailedError = function() {
+      console.log('Loading failed test console');
+      throw new Error('Loading failed: unable to fetch resource');
+    };
+
   </script>
 </body>
 </html>

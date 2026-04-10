@@ -48,7 +48,7 @@ export const readConsoleLogs = createTool<typeof readConsoleLogsArgs, string>({
     const lineCount = args.lineCount ?? 80;
     const slice = logs.slice(-lineCount);
     const header = `Host page console: showing ${slice.length} line(s), newest at the bottom (of ${logs.length} stored).\n\n`;
-    const body = slice.map((line, i) => `${String(i + 1).padStart(4, " ")}  ${line}`).join("\n");
+    const body = slice.map((line: string, i: number) => `${String(i + 1).padStart(4, " ")}  ${line}`).join("\n");
     return header + body;
   },
 });

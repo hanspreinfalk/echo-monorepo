@@ -1,4 +1,4 @@
-import { internalMutation } from "../_generated/server";
+import { internalMutation, internalQuery } from "../_generated/server";
 import { v } from "convex/values";
 
 const issueCategory = v.union(
@@ -22,6 +22,72 @@ const issueAttachment = v.object({
   filename: v.optional(v.string()),
   mimeType: v.optional(v.string()),
   storageId: v.optional(v.id("_storage")),
+});
+
+const DESCRIPTION_PREVIEW_MAX = 1200;
+
+export const listUnresolvedForOrganization = internalQuery({
+  args: {
+    organizationId: v.string(),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const max = Math.min(Math.max(args.limit ?? 25, 1), 50);
+    const candidates = await ctx.db
+      .query("issues")
+      .withIndex("by_organization_id", (q) =>
+        q.eq("organizationId", args.organizationId),
+      )
+      .order("desc")
+      .take(120);
+
+    const unresolved = candidates.filter((i) => i.resolved !== true).slice(0, max);
+
+    return unresolved.map((i) => ({
+      issueId: i._id,
+      title: i.title ?? "",
+      descriptionPreview: (i.description ?? "").slice(0, DESCRIPTION_PREVIEW_MAX),
+      stepsToReproducePreview: (i.stepsToReproduce ?? "").slice(0, 600),
+      pageUrl: i.pageUrl,
+      consoleLogsPreview: i.consoleLogs?.slice(0, 20),
+      category: i.category,
+      criticality: i.criticality,
+      firstReported: i.firstReported,
+      affectedSessionCount: i.affectedSessions?.length ?? 0,
+    }));
+  },
+});
+
+export const appendAffectedSession = internalMutation({
+  args: {
+    issueId: v.id("issues"),
+    organizationId: v.string(),
+    contactSessionId: v.id("contactSessions"),
+  },
+  handler: async (ctx, args) => {
+    const issue = await ctx.db.get(args.issueId);
+    if (!issue || issue.organizationId !== args.organizationId) {
+      return { ok: false as const, error: "Issue not found" };
+    }
+    if (issue.resolved === true) {
+      return { ok: false as const, error: "Issue is already resolved" };
+    }
+
+    const session = await ctx.db.get(args.contactSessionId);
+    if (!session || session.organizationId !== args.organizationId) {
+      return { ok: false as const, error: "Invalid contact session" };
+    }
+
+    const existing = issue.affectedSessions ?? [];
+    if (existing.includes(args.contactSessionId)) {
+      return { ok: true as const, alreadyLinked: true };
+    }
+
+    await ctx.db.patch(args.issueId, {
+      affectedSessions: [...existing, args.contactSessionId],
+    });
+    return { ok: true as const, alreadyLinked: false };
+  },
 });
 
 export const create = internalMutation({

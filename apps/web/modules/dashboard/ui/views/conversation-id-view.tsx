@@ -3,12 +3,27 @@
 import { useInfiniteScroll } from "@workspace/ui/hooks/use-infinite-scroll";
 import { InfiniteScrollTrigger } from "@workspace/ui/components/infinite-scroll-trigger";
 import { useRef, useState, useMemo } from "react";
-import { useThreadMessages, toUIMessages } from "@convex-dev/agent/react";
+import { useThreadMessages } from "@convex-dev/agent/react";
 import { Id } from "@workspace/backend/_generated/dataModel";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "@workspace/backend/_generated/api";
 import { Button } from "@workspace/ui/components/button";
-import { FileIcon, Loader2Icon, MoreHorizontalIcon, PaperclipIcon, Trash2Icon, Wand2Icon, XIcon } from "lucide-react";
+import {
+    CheckIcon,
+    FileIcon,
+    Loader2Icon,
+    MoreHorizontalIcon,
+    PaperclipIcon,
+    Trash2Icon,
+    Wand2Icon,
+    WrenchIcon,
+    XIcon,
+} from "lucide-react";
+import {
+    labelForAgentTool,
+    threadMessagesToSeparateChatRows,
+    toolRowIsComplete,
+} from "@workspace/ui/lib/agent-thread-chat-rows";
 import { PageControlCard } from "@workspace/ui/components/ai/page-control-card";
 import {
     AIConversation,
@@ -119,13 +134,18 @@ export function ConversationIdView({ conversationId }: { conversationId: Id<"con
         loadSize: 10
     })
 
-    const allPageControlRequests = useQuery(
-        api.private.conversations.getLatestPageControlRequest,
-        { conversationId }
-    );
+    const pageControlRequestsList = useQuery(
+        api.private.conversations.listPageControlRequests,
+        { conversationId },
+    ) ?? [];
     const requestsById = useMemo(
-        () => new Map(allPageControlRequests ? [[allPageControlRequests._id as string, allPageControlRequests]] : []),
-        [allPageControlRequests]
+        () => new Map(pageControlRequestsList.map((r) => [r._id as string, r])),
+        [pageControlRequestsList],
+    );
+
+    const chatRows = useMemo(
+        () => threadMessagesToSeparateChatRows(messages.results ?? []),
+        [messages.results],
     );
 
     const form = useForm<z.infer<typeof formSchema>>({
@@ -315,54 +335,19 @@ export function ConversationIdView({ conversationId }: { conversationId: Id<"con
                         onLoadMore={handleLoadMore}
                         ref={topElementRef}
                     />
-                    {toUIMessages(messages.results ?? [])?.map((message) => {
-                        // Detect page control marker — render card inline
-                        const markerMatch = message.content.match(/^\[PAGE_CONTROL_REQUEST:(\{.*\})\]$/);
-                        if (markerMatch?.[1]) {
-                            try {
-                                const { id } = JSON.parse(markerMatch[1]) as { id: string };
-                                const req = requestsById.get(id);
-                                if (req) {
-                                    const phase =
-                                        req.status === "denied" ? "done"
-                                        : req.status === "approved" && req.result ? "done"
-                                        : req.status === "approved" ? "running"
-                                        : "pending";
-                                    const result =
-                                        req.status === "denied"
-                                            ? { success: false, data: "Denied by user" }
-                                            : req.result ?? undefined;
-                                    return (
-                                        <PageControlCard
-                                            key={message.id}
-                                            from="user"
-                                            action={req.action}
-                                            phase={phase}
-                                            steps={req.steps}
-                                            result={result}
-                                            colors={{
-                                                text: "text-white",
-                                                mutedText: "text-white/70",
-                                                icon: "text-white",
-                                            }}
-                                        />
-                                    );
-                                }
-                            } catch { /* fall through */ }
-                        }
-
-                        const parsedMessage = parseMessageAttachments(message.content);
+                    {chatRows.map((row) => {
+                        if (row.kind === "user") {
+                        const parsedMessage = parseMessageAttachments(row.content);
                         return (
                             <AIMessage
-                                // In reverse, because we are watching from "assistant" perspective
-                                from={message.role === "user" ? "assistant" : "user"}
-                                key={message.id}
+                                from="assistant"
+                                key={row.id}
                             >
                                 <div className="flex flex-col gap-2">
                                     {parsedMessage.attachments.map((attachment, index) => (
                                         attachment.isImage ? (
                                             <a
-                                                key={`${message.id}-attachment-${index}`}
+                                                key={`${row.id}-attachment-${index}`}
                                                 href={attachment.url}
                                                 rel="noreferrer"
                                                 target="_blank"
@@ -381,7 +366,7 @@ export function ConversationIdView({ conversationId }: { conversationId: Id<"con
                                             </a>
                                         ) : (
                                             <a
-                                                key={`${message.id}-attachment-${index}`}
+                                                key={`${row.id}-attachment-${index}`}
                                                 href={attachment.url}
                                                 rel="noreferrer"
                                                 target="_blank"
@@ -398,12 +383,138 @@ export function ConversationIdView({ conversationId }: { conversationId: Id<"con
                                         </AIMessageContent>
                                     )}
                                 </div>
-                                {message.role === "user" && (
-                                    <DicebearAvatar 
-                                        seed={conversation?.contactSessionId ?? "user"}
-                                        size={32}
-                                    />
-                                )}
+                                <DicebearAvatar
+                                    seed={conversation?.contactSessionId ?? "user"}
+                                    size={32}
+                                />
+                            </AIMessage>
+                        );
+                        }
+
+                        if (row.kind === "page-control") {
+                            const req = requestsById.get(row.requestId);
+                            if (!req) {
+                                return null;
+                            }
+                            const phase =
+                                req.status === "denied" ? "done"
+                                : req.status === "approved" && req.result ? "done"
+                                : req.status === "approved" ? "running"
+                                : "pending";
+                            const result =
+                                req.status === "denied"
+                                    ? { success: false, data: "Denied by user" }
+                                    : req.result ?? undefined;
+                            const actionLabel = req.action || row.action;
+                            return (
+                                <PageControlCard
+                                    key={row.id}
+                                    from="user"
+                                    action={actionLabel}
+                                    phase={phase}
+                                    steps={req.steps}
+                                    result={result}
+                                    colors={{
+                                        text: "text-white",
+                                        mutedText: "text-white/70",
+                                        icon: "text-white",
+                                    }}
+                                />
+                            );
+                        }
+
+                        if (row.kind === "system") {
+                            return (
+                                <AIMessage from="user" key={row.id}>
+                                    <div className="flex flex-col gap-2">
+                                        <AIMessageContent>
+                                            <AIResponse className="text-muted-foreground text-sm italic">
+                                                {row.content}
+                                            </AIResponse>
+                                        </AIMessageContent>
+                                    </div>
+                                </AIMessage>
+                            );
+                        }
+
+                        if (row.kind === "tool") {
+                            const done = toolRowIsComplete(row);
+                            return (
+                                <AIMessage from="user" key={row.id}>
+                                    <div className="flex flex-col gap-1">
+                                        <div
+                                            className="flex flex-col gap-1.5 rounded-lg border border-border/70 bg-muted/50 px-2.5 py-2"
+                                            aria-label="Assistant tool"
+                                        >
+                                            {/* <p className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                                                <WrenchIcon className="size-3" />
+                                                Tool
+                                            </p> */}
+                                            <div className="flex items-center gap-2 text-xs text-foreground/90">
+                                                <span className="min-w-0 flex-1 leading-snug">
+                                                    {labelForAgentTool(row.toolName)}
+                                                </span>
+                                                {done ? (
+                                                    <CheckIcon
+                                                        aria-hidden
+                                                        className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-500"
+                                                    />
+                                                ) : (
+                                                    <Loader2Icon
+                                                        aria-hidden
+                                                        className="size-3.5 shrink-0 animate-spin text-muted-foreground"
+                                                    />
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </AIMessage>
+                            );
+                        }
+
+                        const parsedMessage = parseMessageAttachments(row.text);
+                        return (
+                            <AIMessage from="user" key={row.id}>
+                                <div className="flex flex-col gap-2">
+                                    {parsedMessage.attachments.map((attachment, index) => (
+                                        attachment.isImage ? (
+                                            <a
+                                                key={`${row.id}-attachment-${index}`}
+                                                href={attachment.url}
+                                                rel="noreferrer"
+                                                target="_blank"
+                                                className="block overflow-hidden rounded-lg border bg-background transition hover:opacity-90"
+                                            >
+                                                {/* eslint-disable-next-line @next/next/no-img-element -- dynamic Convex storage URLs */}
+                                                <img
+                                                    src={attachment.url}
+                                                    alt={attachment.name}
+                                                    loading="lazy"
+                                                    className="h-auto max-h-64 w-full object-cover"
+                                                />
+                                                <div className="border-t px-3 py-1.5 text-xs text-muted-foreground">
+                                                    {attachment.name}
+                                                </div>
+                                            </a>
+                                        ) : (
+                                            <a
+                                                key={`${row.id}-attachment-${index}`}
+                                                href={attachment.url}
+                                                rel="noreferrer"
+                                                target="_blank"
+                                                className="inline-flex w-fit items-center gap-1.5 rounded-full border bg-transparent px-2.5 py-1 text-xs font-medium text-foreground hover:opacity-90"
+                                            >
+                                                <FileIcon className="size-3 shrink-0 text-muted-foreground" />
+                                                <span className="max-w-[220px] truncate">{attachment.name}</span>
+                                            </a>
+                                        )
+                                    ))}
+                                    {parsedMessage.textContent && (
+                                        <AIMessageContent>
+                                            <AIResponse>{parsedMessage.textContent}</AIResponse>
+                                        </AIMessageContent>
+                                    )}
+                                </div>
                             </AIMessage>
                         );
                     })}

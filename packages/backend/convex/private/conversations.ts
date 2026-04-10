@@ -304,4 +304,25 @@ export const getLatestPageControlRequest = query({
             .order("desc")
             .first();
     },
-})
+});
+
+/** All page control requests for a conversation (newest first). */
+export const listPageControlRequests = query({
+    args: { conversationId: v.id("conversations") },
+    handler: async (ctx, args) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new ConvexError({ code: "UNAUTHORIZED", message: "Identity not found" });
+
+        const orgId = identity.orgId as string;
+        if (!orgId) throw new ConvexError({ code: "UNAUTHORIZED", message: "No org ID" });
+
+        const conversation = await ctx.db.get(args.conversationId);
+        if (!conversation || conversation.organizationId !== orgId) return [];
+
+        return await ctx.db
+            .query("pageControlRequests")
+            .withIndex("by_conversation_id", (q) => q.eq("conversationId", args.conversationId))
+            .order("desc")
+            .collect();
+    },
+});

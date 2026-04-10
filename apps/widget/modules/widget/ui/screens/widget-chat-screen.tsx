@@ -4,11 +4,21 @@ import { AISuggestion, AISuggestions } from "@workspace/ui/components/ai/suggest
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
-import { useThreadMessages, toUIMessages } from "@convex-dev/agent/react";
+import { useThreadMessages } from "@convex-dev/agent/react";
 import { WidgetHeader } from "@/modules/widget/ui/components/widget-header";
 import { Button } from "@workspace/ui/components/button";
 import { useAtomValue, useSetAtom } from "jotai";
-import { ArrowLeftIcon, FileIcon, Loader2Icon, MenuIcon, PaperclipIcon, Trash2Icon, XIcon } from "lucide-react";
+import {
+    ArrowLeftIcon,
+    CheckIcon,
+    FileIcon,
+    Loader2Icon,
+    MenuIcon,
+    PaperclipIcon,
+    Trash2Icon,
+    WrenchIcon,
+    XIcon,
+} from "lucide-react";
 import { DicebearAvatar } from "@workspace/ui/components/dicebear-avatar";
 import { useInfiniteScroll } from "@workspace/ui/hooks/use-infinite-scroll";
 import { InfiniteScrollTrigger } from "@workspace/ui/components/infinite-scroll-trigger";
@@ -49,6 +59,11 @@ import {
     AIMessageContent,
 } from "@workspace/ui/components/ai/message";
 import { AIResponse } from "@workspace/ui/components/ai/response";
+import {
+    labelForAgentTool,
+    threadMessagesToSeparateChatRows,
+    toolRowIsComplete,
+} from "@workspace/ui/lib/agent-thread-chat-rows";
 import { cn } from "@workspace/ui/lib/utils";
 import { motion } from "motion/react";
 import { useRef, useState, useMemo, useEffect } from "react";
@@ -100,7 +115,7 @@ function parseMessageAttachments(content: string): { textContent: string; attach
     return { textContent, attachments };
 }
 
-/** Convex `_creationTime` is exposed on UI messages as `createdAt` via `toUIMessages`. */
+/** Message timestamp for chat bubbles. */
 function formatMessageTime(createdAt: Date) {
     return createdAt.toLocaleTimeString(undefined, {
         hour: "numeric",
@@ -328,6 +343,11 @@ export const WidgetChatScreen = () => {
             : "skip"
     );
 
+    const chatRows = useMemo(
+        () => threadMessagesToSeparateChatRows(messages.results ?? []),
+        [messages.results],
+    );
+
     return (
         <>
             <Dialog onOpenChange={setIsDeleteDialogOpen} open={isDeleteDialogOpen}>
@@ -393,143 +413,13 @@ export const WidgetChatScreen = () => {
                         onLoadMore={handleLoadMore}
                         ref={topElementRef}
                     />
-                    {toUIMessages(messages.results ?? [])?.map((message) => {
-                        // Detect page control marker
-                        const markerMatch = message.content.match(/^\[PAGE_CONTROL_REQUEST:(\{.*\})\]$/);
-                        if (markerMatch?.[1] && contactSessionId) {
-                            try {
-                                const { id } = JSON.parse(markerMatch[1]) as { id: string };
-                                const request = requestsById.get(id);
-                                if (request) {
-                                    const phase =
-                                        request.status === "denied" ? "done"
-                                        : request.status === "approved" && request.result ? "done"
-                                        : request.status === "approved" ? "running"
-                                        : "pending";
-                                    const result =
-                                        request.status === "denied"
-                                            ? { success: false, data: "Denied by user" }
-                                            : request.result ?? undefined;
-                                    const onAllow = request.status === "pending" ? async () => {
-                                        await resolvePageControlRequest({
-                                            requestId: request._id,
-                                            contactSessionId,
-                                            decision: "approved",
-                                        });
-                                        window.parent.postMessage(
-                                            { type: "page-agent-execute", payload: { action: request.action, requestId: request._id } },
-                                            "*"
-                                        );
-                                    } : undefined;
-                                    const onDeny = request.status === "pending" ? async () => {
-                                        await resolvePageControlRequest({
-                                            requestId: request._id,
-                                            contactSessionId,
-                                            decision: "denied",
-                                        });
-                                    } : undefined;
-                                    const onStop =
-                                        phase === "running"
-                                            ? () => {
-                                                window.parent.postMessage(
-                                                    {
-                                                        type: "page-agent-stop",
-                                                        payload: { requestId: request._id },
-                                                    },
-                                                    "*",
-                                                );
-                                            }
-                                            : undefined;
-                                    const confirmationText =
-                                        result?.data ??
-                                        (result?.success ? "Completed" : "Failed");
-                                    const avatar = (
-                                        <DicebearAvatar imageUrl="/logo.svg" seed="assistant" size={32} />
-                                    );
-                                    const pageControlTime =
-                                        message.createdAt != null ? (
-                                            <p className="mt-0.5 w-max max-w-full shrink-0 grow-0 basis-auto self-end text-right text-[10px] leading-none text-muted-foreground tabular-nums">
-                                                {formatMessageTime(message.createdAt)}
-                                            </p>
-                                        ) : null;
-                                    return (
-                                        <motion.div
-                                            key={message.id}
-                                            className="w-full"
-                                            initial={{ opacity: 0, y: 10, scale: 0.98 }}
-                                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                                            transition={{
-                                                type: "spring",
-                                                stiffness: 420,
-                                                damping: 32,
-                                                mass: 0.85,
-                                            }}
-                                        >
-                                            {phase === "pending" ? (
-                                                <AIMessage from="assistant">
-                                                    <div className="flex flex-col gap-1">
-                                                        <AIMessageContent>
-                                                            <PageControlRequestCardContent
-                                                                action={request.action}
-                                                                allowLabel="Confirm"
-                                                                denyLabel="Deny"
-                                                                interactive
-                                                                onAllow={onAllow}
-                                                                onDeny={onDeny}
-                                                            />
-                                                        </AIMessageContent>
-                                                        {pageControlTime}
-                                                    </div>
-                                                    {avatar}
-                                                </AIMessage>
-                                            ) : phase === "running" ? (
-                                                <AIMessage from="assistant">
-                                                    <div className="flex min-w-0 w-fit max-w-[80%] flex-col items-start gap-1">
-                                                        {request.steps && request.steps.length > 0 ? (
-                                                            <PageControlAgentStepsPanel
-                                                                expandWhileRunning
-                                                                phase="running"
-                                                                steps={request.steps}
-                                                            />
-                                                        ) : null}
-                                                        <div className="flex min-w-0 w-fit max-w-full flex-col gap-1">
-                                                            <PageControlRunningBar onStop={onStop} />
-                                                            {pageControlTime}
-                                                        </div>
-                                                    </div>
-                                                    {avatar}
-                                                </AIMessage>
-                                            ) : (
-                                                <AIMessage from="assistant">
-                                                    <div className="flex min-w-0 w-fit max-w-[80%] flex-col items-start gap-1">
-                                                        {request.steps && request.steps.length > 0 ? (
-                                                            <PageControlAgentStepsPanel
-                                                                expandWhileRunning
-                                                                phase="done"
-                                                                steps={request.steps}
-                                                            />
-                                                        ) : null}
-                                                        <div className="flex min-w-0 w-fit max-w-full flex-col gap-1">
-                                                            <AIMessageContent className="min-w-0 w-fit max-w-full">
-                                                                <AIResponse>{confirmationText}</AIResponse>
-                                                            </AIMessageContent>
-                                                            {pageControlTime}
-                                                        </div>
-                                                    </div>
-                                                    {avatar}
-                                                </AIMessage>
-                                            )}
-                                        </motion.div>
-                                    );
-                                }
-                            } catch { /* fall through to normal render */ }
-                        }
-
-                        const parsed = parseMessageAttachments(message.content);
+                    {chatRows.map((row) => {
+                        if (row.kind === "user") {
+                        const parsed = parseMessageAttachments(row.content);
                         return (
                             <AIMessage
-                                from={message.role === "user" ? "user" : "assistant"}
-                                key={message.id}
+                                from="user"
+                                key={row.id}
                             >
                                 <div className="flex flex-col gap-2">
                                     {parsed.attachments.map((attachment, i) => (
@@ -570,15 +460,257 @@ export const WidgetChatScreen = () => {
                                             <AIResponse>{parsed.textContent}</AIResponse>
                                         </AIMessageContent>
                                     )}
-                                    {message.createdAt != null && (
+                                    {row.createdAt != null && (
                                         <p className="mt-0.5 w-max max-w-full shrink-0 self-end text-right text-[10px] leading-none text-muted-foreground tabular-nums">
-                                            {formatMessageTime(message.createdAt)}
+                                            {formatMessageTime(row.createdAt)}
                                         </p>
                                     )}
                                 </div>
-                                {message.role === "assistant" && (
+                            </AIMessage>
+                        );
+                        }
+
+                        if (row.kind === "page-control") {
+                            if (!contactSessionId) {
+                                return null;
+                            }
+                            const request = requestsById.get(row.requestId);
+                            if (!request) {
+                                return null;
+                            }
+                            const phase =
+                                request.status === "denied" ? "done"
+                                : request.status === "approved" && request.result ? "done"
+                                : request.status === "approved" ? "running"
+                                : "pending";
+                            const result =
+                                request.status === "denied"
+                                    ? { success: false, data: "Denied by user" }
+                                    : request.result ?? undefined;
+                            const onAllow = request.status === "pending" ? async () => {
+                                await resolvePageControlRequest({
+                                    requestId: request._id,
+                                    contactSessionId,
+                                    decision: "approved",
+                                });
+                                window.parent.postMessage(
+                                    { type: "page-agent-execute", payload: { action: request.action, requestId: request._id } },
+                                    "*"
+                                );
+                            } : undefined;
+                            const onDeny = request.status === "pending" ? async () => {
+                                await resolvePageControlRequest({
+                                    requestId: request._id,
+                                    contactSessionId,
+                                    decision: "denied",
+                                });
+                            } : undefined;
+                            const onStop =
+                                phase === "running"
+                                    ? () => {
+                                        window.parent.postMessage(
+                                            {
+                                                type: "page-agent-stop",
+                                                payload: { requestId: request._id },
+                                            },
+                                            "*",
+                                        );
+                                    }
+                                    : undefined;
+                            const confirmationText =
+                                result?.data ??
+                                (result?.success ? "Completed" : "Failed");
+                            const avatar = (
+                                <DicebearAvatar imageUrl="/logo.svg" seed="assistant" size={32} />
+                            );
+                            const pageControlTime =
+                                row.createdAt != null ? (
+                                    <p className="mt-0.5 w-max max-w-full shrink-0 grow-0 basis-auto self-end text-right text-[10px] leading-none text-muted-foreground tabular-nums">
+                                        {formatMessageTime(row.createdAt)}
+                                    </p>
+                                ) : null;
+                            const actionLabel = request.action || row.action;
+                            return (
+                                <motion.div
+                                    key={row.id}
+                                    className="w-full"
+                                    initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                                    transition={{
+                                        type: "spring",
+                                        stiffness: 420,
+                                        damping: 32,
+                                        mass: 0.85,
+                                    }}
+                                >
+                                    {phase === "pending" ? (
+                                        <AIMessage from="assistant">
+                                            <div className="flex flex-col gap-1">
+                                                <AIMessageContent>
+                                                    <PageControlRequestCardContent
+                                                        action={actionLabel}
+                                                        allowLabel="Confirm"
+                                                        denyLabel="Deny"
+                                                        interactive
+                                                        onAllow={onAllow}
+                                                        onDeny={onDeny}
+                                                    />
+                                                </AIMessageContent>
+                                                {pageControlTime}
+                                            </div>
+                                            {avatar}
+                                        </AIMessage>
+                                    ) : phase === "running" ? (
+                                        <AIMessage from="assistant">
+                                            <div className="flex min-w-0 w-fit max-w-[80%] flex-col items-start gap-1">
+                                                {request.steps && request.steps.length > 0 ? (
+                                                    <PageControlAgentStepsPanel
+                                                        expandWhileRunning
+                                                        phase="running"
+                                                        steps={request.steps}
+                                                    />
+                                                ) : null}
+                                                <div className="flex min-w-0 w-fit max-w-full flex-col gap-1">
+                                                    <PageControlRunningBar onStop={onStop} />
+                                                    {pageControlTime}
+                                                </div>
+                                            </div>
+                                            {avatar}
+                                        </AIMessage>
+                                    ) : (
+                                        <AIMessage from="assistant">
+                                            <div className="flex min-w-0 w-fit max-w-[80%] flex-col items-start gap-1">
+                                                {request.steps && request.steps.length > 0 ? (
+                                                    <PageControlAgentStepsPanel
+                                                        expandWhileRunning
+                                                        phase="done"
+                                                        steps={request.steps}
+                                                    />
+                                                ) : null}
+                                                <div className="flex min-w-0 w-fit max-w-full flex-col gap-1">
+                                                    <AIMessageContent className="min-w-0 w-fit max-w-full">
+                                                        <AIResponse>{confirmationText}</AIResponse>
+                                                    </AIMessageContent>
+                                                    {pageControlTime}
+                                                </div>
+                                            </div>
+                                            {avatar}
+                                        </AIMessage>
+                                    )}
+                                </motion.div>
+                            );
+                        }
+
+                        if (row.kind === "system") {
+                            return (
+                                <AIMessage from="assistant" key={row.id}>
+                                    <div className="flex flex-col gap-2">
+                                        <AIMessageContent>
+                                            <AIResponse className="text-muted-foreground text-sm italic">
+                                                {row.content}
+                                            </AIResponse>
+                                        </AIMessageContent>
+                                        {row.createdAt != null && (
+                                            <p className="mt-0.5 w-max max-w-full shrink-0 self-end text-right text-[10px] leading-none text-muted-foreground tabular-nums">
+                                                {formatMessageTime(row.createdAt)}
+                                            </p>
+                                        )}
+                                    </div>
                                     <DicebearAvatar imageUrl="/logo.svg" seed="assistant" size={32} />
-                                )}
+                                </AIMessage>
+                            );
+                        }
+
+                        if (row.kind === "tool") {
+                            const done = toolRowIsComplete(row);
+                            return (
+                                <AIMessage from="assistant" key={row.id}>
+                                    <div className="flex flex-col gap-1">
+                                        <div
+                                            className="flex flex-col gap-1.5 rounded-lg border border-border/70 bg-muted/50 px-2.5 py-2"
+                                            aria-label="Assistant tool"
+                                        >
+                                            {/* <p className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                                                <WrenchIcon className="size-3" />
+                                                Tool
+                                            </p> */}
+                                            <div className="flex items-center gap-2 text-xs text-foreground/90">
+                                                <span className="min-w-0 flex-1 leading-snug">
+                                                    {labelForAgentTool(row.toolName)}
+                                                </span>
+                                                {done ? (
+                                                    <CheckIcon
+                                                        aria-hidden
+                                                        className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-500"
+                                                    />
+                                                ) : (
+                                                    <Loader2Icon
+                                                        aria-hidden
+                                                        className="size-3.5 shrink-0 animate-spin text-muted-foreground"
+                                                    />
+                                                )}
+                                            </div>
+                                        </div>
+                                        {row.createdAt != null && (
+                                            <p className="mt-0.5 w-max max-w-full shrink-0 self-end text-right text-[10px] leading-none text-muted-foreground tabular-nums">
+                                                {formatMessageTime(row.createdAt)}
+                                            </p>
+                                        )}
+                                    </div>
+                                    <DicebearAvatar imageUrl="/logo.svg" seed="assistant" size={32} />
+                                </AIMessage>
+                            );
+                        }
+
+                        const parsed = parseMessageAttachments(row.text);
+                        return (
+                            <AIMessage from="assistant" key={row.id}>
+                                <div className="flex flex-col gap-2">
+                                    {parsed.attachments.map((attachment, i) => (
+                                        attachment.isImage ? (
+                                            <a
+                                                key={i}
+                                                href={attachment.url}
+                                                rel="noreferrer"
+                                                target="_blank"
+                                                className="block overflow-hidden rounded-lg border bg-background transition hover:opacity-90"
+                                            >
+                                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                <img
+                                                    src={attachment.url}
+                                                    alt={attachment.name}
+                                                    loading="lazy"
+                                                    className="h-auto max-h-48 w-full object-cover"
+                                                />
+                                                <div className="border-t px-3 py-1.5 text-xs text-muted-foreground">
+                                                    {attachment.name}
+                                                </div>
+                                            </a>
+                                        ) : (
+                                            <a
+                                                key={i}
+                                                href={attachment.url}
+                                                rel="noreferrer"
+                                                target="_blank"
+                                                className="inline-flex w-fit items-center gap-1.5 rounded-full border bg-transparent px-2.5 py-1 text-xs font-medium text-foreground hover:opacity-90"
+                                            >
+                                                <FileIcon className="size-3 shrink-0 text-muted-foreground" />
+                                                <span className="max-w-[180px] truncate">{attachment.name}</span>
+                                            </a>
+                                        )
+                                    ))}
+                                    {parsed.textContent && (
+                                        <AIMessageContent>
+                                            <AIResponse>{parsed.textContent}</AIResponse>
+                                        </AIMessageContent>
+                                    )}
+                                    {row.createdAt != null && (
+                                        <p className="mt-0.5 w-max max-w-full shrink-0 self-end text-right text-[10px] leading-none text-muted-foreground tabular-nums">
+                                            {formatMessageTime(row.createdAt)}
+                                        </p>
+                                    )}
+                                </div>
+                                <DicebearAvatar imageUrl="/logo.svg" seed="assistant" size={32} />
                             </AIMessage>
                         );
                     })}
@@ -601,7 +733,7 @@ export const WidgetChatScreen = () => {
                 </AIConversationContent>
                 <AIConversationScrollButton />
             </AIConversation>
-            {toUIMessages(messages.results ?? [])?.length === 1 && (
+            {messages.results?.length === 1 && (
                 <AISuggestions className="flex w-full flex-col items-end p-2">
                     {suggestions.map((suggestion) => {
                         if (!suggestion) {

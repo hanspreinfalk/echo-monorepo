@@ -1,8 +1,17 @@
 const PAGE_CONTROL_REQUEST_MARKER = /^\[PAGE_CONTROL_REQUEST:/;
 
+function isPageControlToolResultJson(text: string): boolean {
+    try {
+        const o = JSON.parse(text) as { pageControlRequestId?: unknown };
+        return typeof o.pageControlRequestId === "string" && o.pageControlRequestId.length > 0;
+    } catch {
+        return false;
+    }
+}
+
 /**
  * Human-readable preview for conversation list rows (inbox / sidebar).
- * Tool markers stored as message text are replaced with a short label.
+ * Legacy page-control markers and tool-result JSON are replaced with a short label.
  */
 export function formatConversationLastMessagePreview(
     text: string | undefined,
@@ -11,7 +20,10 @@ export function formatConversationLastMessagePreview(
         return text;
     }
     if (PAGE_CONTROL_REQUEST_MARKER.test(text)) {
-        return "Page Control Request";
+        return "Page control requested";
+    }
+    if (isPageControlToolResultJson(text)) {
+        return "Page control requested";
     }
     return text;
 }
