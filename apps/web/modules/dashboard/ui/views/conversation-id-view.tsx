@@ -311,7 +311,7 @@ export function ConversationIdView({ conversationId }: { conversationId: Id<"con
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="start">
                         <DropdownMenuItem
-                            className="text-destructive focus:text-destructive"
+                            variant="destructive"
                             onClick={() => setIsDeleteDialogOpen(true)}
                         >
                             <Trash2Icon className="size-4" />

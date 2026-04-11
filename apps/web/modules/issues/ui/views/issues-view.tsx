@@ -651,7 +651,7 @@ export const IssuesView = () => {
                                                                     </DropdownMenuItem>
                                                                 )}
                                                                 <DropdownMenuItem
-                                                                    className="text-destructive"
+                                                                    variant="destructive"
                                                                     onClick={(
                                                                         e,
                                                                     ) => {

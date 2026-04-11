@@ -152,7 +152,7 @@ export const FilesView = () => {
                                                     </DropdownMenuTrigger>
                                                     <DropdownMenuContent align="end">
                                                         <DropdownMenuItem
-                                                            className="text-destructive"
+                                                            variant="destructive"
                                                             onClick={() => handleDeleteClick(file)}
                                                         >
                                                             <TrashIcon className="size-4 mr-2" />

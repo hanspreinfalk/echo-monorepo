@@ -396,7 +396,7 @@ export const WidgetChatScreen = () => {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                         <DropdownMenuItem
-                            className="text-destructive focus:text-destructive"
+                            variant="destructive"
                             onClick={() => setIsDeleteDialogOpen(true)}
                         >
                             <Trash2Icon className="size-4" />
