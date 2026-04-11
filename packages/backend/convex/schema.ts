@@ -137,4 +137,45 @@ export default defineSchema({
             data: v.string(), 
         })),
     }).index("by_conversation_id", ["conversationId"]),
+    agentCustomTools: defineTable({
+        organizationId: v.string(),
+        name: v.string(),
+        description: v.string(),
+        endpoint: v.string(),
+        method: v.union(
+            v.literal("GET"),
+            v.literal("POST"),
+            v.literal("PUT"),
+            v.literal("PATCH"),
+        ),
+        headers: v.optional(
+            v.array(
+                v.object({
+                    key: v.string(),
+                    value: v.string(),
+                }),
+            ),
+        ),
+        argumentFields: v.optional(
+            v.array(
+                v.object({
+                    name: v.string(),
+                    type: v.optional(
+                        v.union(
+                            v.literal("string"),
+                            v.literal("number"),
+                            v.literal("integer"),
+                            v.literal("boolean"),
+                            v.literal("array"),
+                            v.literal("object"),
+                        ),
+                    ),
+                    description: v.optional(v.string()),
+                    schema: v.optional(v.string()),
+                    /** When true, the agent should always pass this argument (Zod required). */
+                    required: v.optional(v.boolean()),
+                }),
+            ),
+        ),
+    }).index("by_organization_id", ["organizationId"]),
 });

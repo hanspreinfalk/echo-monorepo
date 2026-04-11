@@ -2,13 +2,13 @@
 
 import { OrganizationSwitcher, UserButton } from "@clerk/nextjs"
 import {
+    BugIcon,
     CreditCardIcon,
     InboxIcon,
     LayoutDashboardIcon,
     LibraryBigIcon,
-    Mic,
     PaletteIcon,
-    BugIcon
+    WrenchIcon,
 } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
@@ -56,6 +56,11 @@ const configurationItems = [
         title: 'Integrations',
         url: '/integrations',
         icon: LayoutDashboardIcon,
+    },
+    {
+        title: 'Custom Tools',
+        url: '/custom-tools',
+        icon: WrenchIcon,
     },
     // {
     //     title: 'Voice Assistant',

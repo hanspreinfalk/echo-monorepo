@@ -16,6 +16,7 @@ import { readOpenIssueDetails } from "../system/ai/tools/readOpenIssueDetails";
 import { readConsoleLogs } from "../system/ai/tools/readConsoleLogs";
 import { formatVisitorContextForAgent } from "../system/ai/visitorContext";
 import { supportAgentSystemWithVisitorContext } from "../system/ai/constants";
+import { buildCustomHttpTools } from "../system/ai/tools/customHttpTools";
 
 export const create = action({
   args: {
@@ -96,6 +97,12 @@ export const create = action({
         isAiTyping: true,
       });
 
+      const customToolDefs = await ctx.runQuery(
+        internal.system.agentCustomTools.listByOrganizationId,
+        { organizationId: conversation.organizationId },
+      );
+      const customHttpTools = buildCustomHttpTools(customToolDefs);
+
       await supportAgent.generateText(
         ctx,
         { threadId: args.threadId },
@@ -115,6 +122,7 @@ export const create = action({
             ...(subscription?.status === "active"
               ? { requestPageControlTool: requestPageControl }
               : {}),
+            ...customHttpTools,
           },
         },
       )

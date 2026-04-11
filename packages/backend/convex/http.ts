@@ -9,6 +9,7 @@ import {
   embedWidgetAppearanceGet,
   embedWidgetAppearanceOptions,
 } from "./embedWidgetAppearance";
+import { customToolTest } from "./customToolTestHttp";
 
 const clerkClient = createClerkClient({
   secretKey: process.env.CLERK_SECRET_KEY || "",
@@ -37,6 +38,14 @@ http.route({
   method: "GET",
   handler: embedWidgetAppearanceGet,
 });
+
+for (const method of ["GET", "POST", "PUT", "PATCH"] as const) {
+  http.route({
+    path: "/custom-tool-test",
+    method,
+    handler: customToolTest,
+  });
+}
 
 http.route({
   path: "/clerk-webhook",

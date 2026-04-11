@@ -9,10 +9,12 @@
  */
 
 import type * as constants from "../constants.js";
+import type * as customToolTestHttp from "../customToolTestHttp.js";
 import type * as embedOpenai from "../embedOpenai.js";
 import type * as embedWidgetAppearance from "../embedWidgetAppearance.js";
 import type * as http from "../http.js";
 import type * as lib_extractTextContent from "../lib/extractTextContent.js";
+import type * as private_agentCustomTools from "../private/agentCustomTools.js";
 import type * as private_contactSessions from "../private/contactSessions.js";
 import type * as private_conversations from "../private/conversations.js";
 import type * as private_files from "../private/files.js";
@@ -25,11 +27,13 @@ import type * as public_conversations from "../public/conversations.js";
 import type * as public_messages from "../public/messages.js";
 import type * as public_organizations from "../public/organizations.js";
 import type * as public_widgetSettings from "../public/widgetSettings.js";
+import type * as system_agentCustomTools from "../system/agentCustomTools.js";
 import type * as system_ai_agents_supportAgent from "../system/ai/agents/supportAgent.js";
 import type * as system_ai_constants from "../system/ai/constants.js";
 import type * as system_ai_rag from "../system/ai/rag.js";
 import type * as system_ai_tools_appendSessionToIssue from "../system/ai/tools/appendSessionToIssue.js";
 import type * as system_ai_tools_createIssue from "../system/ai/tools/createIssue.js";
+import type * as system_ai_tools_customHttpTools from "../system/ai/tools/customHttpTools.js";
 import type * as system_ai_tools_escalateConversation from "../system/ai/tools/escalateConversation.js";
 import type * as system_ai_tools_listOpenIssues from "../system/ai/tools/listOpenIssues.js";
 import type * as system_ai_tools_readAttachment from "../system/ai/tools/readAttachment.js";
@@ -53,10 +57,12 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   constants: typeof constants;
+  customToolTestHttp: typeof customToolTestHttp;
   embedOpenai: typeof embedOpenai;
   embedWidgetAppearance: typeof embedWidgetAppearance;
   http: typeof http;
   "lib/extractTextContent": typeof lib_extractTextContent;
+  "private/agentCustomTools": typeof private_agentCustomTools;
   "private/contactSessions": typeof private_contactSessions;
   "private/conversations": typeof private_conversations;
   "private/files": typeof private_files;
@@ -69,11 +75,13 @@ declare const fullApi: ApiFromModules<{
   "public/messages": typeof public_messages;
   "public/organizations": typeof public_organizations;
   "public/widgetSettings": typeof public_widgetSettings;
+  "system/agentCustomTools": typeof system_agentCustomTools;
   "system/ai/agents/supportAgent": typeof system_ai_agents_supportAgent;
   "system/ai/constants": typeof system_ai_constants;
   "system/ai/rag": typeof system_ai_rag;
   "system/ai/tools/appendSessionToIssue": typeof system_ai_tools_appendSessionToIssue;
   "system/ai/tools/createIssue": typeof system_ai_tools_createIssue;
+  "system/ai/tools/customHttpTools": typeof system_ai_tools_customHttpTools;
   "system/ai/tools/escalateConversation": typeof system_ai_tools_escalateConversation;
   "system/ai/tools/listOpenIssues": typeof system_ai_tools_listOpenIssues;
   "system/ai/tools/readAttachment": typeof system_ai_tools_readAttachment;
