@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "convex/react";
-import { useEffect } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { Button } from "@workspace/ui/components/button";
@@ -43,7 +43,7 @@ import type { Doc } from "@workspace/backend/_generated/dataModel";
 import { InfoIcon, MinusIcon, PlusIcon } from "lucide-react";
 import {
   type CustomToolFormValues,
-  customToolFormSchema,
+  createCustomToolFormSchema,
 } from "../../schemas";
 
 type AgentCustomTool = Doc<"agentCustomTools">;
@@ -52,6 +52,7 @@ type CustomToolFormDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   editing: AgentCustomTool | null;
+  tools: AgentCustomTool[];
 };
 
 const defaultValues: CustomToolFormValues = {
@@ -75,12 +76,31 @@ export const CustomToolFormDialog = ({
   open,
   onOpenChange,
   editing,
+  tools,
 }: CustomToolFormDialogProps) => {
   const createTool = useMutation(api.private.agentCustomTools.create);
   const updateTool = useMutation(api.private.agentCustomTools.update);
 
+  const takenToolNamesRef = useRef<ReadonlySet<string>>(new Set());
+  const takenToolNames = useMemo(() => {
+    const next = new Set<string>();
+    for (const t of tools) {
+      if (editing && t._id === editing._id) {
+        continue;
+      }
+      next.add(t.name);
+    }
+    return next;
+  }, [tools, editing]);
+  takenToolNamesRef.current = takenToolNames;
+
+  const formSchema = useMemo(
+    () => createCustomToolFormSchema(() => takenToolNamesRef.current),
+    [],
+  );
+
   const form = useForm<CustomToolFormValues>({
-    resolver: zodResolver(customToolFormSchema),
+    resolver: zodResolver(formSchema),
     defaultValues,
   });
 

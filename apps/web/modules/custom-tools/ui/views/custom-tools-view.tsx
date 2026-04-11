@@ -61,6 +61,7 @@ export const CustomToolsView = () => {
         editing={editing}
         onOpenChange={setFormOpen}
         open={formOpen}
+        tools={tools}
       />
       <DeleteCustomToolDialog
         onDeleted={() => setDeleteTarget(null)}

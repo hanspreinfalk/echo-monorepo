@@ -29,7 +29,7 @@ function endpointRefine(url: string) {
   }
 }
 
-export const customToolFormSchema = z.object({
+const customToolFormObjectSchema = z.object({
   name: z
     .string()
     .min(1, "Name is required")
@@ -60,7 +60,12 @@ export const customToolFormSchema = z.object({
       value: z.string(),
     }),
   ),
-}).superRefine((data, ctx) => {
+});
+
+function refineArgumentFieldNames(
+  data: z.infer<typeof customToolFormObjectSchema>,
+  ctx: z.RefinementCtx,
+) {
   const seen = new Set<string>();
   for (let i = 0; i < data.argumentFields.length; i++) {
     const raw = data.argumentFields[i]?.name?.trim() ?? "";
@@ -85,6 +90,30 @@ export const customToolFormSchema = z.object({
     }
     seen.add(raw);
   }
-});
+}
 
-export type CustomToolFormValues = z.infer<typeof customToolFormSchema>;
+/**
+ * Validates tool name uniqueness against names returned by `getTakenToolNames`
+ * (called at validation time, e.g. after trim — match Convex create/update).
+ */
+export function createCustomToolFormSchema(
+  getTakenToolNames: () => ReadonlySet<string>,
+) {
+  return customToolFormObjectSchema
+    .superRefine(refineArgumentFieldNames)
+    .superRefine((data, ctx) => {
+      const trimmed = data.name.trim();
+      if (trimmed.length === 0) {
+        return;
+      }
+      if (getTakenToolNames().has(trimmed)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "A tool with this name already exists",
+          path: ["name"],
+        });
+      }
+    });
+}
+
+export type CustomToolFormValues = z.infer<typeof customToolFormObjectSchema>;
