@@ -17,6 +17,7 @@ const appearanceArgs = v.optional(
 export const upsert = mutation({
   args: {
     greetMessage: v.string(),
+    showLogo: v.boolean(),
     defaultSuggestions: v.object({
       suggestion1: v.optional(v.string()),
       suggestion2: v.optional(v.string()),
@@ -51,6 +52,7 @@ export const upsert = mutation({
     if (existingWidgetSettings) {
       await ctx.db.patch(existingWidgetSettings._id, {
         greetMessage: args.greetMessage,
+        showLogo: args.showLogo,
         defaultSuggestions: args.defaultSuggestions,
         ...(args.appearance !== undefined ? { appearance: args.appearance } : {}),
       });
@@ -58,6 +60,7 @@ export const upsert = mutation({
       await ctx.db.insert("widgetSettings", {
         organizationId: orgId,
         greetMessage: args.greetMessage,
+        showLogo: args.showLogo,
         defaultSuggestions: args.defaultSuggestions,
         ...(args.appearance !== undefined ? { appearance: args.appearance } : {}),
       });

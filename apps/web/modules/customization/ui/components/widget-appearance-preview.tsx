@@ -5,6 +5,7 @@ import type { FormSchema } from "../../types";
 type PreviewProps = {
   appearance: FormSchema["appearance"];
   greetMessage: string;
+  showLogo?: boolean;
   suggestionSample?: string;
   className?: string;
 };
@@ -12,6 +13,7 @@ type PreviewProps = {
 export function WidgetAppearancePreview({
   appearance,
   greetMessage,
+  showLogo = true,
   suggestionSample,
   className,
 }: PreviewProps) {
@@ -41,7 +43,18 @@ export function WidgetAppearancePreview({
         </header>
 
         <div className="flex max-h-[220px] min-h-[140px] flex-col gap-2 overflow-hidden p-3 text-sm">
-          <div className="flex justify-start">
+          <div
+            className={cn(
+              "flex justify-start gap-2",
+              showLogo ? "items-end" : "items-start",
+            )}
+          >
+            {showLogo ? (
+              <div
+                aria-hidden
+                className="size-6 shrink-0 rounded-full border border-border bg-muted"
+              />
+            ) : null}
             <div
               className={cn(
                 "max-w-[88%] rounded-lg border border-border px-2.5 py-2 text-xs leading-snug",

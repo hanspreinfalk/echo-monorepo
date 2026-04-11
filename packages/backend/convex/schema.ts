@@ -56,6 +56,8 @@ export default defineSchema({
     widgetSettings: defineTable({
         organizationId: v.string(),
         greetMessage: v.string(),
+        /** When false, assistant rows hide the logo/avatar. Default true when omitted (legacy docs). */
+        showLogo: v.optional(v.boolean()),
         defaultSuggestions: v.object({
           suggestion1: v.optional(v.string()),
           suggestion2: v.optional(v.string()),

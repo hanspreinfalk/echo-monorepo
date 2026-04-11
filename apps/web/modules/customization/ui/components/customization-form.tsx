@@ -21,6 +21,7 @@ import {
 } from "@workspace/ui/components/form";
 import { Input } from "@workspace/ui/components/input";
 import { Separator } from "@workspace/ui/components/separator";
+import { Switch } from "@workspace/ui/components/switch";
 import { Textarea } from "@workspace/ui/components/textarea";
 import { Doc } from "@workspace/backend/_generated/dataModel";
 import { useMutation } from "convex/react";
@@ -103,6 +104,7 @@ export const CustomizationForm = ({
     defaultValues: {
       greetMessage:
         initialData?.greetMessage || "Hi! How can I help you today?",
+      showLogo: initialData?.showLogo !== false,
       defaultSuggestions: {
         suggestion1: initialData?.defaultSuggestions.suggestion1 || "",
         suggestion2: initialData?.defaultSuggestions.suggestion2 || "",
@@ -124,6 +126,10 @@ export const CustomizationForm = ({
     control: form.control,
     name: "defaultSuggestions",
   });
+  const watchedShowLogo = useWatch({
+    control: form.control,
+    name: "showLogo",
+  });
   const previewSuggestion =
     watchedSuggestions?.suggestion1?.trim() ||
     watchedSuggestions?.suggestion2?.trim() ||
@@ -134,6 +140,7 @@ export const CustomizationForm = ({
     try {
       await upsertWidgetSettings({
         greetMessage: values.greetMessage,
+        showLogo: values.showLogo,
         defaultSuggestions: values.defaultSuggestions,
         appearance: appearanceForConvex(values.appearance),
       });
@@ -173,6 +180,28 @@ export const CustomizationForm = ({
                     The first message customers see when they open the chat
                   </FormDescription>
                   <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="showLogo"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                  <div className="mr-4 space-y-1">
+                    <FormLabel>Show assistant logo</FormLabel>
+                    <FormDescription>
+                      Toggle the logo next to assistant messages in the embedded
+                      widget
+                    </FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
                 </FormItem>
               )}
             />
@@ -260,6 +289,7 @@ export const CustomizationForm = ({
                   ? watchedGreet
                   : form.getValues("greetMessage")
               }
+              showLogo={watchedShowLogo !== false}
               suggestionSample={previewSuggestion}
             />
             <Separator />

@@ -129,6 +129,14 @@ const formSchema = z.object({
     message: z.string(),
 });
 
+function WidgetAssistantAvatar() {
+    const widgetSettings = useAtomValue(widgetSettingsAtom);
+    if (widgetSettings?.showLogo === false) {
+        return null;
+    }
+    return <DicebearAvatar imageUrl="/logo.svg" seed="assistant" size={32} />;
+}
+
 function WidgetPageControlRow({
     row,
     request,
@@ -182,9 +190,7 @@ function WidgetPageControlRow({
                   });
               }
             : undefined;
-    const avatar = (
-        <DicebearAvatar imageUrl="/logo.svg" seed="assistant" size={32} />
-    );
+    const avatar = <WidgetAssistantAvatar />;
     const pageControlTime =
         row.createdAt != null ? (
             <p className="mt-0.5 w-max max-w-full shrink-0 grow-0 basis-auto self-end text-right text-[10px] leading-none text-muted-foreground tabular-nums">
@@ -615,7 +621,7 @@ export const WidgetChatScreen = () => {
                                                 </p>
                                             )}
                                         </div>
-                                        <DicebearAvatar imageUrl="/logo.svg" seed="assistant" size={32} />
+                                        <WidgetAssistantAvatar />
                                     </AIMessage>
                                 </motion.div>
                             );
@@ -655,7 +661,7 @@ export const WidgetChatScreen = () => {
                                             </p>
                                         )}
                                     </div>
-                                    <DicebearAvatar imageUrl="/logo.svg" seed="assistant" size={32} />
+                                    <WidgetAssistantAvatar />
                                 </AIMessage>
                             );
                         }
@@ -696,7 +702,7 @@ export const WidgetChatScreen = () => {
                                             </p>
                                         )}
                                     </div>
-                                    <DicebearAvatar imageUrl="/logo.svg" seed="assistant" size={32} />
+                                    <WidgetAssistantAvatar />
                                 </AIMessage>
                             );
                         }
@@ -749,7 +755,7 @@ export const WidgetChatScreen = () => {
                                         </p>
                                     )}
                                 </div>
-                                <DicebearAvatar imageUrl="/logo.svg" seed="assistant" size={32} />
+                                <WidgetAssistantAvatar />
                             </AIMessage>
                         );
                     })}
@@ -762,11 +768,7 @@ export const WidgetChatScreen = () => {
                                     <span className="size-1.5 animate-bounce rounded-full bg-current" />
                                 </div>
                             </AIMessageContent>
-                            <DicebearAvatar
-                                imageUrl="/logo.svg"
-                                seed="assistant"
-                                size={32}
-                            />
+                            <WidgetAssistantAvatar />
                         </AIMessage>
                     )}
                 </AIConversationContent>
