@@ -1,0 +1,76 @@
+# Hospital Management System — user guide
+
+This is a **demo** of a hospital management app. Use the **left sidebar** to move between areas. **Forms open in pop-up windows** on top of the page.
+
+**Important:** Nothing is saved permanently. Your changes only last until you **refresh or close the page**, then the sample data returns.
+
+---
+
+## Screen layout
+
+- **Sidebar** — Choose which area to work in. You can collapse the sidebar with the arrow at the bottom so only icons show.
+- **Top of the main area** — Shows which section you are in.
+
+---
+
+## Dashboard
+
+This is the first screen you see. It shows overview numbers, charts, recent admissions, and today’s schedule. You **cannot add or edit** data here—use the other sections for that.
+
+---
+
+## Patients
+
+1. Click **Patients** in the sidebar.
+2. To **add a patient**, click **Add Patient**, enter first name, last name, date of birth, gender, and contact, then save.
+3. Use **Search patients** to narrow the list by name or phone.
+4. To **remove someone**, click the trash icon on their row and confirm.
+
+---
+
+## Appointments
+
+1. Click **Appointments** in the sidebar.
+2. Click **New Appointment**, pick patient, doctor, date, time, department, and visit type, then **Schedule**.
+3. Use the search box to filter by patient, doctor, or department.
+4. To delete an appointment, use the trash icon on the row and confirm.
+
+---
+
+## Medical Records
+
+1. Click **Medical Records** in the sidebar.
+2. Click **Add Record**, choose patient, record type, diagnosis or notes, and doctor, then **Save Record**. The date is filled in for you as today.
+3. To delete a record, use the trash icon and confirm.
+
+---
+
+## Billing
+
+1. Click **Billing** in the sidebar.
+2. The summary numbers at the top are for display in this demo.
+3. Click **New Invoice**, choose a patient, enter the service and amount, then **Create Invoice**. New invoices show as **Pending**.
+4. To delete an invoice, use the trash icon and confirm.
+
+---
+
+## Inventory
+
+1. Click **Inventory** in the sidebar.
+2. Click **Add Item** and enter name, category, how many, unit (e.g. box), and expiry if needed. Small quantities may show as **Low Stock**.
+3. To remove an item, use the trash icon and confirm.
+
+---
+
+## Staff
+
+1. Click **Staff** in the sidebar.
+2. Click **Add Staff**, enter name, role, department, and contact, then save. Join date and status are set automatically for new people in this demo.
+3. To remove someone from the list, use the trash icon and confirm.
+
+---
+
+## Departments
+
+1. Click **Departments** in the sidebar.
+2. Each card shows the department, who leads it, beds and occupancy where relevant, and how many staff are listed for that department. You **cannot add or edit** departments in this demo.
