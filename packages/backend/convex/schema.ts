@@ -61,6 +61,18 @@ export default defineSchema({
           suggestion2: v.optional(v.string()),
           suggestion3: v.optional(v.string()),
         }),
+        appearance: v.optional(
+          v.object({
+            primaryColor: v.optional(v.string()),
+            primaryGradientEndColor: v.optional(v.string()),
+            headerForegroundColor: v.optional(v.string()),
+            backgroundColor: v.optional(v.string()),
+            foregroundColor: v.optional(v.string()),
+            mutedColor: v.optional(v.string()),
+            mutedForegroundColor: v.optional(v.string()),
+            borderColor: v.optional(v.string()),
+          }),
+        ),
       })
       .index("by_organization_id", ["organizationId"])
     ,

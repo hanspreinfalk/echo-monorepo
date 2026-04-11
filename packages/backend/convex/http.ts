@@ -5,6 +5,10 @@ import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { embedOpenaiCors, embedOpenaiProxy } from "./embedOpenai";
+import {
+  embedWidgetAppearanceGet,
+  embedWidgetAppearanceOptions,
+} from "./embedWidgetAppearance";
 
 const clerkClient = createClerkClient({
   secretKey: process.env.CLERK_SECRET_KEY || "",
@@ -21,6 +25,17 @@ http.route({
   path: "/embed/openai/v1/chat/completions",
   method: "POST",
   handler: embedOpenaiProxy,
+});
+
+http.route({
+  path: "/embed/widget-appearance",
+  method: "OPTIONS",
+  handler: embedWidgetAppearanceOptions,
+});
+http.route({
+  path: "/embed/widget-appearance",
+  method: "GET",
+  handler: embedWidgetAppearanceGet,
 });
 
 http.route({

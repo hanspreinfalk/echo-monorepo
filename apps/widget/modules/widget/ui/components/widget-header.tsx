@@ -10,7 +10,7 @@ export function WidgetHeader({
     return (
         <header
             className={cn(
-                "bg-linear-to-b from-primary to-[#0b63f3] p-4 text-primary-foreground",
+                "bg-linear-to-b from-primary to-[var(--widget-gradient-end)] p-4 text-primary-foreground",
                 className
             )}
         >

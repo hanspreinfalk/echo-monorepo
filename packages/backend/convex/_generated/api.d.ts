@@ -10,6 +10,7 @@
 
 import type * as constants from "../constants.js";
 import type * as embedOpenai from "../embedOpenai.js";
+import type * as embedWidgetAppearance from "../embedWidgetAppearance.js";
 import type * as http from "../http.js";
 import type * as lib_extractTextContent from "../lib/extractTextContent.js";
 import type * as private_contactSessions from "../private/contactSessions.js";
@@ -53,6 +54,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   constants: typeof constants;
   embedOpenai: typeof embedOpenai;
+  embedWidgetAppearance: typeof embedWidgetAppearance;
   http: typeof http;
   "lib/extractTextContent": typeof lib_extractTextContent;
   "private/contactSessions": typeof private_contactSessions;

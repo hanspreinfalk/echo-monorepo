@@ -1,6 +1,19 @@
 import { ConvexError, v } from "convex/values";
 import { mutation, query } from "../_generated/server";
 
+const appearanceArgs = v.optional(
+  v.object({
+    primaryColor: v.optional(v.string()),
+    primaryGradientEndColor: v.optional(v.string()),
+    headerForegroundColor: v.optional(v.string()),
+    backgroundColor: v.optional(v.string()),
+    foregroundColor: v.optional(v.string()),
+    mutedColor: v.optional(v.string()),
+    mutedForegroundColor: v.optional(v.string()),
+    borderColor: v.optional(v.string()),
+  }),
+);
+
 export const upsert = mutation({
   args: {
     greetMessage: v.string(),
@@ -9,6 +22,7 @@ export const upsert = mutation({
       suggestion2: v.optional(v.string()),
       suggestion3: v.optional(v.string()),
     }),
+    appearance: appearanceArgs,
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -38,12 +52,14 @@ export const upsert = mutation({
       await ctx.db.patch(existingWidgetSettings._id, {
         greetMessage: args.greetMessage,
         defaultSuggestions: args.defaultSuggestions,
+        ...(args.appearance !== undefined ? { appearance: args.appearance } : {}),
       });
     } else {
       await ctx.db.insert("widgetSettings", {
         organizationId: orgId,
         greetMessage: args.greetMessage,
         defaultSuggestions: args.defaultSuggestions,
+        ...(args.appearance !== undefined ? { appearance: args.appearance } : {}),
       });
     }
   },

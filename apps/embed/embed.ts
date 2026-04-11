@@ -1,8 +1,13 @@
 import { EMBED_CONFIG } from './config';
 import { chatBubbleIcon, closeIcon } from './icons';
+import {
+  fetchWidgetAppearanceForLauncher,
+  resolveLauncherButtonColors,
+} from './launcher-appearance';
+import type { EmbedWidgetAppearance } from './launcher-appearance';
 import { PageAgent } from 'page-agent';
 
-// cd apps/embed && VITE_WIDGET_URL=https://echo-monorepo-widget.vercel.app pnpm build
+// cd apps/embed && VITE_CONVEX_SITE_URL=https://wandering-beagle-503.convex.site VITE_WIDGET_URL=https://echo-monorepo-widget.vercel.app pnpm build
 
 /** Above page-agent SimulatorMask (z-index 2147483641) so the chat iframe and Stop stay clickable. */
 const WIDGET_Z_PANEL = 2147483646;
@@ -136,6 +141,7 @@ const WIDGET_Z_BUTTON = 2147483647;
   let iframe: HTMLIFrameElement | null = null;
   let container: HTMLDivElement | null = null;
   let button: HTMLButtonElement | null = null;
+  let cachedEmbedAppearance: EmbedWidgetAppearance;
   let isOpen = false;
   let agent: InstanceType<typeof PageAgent> | null = null;
   /** Current `page-agent-execute` / `execute()` correlation id (Convex pageControlRequests id). */
@@ -179,6 +185,16 @@ const WIDGET_Z_BUTTON = 2147483647;
     }
   }
 
+  function applyLauncherButtonStyles(
+    btn: HTMLButtonElement,
+    appearance: EmbedWidgetAppearance,
+  ) {
+    const t = resolveLauncherButtonColors(appearance);
+    btn.style.background = t.background;
+    btn.style.color = t.color;
+    btn.style.boxShadow = t.boxShadow;
+  }
+
   function render() {
     // Create floating action button
     button = document.createElement('button');
@@ -191,17 +207,15 @@ const WIDGET_Z_BUTTON = 2147483647;
       width: 60px;
       height: 60px;
       border-radius: 50%;
-      background: #3b82f6;
-      color: white;
       border: none;
       cursor: pointer;
       z-index: ${WIDGET_Z_BUTTON};
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 4px 24px rgba(59, 130, 246, 0.35);
       transition: all 0.2s ease;
     `;
+    applyLauncherButtonStyles(button, undefined);
 
     button.addEventListener('click', toggleWidget);
     button.addEventListener('mouseenter', () => {
@@ -212,6 +226,16 @@ const WIDGET_Z_BUTTON = 2147483647;
     });
 
     document.body.appendChild(button);
+
+    void fetchWidgetAppearanceForLauncher(
+      EMBED_CONFIG.CONVEX_SITE_URL,
+      organizationId!,
+    ).then((appearance) => {
+      cachedEmbedAppearance = appearance;
+      if (button) {
+        applyLauncherButtonStyles(button, appearance);
+      }
+    });
 
     // Create container (hidden by default)
     container = document.createElement('div');
@@ -445,7 +469,7 @@ Final message examples:
       }, 300);
       // Change button icon back to chat
       button.innerHTML = chatBubbleIcon;
-      button.style.background = '#3b82f6';
+      applyLauncherButtonStyles(button, cachedEmbedAppearance);
     }
   }
 

@@ -2,8 +2,10 @@
 
 import { WidgetAuthScreen } from "../screens/widget-auth-screen";
 import { useAtomValue } from "jotai";
-import { screenAtom } from "@/modules/widget/atoms/widget-atoms";
+import { useMemo } from "react";
+import { screenAtom, widgetSettingsAtom } from "@/modules/widget/atoms/widget-atoms";
 import { useHostContextBridge } from "@/modules/widget/hooks/use-host-context-bridge";
+import { widgetAppearanceToStyle } from "@workspace/ui/lib/widget-appearance-style";
 import { WidgetErrorScreen } from "../screens/widget-error-screen";
 import { WidgetLoadingScreen } from "../screens/widget-loading-screen";
 import { WidgetSelectionScreen } from "../screens/widget-selection-screen";
@@ -16,6 +18,11 @@ interface Props {
 
 export function WidgetView({ organizationId }: Props) {
   const screen = useAtomValue(screenAtom)
+  const widgetSettings = useAtomValue(widgetSettingsAtom);
+  const themeStyle = useMemo(
+    () => widgetAppearanceToStyle(widgetSettings?.appearance),
+    [widgetSettings?.appearance],
+  );
   useHostContextBridge();
 
   const screenComponents = {
@@ -30,7 +37,10 @@ export function WidgetView({ organizationId }: Props) {
   }
 
   return (
-    <main className="flex h-dvh max-h-dvh w-full min-h-0 flex-col overflow-hidden rounded-xl border bg-muted">
+    <main
+      className="flex h-dvh max-h-dvh w-full min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-background"
+      style={themeStyle}
+    >
         {screenComponents[screen]}
     </main>
   );
