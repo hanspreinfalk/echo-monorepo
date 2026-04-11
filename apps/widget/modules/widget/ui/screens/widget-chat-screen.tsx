@@ -60,6 +60,7 @@ import {
 } from "@workspace/ui/components/ai/message";
 import { AIResponse } from "@workspace/ui/components/ai/response";
 import {
+    injectPageControlStepRows,
     labelForAgentTool,
     threadMessagesToSeparateChatRows,
     toolRowIsComplete,
@@ -68,10 +69,10 @@ import { cn } from "@workspace/ui/lib/utils";
 import { motion } from "motion/react";
 import { useRef, useState, useMemo, useEffect } from "react";
 import {
-    PageControlAgentStepsPanel,
-    PageControlRequestCardContent,
-    PageControlRunningBar,
+    PageAgentStepsToolCard,
+    PageControlCard,
 } from "@workspace/ui/components/ai/page-control-card";
+import type { Doc } from "@workspace/backend/_generated/dataModel";
 
 const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024; // 10 MB
 
@@ -127,6 +128,96 @@ function formatMessageTime(createdAt: Date) {
 const formSchema = z.object({
     message: z.string(),
 });
+
+function WidgetPageControlRow({
+    row,
+    request,
+    contactSessionId,
+    resolvePageControlRequest,
+}: {
+    row: { id: string; createdAt: Date; action: string };
+    request: Doc<"pageControlRequests">;
+    contactSessionId: Id<"contactSessions">;
+    resolvePageControlRequest: (args: {
+        requestId: Id<"pageControlRequests">;
+        contactSessionId: Id<"contactSessions">;
+        decision: "approved" | "denied";
+    }) => Promise<unknown>;
+}) {
+    const [acceptSubmitted, setAcceptSubmitted] = useState(false);
+
+    useEffect(() => {
+        setAcceptSubmitted(false);
+    }, [request._id]);
+
+    const onAllow =
+        request.status === "pending"
+            ? async () => {
+                  setAcceptSubmitted(true);
+                  try {
+                      await resolvePageControlRequest({
+                          requestId: request._id,
+                          contactSessionId,
+                          decision: "approved",
+                      });
+                      window.parent.postMessage(
+                          {
+                              type: "page-agent-execute",
+                              payload: { action: request.action, requestId: request._id },
+                          },
+                          "*",
+                      );
+                  } catch {
+                      setAcceptSubmitted(false);
+                  }
+              }
+            : undefined;
+    const onDeny =
+        request.status === "pending"
+            ? async () => {
+                  await resolvePageControlRequest({
+                      requestId: request._id,
+                      contactSessionId,
+                      decision: "denied",
+                  });
+              }
+            : undefined;
+    const avatar = (
+        <DicebearAvatar imageUrl="/logo.svg" seed="assistant" size={32} />
+    );
+    const pageControlTime =
+        row.createdAt != null ? (
+            <p className="mt-0.5 w-max max-w-full shrink-0 grow-0 basis-auto self-end text-right text-[10px] leading-none text-muted-foreground tabular-nums">
+                {formatMessageTime(row.createdAt)}
+            </p>
+        ) : null;
+    const actionLabel = request.action || row.action;
+
+    return (
+        <motion.div
+            className="w-full"
+            initial={{ opacity: 0, y: 10, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{
+                type: "spring",
+                stiffness: 420,
+                damping: 32,
+                mass: 0.85,
+            }}
+        >
+            <PageControlCard
+                acceptSubmitted={acceptSubmitted}
+                action={actionLabel}
+                avatar={avatar}
+                from="assistant"
+                onAllow={onAllow}
+                onDeny={onDeny}
+                requestStatus={request.status}
+                requestTrailing={pageControlTime}
+            />
+        </motion.div>
+    );
+}
 
 export const WidgetChatScreen = () => {
     const setScreen = useSetAtom(screenAtom);
@@ -343,10 +434,13 @@ export const WidgetChatScreen = () => {
             : "skip"
     );
 
-    const chatRows = useMemo(
-        () => threadMessagesToSeparateChatRows(messages.results ?? []),
-        [messages.results],
-    );
+    const chatRows = useMemo(() => {
+        const base = threadMessagesToSeparateChatRows(messages.results ?? []);
+        return injectPageControlStepRows(base, (requestId) => {
+            const r = requestsById.get(requestId);
+            return r?.status === "approved";
+        });
+    }, [messages.results, requestsById]);
 
     return (
         <>
@@ -470,66 +564,30 @@ export const WidgetChatScreen = () => {
                         );
                         }
 
-                        if (row.kind === "page-control") {
+                        if (row.kind === "page-control-steps") {
                             if (!contactSessionId) {
                                 return null;
                             }
-                            const request = requestsById.get(row.requestId);
-                            if (!request) {
+                            const pcRequest = requestsById.get(row.requestId);
+                            if (!pcRequest) {
                                 return null;
                             }
-                            const phase =
-                                request.status === "denied" ? "done"
-                                : request.status === "approved" && request.result ? "done"
-                                : request.status === "approved" ? "running"
-                                : "pending";
-                            const result =
-                                request.status === "denied"
-                                    ? { success: false, data: "Denied by user" }
-                                    : request.result ?? undefined;
-                            const onAllow = request.status === "pending" ? async () => {
-                                await resolvePageControlRequest({
-                                    requestId: request._id,
-                                    contactSessionId,
-                                    decision: "approved",
-                                });
-                                window.parent.postMessage(
-                                    { type: "page-agent-execute", payload: { action: request.action, requestId: request._id } },
-                                    "*"
-                                );
-                            } : undefined;
-                            const onDeny = request.status === "pending" ? async () => {
-                                await resolvePageControlRequest({
-                                    requestId: request._id,
-                                    contactSessionId,
-                                    decision: "denied",
-                                });
-                            } : undefined;
-                            const onStop =
-                                phase === "running"
+                            const agentPhase =
+                                pcRequest.status === "approved" && pcRequest.result
+                                    ? "done"
+                                    : "running";
+                            const onAgentStop =
+                                agentPhase === "running"
                                     ? () => {
-                                        window.parent.postMessage(
-                                            {
-                                                type: "page-agent-stop",
-                                                payload: { requestId: request._id },
-                                            },
-                                            "*",
-                                        );
-                                    }
+                                          window.parent.postMessage(
+                                              {
+                                                  type: "page-agent-stop",
+                                                  payload: { requestId: pcRequest._id },
+                                              },
+                                              "*",
+                                          );
+                                      }
                                     : undefined;
-                            const confirmationText =
-                                result?.data ??
-                                (result?.success ? "Completed" : "Failed");
-                            const avatar = (
-                                <DicebearAvatar imageUrl="/logo.svg" seed="assistant" size={32} />
-                            );
-                            const pageControlTime =
-                                row.createdAt != null ? (
-                                    <p className="mt-0.5 w-max max-w-full shrink-0 grow-0 basis-auto self-end text-right text-[10px] leading-none text-muted-foreground tabular-nums">
-                                        {formatMessageTime(row.createdAt)}
-                                    </p>
-                                ) : null;
-                            const actionLabel = request.action || row.action;
                             return (
                                 <motion.div
                                     key={row.id}
@@ -543,61 +601,42 @@ export const WidgetChatScreen = () => {
                                         mass: 0.85,
                                     }}
                                 >
-                                    {phase === "pending" ? (
-                                        <AIMessage from="assistant">
-                                            <div className="flex flex-col gap-1">
-                                                <AIMessageContent>
-                                                    <PageControlRequestCardContent
-                                                        action={actionLabel}
-                                                        allowLabel="Confirm"
-                                                        denyLabel="Deny"
-                                                        interactive
-                                                        onAllow={onAllow}
-                                                        onDeny={onDeny}
-                                                    />
-                                                </AIMessageContent>
-                                                {pageControlTime}
-                                            </div>
-                                            {avatar}
-                                        </AIMessage>
-                                    ) : phase === "running" ? (
-                                        <AIMessage from="assistant">
-                                            <div className="flex min-w-0 w-fit max-w-[80%] flex-col items-start gap-1">
-                                                {request.steps && request.steps.length > 0 ? (
-                                                    <PageControlAgentStepsPanel
-                                                        expandWhileRunning
-                                                        phase="running"
-                                                        steps={request.steps}
-                                                    />
-                                                ) : null}
-                                                <div className="flex min-w-0 w-fit max-w-full flex-col gap-1">
-                                                    <PageControlRunningBar onStop={onStop} />
-                                                    {pageControlTime}
-                                                </div>
-                                            </div>
-                                            {avatar}
-                                        </AIMessage>
-                                    ) : (
-                                        <AIMessage from="assistant">
-                                            <div className="flex min-w-0 w-fit max-w-[80%] flex-col items-start gap-1">
-                                                {request.steps && request.steps.length > 0 ? (
-                                                    <PageControlAgentStepsPanel
-                                                        expandWhileRunning
-                                                        phase="done"
-                                                        steps={request.steps}
-                                                    />
-                                                ) : null}
-                                                <div className="flex min-w-0 w-fit max-w-full flex-col gap-1">
-                                                    <AIMessageContent className="min-w-0 w-fit max-w-full">
-                                                        <AIResponse>{confirmationText}</AIResponse>
-                                                    </AIMessageContent>
-                                                    {pageControlTime}
-                                                </div>
-                                            </div>
-                                            {avatar}
-                                        </AIMessage>
-                                    )}
+                                    <AIMessage from="assistant">
+                                        <div className="flex min-w-0 w-fit max-w-[80%] flex-col items-start gap-1">
+                                            <PageAgentStepsToolCard
+                                                expandWhileRunning
+                                                onStop={onAgentStop}
+                                                phase={agentPhase}
+                                                steps={pcRequest.steps ?? []}
+                                            />
+                                            {row.createdAt != null && (
+                                                <p className="mt-0.5 w-max max-w-full shrink-0 self-end text-right text-[10px] leading-none text-muted-foreground tabular-nums">
+                                                    {formatMessageTime(row.createdAt)}
+                                                </p>
+                                            )}
+                                        </div>
+                                        <DicebearAvatar imageUrl="/logo.svg" seed="assistant" size={32} />
+                                    </AIMessage>
                                 </motion.div>
+                            );
+                        }
+
+                        if (row.kind === "page-control") {
+                            if (!contactSessionId) {
+                                return null;
+                            }
+                            const request = requestsById.get(row.requestId);
+                            if (!request) {
+                                return null;
+                            }
+                            return (
+                                <WidgetPageControlRow
+                                    key={row.id}
+                                    contactSessionId={contactSessionId}
+                                    request={request}
+                                    resolvePageControlRequest={resolvePageControlRequest}
+                                    row={row}
+                                />
                             );
                         }
 

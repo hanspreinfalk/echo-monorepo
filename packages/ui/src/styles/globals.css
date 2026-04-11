@@ -164,45 +164,6 @@
   --shadow-2xl: var(--shadow-2xl);
 }
 
-/* Agent steps (and similar Radix collapsibles): height + fade using --radix-collapsible-content-height */
-@keyframes agent-steps-collapsible-down {
-  from {
-    height: 0;
-    opacity: 0;
-  }
-  to {
-    height: var(--radix-collapsible-content-height);
-    opacity: 1;
-  }
-}
-
-@keyframes agent-steps-collapsible-up {
-  from {
-    height: var(--radix-collapsible-content-height);
-    opacity: 1;
-  }
-  to {
-    height: 0;
-    opacity: 0;
-  }
-}
-
-@layer components {
-  .agent-steps-collapsible-content[data-state="open"] {
-    animation: agent-steps-collapsible-down 0.28s cubic-bezier(0.32, 0.72, 0, 1) both;
-  }
-
-  .agent-steps-collapsible-content[data-state="closed"] {
-    animation: agent-steps-collapsible-up 0.26s cubic-bezier(0.32, 0.72, 0, 1) both;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .agent-steps-collapsible-content[data-state] {
-      animation: none;
-    }
-  }
-}
-
 @layer base {
   button:not([disabled]),
   [role="button"]:not([disabled]) {

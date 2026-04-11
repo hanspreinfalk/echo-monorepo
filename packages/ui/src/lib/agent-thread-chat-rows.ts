@@ -70,6 +70,15 @@ export type AgentChatRow =
       order: number;
       stepOrder: number;
       streaming?: boolean;
+    }
+  | {
+      kind: "page-control-steps";
+      id: string;
+      key: string;
+      createdAt: Date;
+      requestId: string;
+      order: number;
+      stepOrder: number;
     };
 
 const AGENT_TOOL_LABELS: Record<string, string> = {
@@ -384,4 +393,80 @@ export function threadMessagesToSeparateChatRows(
 export function toolRowIsComplete(row: Extract<AgentChatRow, { kind: "tool" }>): boolean {
   if (row.result !== undefined) return true;
   return !row.streaming;
+}
+
+/**
+ * Where to place live page-agent steps: immediately before the summary `assistant-text`
+ * (`saveMessage` uses a new thread message, so `order` is greater than the page-control row’s).
+ * Same-message text after the tool shares `order` with the page-control row — skip those.
+ * If no summary yet (page agent still running), anchor to the **last** row in the thread so the
+ * steps card sits at the bottom — not squeezed directly under the page-control request when
+ * later rows (e.g. tools) still follow it.
+ */
+function findPageControlStepsInsertTarget(
+  rows: AgentChatRow[],
+  pageControlIndex: number,
+  pageControlOrder: number,
+):
+  | { mode: "before_assistant_text"; rowIndex: number }
+  | { mode: "after_last_row"; lastRowIndex: number } {
+  for (let j = pageControlIndex + 1; j < rows.length; j++) {
+    const r = rows[j];
+    if (!r) continue;
+    if (r.kind === "assistant-text" && r.order > pageControlOrder) {
+      return { mode: "before_assistant_text", rowIndex: j };
+    }
+  }
+  const lastRowIndex = rows.length > 0 ? rows.length - 1 : pageControlIndex;
+  return { mode: "after_last_row", lastRowIndex };
+}
+
+/**
+ * Inserts synthetic `page-control-steps` rows just above the saved summary, or at the end of the
+ * thread while the summary message does not exist yet (streaming / in progress).
+ */
+export function injectPageControlStepRows(
+  rows: AgentChatRow[],
+  shouldShowStepsForRequest: (requestId: string) => boolean,
+): AgentChatRow[] {
+  const insertAfterRowIndex = new Map<number, AgentChatRow[]>();
+  const stepsBeforeAssistantText = new Map<number, AgentChatRow[]>();
+
+  for (let pcIdx = 0; pcIdx < rows.length; pcIdx++) {
+    const row = rows[pcIdx];
+    if (!row || row.kind !== "page-control") continue;
+    if (!shouldShowStepsForRequest(row.requestId)) continue;
+
+    const stepRow: AgentChatRow = {
+      kind: "page-control-steps",
+      id: `${row.id}-agent-steps`,
+      key: `${row.key}-agent-steps`,
+      createdAt: row.createdAt,
+      requestId: row.requestId,
+      order: row.order,
+      stepOrder: row.stepOrder,
+    };
+
+    const target = findPageControlStepsInsertTarget(rows, pcIdx, row.order);
+    if (target.mode === "before_assistant_text") {
+      const list = stepsBeforeAssistantText.get(target.rowIndex) ?? [];
+      list.push(stepRow);
+      stepsBeforeAssistantText.set(target.rowIndex, list);
+    } else {
+      const list = insertAfterRowIndex.get(target.lastRowIndex) ?? [];
+      list.push(stepRow);
+      insertAfterRowIndex.set(target.lastRowIndex, list);
+    }
+  }
+
+  const out: AgentChatRow[] = [];
+  for (let i = 0; i < rows.length; i++) {
+    const beforeSummary = stepsBeforeAssistantText.get(i);
+    if (beforeSummary) out.push(...beforeSummary);
+    const original = rows[i];
+    if (original) out.push(original);
+    const afterRow = insertAfterRowIndex.get(i);
+    if (afterRow) out.push(...afterRow);
+  }
+  return out;
 }

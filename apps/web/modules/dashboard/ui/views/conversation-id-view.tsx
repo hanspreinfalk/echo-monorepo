@@ -20,11 +20,15 @@ import {
     XIcon,
 } from "lucide-react";
 import {
+    injectPageControlStepRows,
     labelForAgentTool,
     threadMessagesToSeparateChatRows,
     toolRowIsComplete,
 } from "@workspace/ui/lib/agent-thread-chat-rows";
-import { PageControlCard } from "@workspace/ui/components/ai/page-control-card";
+import {
+    PageAgentStepsToolCard,
+    PageControlCard,
+} from "@workspace/ui/components/ai/page-control-card";
 import {
     AIConversation,
     AIConversationContent,
@@ -143,10 +147,13 @@ export function ConversationIdView({ conversationId }: { conversationId: Id<"con
         [pageControlRequestsList],
     );
 
-    const chatRows = useMemo(
-        () => threadMessagesToSeparateChatRows(messages.results ?? []),
-        [messages.results],
-    );
+    const chatRows = useMemo(() => {
+        const base = threadMessagesToSeparateChatRows(messages.results ?? []);
+        return injectPageControlStepRows(base, (requestId) => {
+            const r = requestsById.get(requestId);
+            return r?.status === "approved";
+        });
+    }, [messages.results, requestsById]);
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -391,29 +398,37 @@ export function ConversationIdView({ conversationId }: { conversationId: Id<"con
                         );
                         }
 
+                        if (row.kind === "page-control-steps") {
+                            const req = requestsById.get(row.requestId);
+                            if (!req) {
+                                return null;
+                            }
+                            const agentPhase =
+                                req.status === "approved" && req.result ? "done" : "running";
+                            return (
+                                <AIMessage from="user" key={row.id}>
+                                    <div className="flex flex-col gap-1">
+                                        <PageAgentStepsToolCard
+                                            phase={agentPhase}
+                                            steps={req.steps ?? []}
+                                        />
+                                    </div>
+                                </AIMessage>
+                            );
+                        }
+
                         if (row.kind === "page-control") {
                             const req = requestsById.get(row.requestId);
                             if (!req) {
                                 return null;
                             }
-                            const phase =
-                                req.status === "denied" ? "done"
-                                : req.status === "approved" && req.result ? "done"
-                                : req.status === "approved" ? "running"
-                                : "pending";
-                            const result =
-                                req.status === "denied"
-                                    ? { success: false, data: "Denied by user" }
-                                    : req.result ?? undefined;
                             const actionLabel = req.action || row.action;
                             return (
                                 <PageControlCard
                                     key={row.id}
                                     from="user"
                                     action={actionLabel}
-                                    phase={phase}
-                                    steps={req.steps}
-                                    result={result}
+                                    requestStatus={req.status}
                                     colors={{
                                         text: "text-white",
                                         mutedText: "text-white/70",

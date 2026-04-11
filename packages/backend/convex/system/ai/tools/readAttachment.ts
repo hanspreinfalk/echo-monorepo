@@ -2,7 +2,6 @@ import { openai } from "@ai-sdk/openai";
 import { createTool } from "@convex-dev/agent";
 import { generateText } from "ai";
 import z from "zod";
-import { supportAgent } from "../agents/supportAgent";
 
 export const readAttachment = createTool({
     description: "Read an attached file and answer a question about its contents",
@@ -40,11 +39,6 @@ export const readAttachment = createTool({
                 ],
             });
         }
-
-        await supportAgent.saveMessage(ctx, {
-            threadId: ctx.threadId,
-            message: { role: "assistant", content: result.text },
-        });
 
         return result.text;
     },

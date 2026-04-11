@@ -225,7 +225,22 @@ export const setPageControlResult = mutation({
         if (!conversation || conversation.contactSessionId !== args.contactSessionId) {
             throw new ConvexError({ code: "UNAUTHORIZED", message: "Forbidden" });
         }
+
+        const isFirstResult = req.result === undefined;
         await ctx.db.patch(args.requestId, { result: args.result });
+
+        if (isFirstResult) {
+            const summary =
+                args.result.data.trim() ||
+                (args.result.success ? "Completed" : "Failed");
+            await supportAgent.saveMessage(ctx, {
+                threadId: conversation.threadId,
+                message: {
+                    role: "assistant",
+                    content: summary,
+                },
+            });
+        }
     },
 });
 
