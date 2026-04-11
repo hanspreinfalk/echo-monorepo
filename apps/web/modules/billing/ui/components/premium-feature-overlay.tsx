@@ -8,7 +8,9 @@ import {
   MicIcon,
   PaletteIcon,
   PhoneIcon,
+  SquareMousePointer,
   UsersIcon,
+  Wrench,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@workspace/ui/components/button";
@@ -36,16 +38,16 @@ const features: Feature[] = [
     label: "AI Customer Support",
     description: "Intelligent automated responses 24/7",
   },
-  {
-    icon: MicIcon,
-    label: "AI Voice Agent",
-    description: "Natural voice conversations with customers",
-  },
-  {
-    icon: PhoneIcon,
-    label: "Phone System",
-    description: "Inbound & outbound calling capabilities",
-  },
+  // {
+  //   icon: MicIcon,
+  //   label: "AI Voice Agent",
+  //   description: "Natural voice conversations with customers",
+  // },
+  // {
+  //   icon: PhoneIcon,
+  //   label: "Phone System",
+  //   description: "Inbound & outbound calling capabilities",
+  // },
   {
     icon: BookOpenIcon,
     label: "Knowledge Base",
@@ -61,6 +63,16 @@ const features: Feature[] = [
     label: "Widget Customization",
     description: "Customize your chat widget appearance",
   },
+  {
+    icon: Wrench,
+    label: "Custom Tools",
+    description: "Create custom tools for your AI",
+  },
+  {
+    icon: SquareMousePointer,
+    label: "Page Control",
+    description: "Control the page from the chat",
+  }
 ];
 
 export const PremiumFeatureOverlay = ({
