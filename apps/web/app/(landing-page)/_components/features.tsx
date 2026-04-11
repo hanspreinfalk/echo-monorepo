@@ -1,124 +1,81 @@
-'use client'
-import { cn } from '@workspace/ui/lib/utils'
-import { ToggleGroup, ToggleGroupItem } from '@workspace/ui/components/toggle-group'
-import { Bold, Calendar1, Ellipsis, Italic, Strikethrough, Underline } from 'lucide-react'
-import { Button } from '@workspace/ui/components/button'
 import { Card } from '@workspace/ui/components/card'
+import {
+    Bot,
+    ClipboardCheck,
+    GitBranch,
+    Layers,
+    MessageSquare,
+    Shield,
+} from 'lucide-react'
+
+const features = [
+    {
+        icon: Bot,
+        title: 'AI that sounds like your team',
+        description:
+            'Trained on how your product works so users get accurate, on brand answers, while the system quietly spots bugs, gaps, and feature requests worth tracking.',
+    },
+    {
+        icon: MessageSquare,
+        title: 'Support through your embedded widget',
+        description:
+            'Drop the Echo chatbot into your product so users get help without leaving the app. Every thread stays in one place for answers and issue capture.',
+    },
+    {
+        icon: ClipboardCheck,
+        title: 'From chat to product issues',
+        description:
+            'When a problem is real, Echo drafts structured product issues with context from the thread. Your team reviews, edits, and accepts, so nothing lands on the backlog by surprise.',
+    },
+    {
+        icon: Layers,
+        title: 'Prioritized engineering work',
+        description:
+            'Combine severity, customer impact, recurrence, and strategic fit into a transparent ranking. Engineering sees what to fix first without another prioritization meeting.',
+    },
+    {
+        icon: GitBranch,
+        title: 'One place to triage and prioritize',
+        description:
+            'Accepted issues live in Echo where your team reviews, ranks, and hands off work with full context from the conversation. No duplicate trackers to keep in sync.',
+    },
+    {
+        icon: Shield,
+        title: 'Automation with guardrails',
+        description:
+            'You choose how much runs on autopilot: suggestions only, approve before sync, or fully automated for low risk categories. Customer data stays under your controls.',
+    },
+] as const
 
 export default function FeaturesSection() {
     return (
         <section id="features">
             <div className="bg-muted/50 py-24">
                 <div className="mx-auto w-full max-w-5xl px-6">
-                    <div>
-                        <h2 className="text-foreground mt-4 text-balance text-5xl max-md:font-semibold md:font-normal">
-                            Personal AI, with you Anywhere
+                    <div className="max-w-2xl">
+                        <h2 className="text-foreground text-balance text-5xl max-md:font-semibold md:font-normal">
+                            Everything between “help” and “ship”
                         </h2>
-                        <p className="text-muted-foreground mb-12 mt-4 text-balance text-lg">Quick AI lives a single hotkey away - ready to quickly appear as a floating window above your other apps. Get instant assistance whether you're browsing, coding, or writing documents.</p>
+                        <p className="text-muted-foreground mb-12 mt-4 text-pretty text-lg">
+                            Echo is customer support that does not stop at closing tickets. It makes sure real product problems become visible, owned, and ordered for the people who build the product.
+                        </p>
                     </div>
 
-                    <div className="grid gap-4 sm:grid-cols-2">
-                        <Card className="p-6">
-                            <div className="flex aspect-video items-center justify-center">
-                                <CodeIllustration className="w-full" />
-                            </div>
-                            <div className="text-center">
-                                <h3 className="text-foreground text-xl font-semibold">Marketing Campaigns</h3>
-                                <p className="text-muted-foreground mt-4 text-balance text-lg">Effortlessly plan and execute your marketing campaigns organized.</p>
-                            </div>
-                        </Card>
-                        <Card className="p-6">
-                            <div className="flex aspect-video items-center justify-center">
-                                <ScheduleIllustation
-                                    className="border"
-                                    variant="mixed"
-                                />
-                            </div>
-                            <div className="text-center">
-                                <h3 className="text-foreground text-xl font-semibold">AI Meeting Scheduler</h3>
-                                <p className="text-muted-foreground mt-4 text-balance text-lg">Effortlessly book and manage your meetings. Stay on top of your schedule.</p>
-                            </div>
-                        </Card>
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        {features.map(({ icon: Icon, title, description }) => (
+                            <Card
+                                key={title}
+                                className="flex flex-col p-6">
+                                <span className="bg-primary/10 text-primary mb-4 flex size-10 items-center justify-center rounded-lg">
+                                    <Icon className="size-5" strokeWidth={2} aria-hidden />
+                                </span>
+                                <h3 className="text-foreground text-lg font-semibold">{title}</h3>
+                                <p className="text-muted-foreground mt-3 flex-1 text-pretty text-base leading-relaxed">{description}</p>
+                            </Card>
+                        ))}
                     </div>
                 </div>
             </div>
         </section>
-    )
-}
-
-type IllustrationProps = {
-    className?: string
-    variant?: 'elevated' | 'outlined' | 'mixed'
-}
-
-export const ScheduleIllustation = ({ className, variant = 'elevated' }: IllustrationProps) => {
-    return (
-        <div className={cn('relative', className)}>
-            <div
-                className={cn('bg-background -translate-x-1/8 absolute flex -translate-y-[110%] items-center gap-2 rounded-lg p-1', {
-                    'shadow-black-950/10 shadow-lg': variant === 'elevated',
-                    'border-foreground/10 border': variant === 'outlined',
-                    'border-foreground/10 border shadow-md shadow-black/5': variant === 'mixed',
-                })}>
-                <Button
-                    size="sm"
-                    className="rounded-sm">
-                    <Calendar1 className="size-3" />
-                    <span className="text-sm font-medium">Schedule</span>
-                </Button>
-                <span className="bg-border block h-4 w-px"></span>
-                <ToggleGroup
-                    type="multiple"
-                    size="sm"
-                    className="gap-0.5 *:rounded-md">
-                    <ToggleGroupItem
-                        value="bold"
-                        aria-label="Toggle bold">
-                        <Bold className="size-4" />
-                    </ToggleGroupItem>
-                    <ToggleGroupItem
-                        value="italic"
-                        aria-label="Toggle italic">
-                        <Italic className="size-4" />
-                    </ToggleGroupItem>
-                    <ToggleGroupItem
-                        value="underline"
-                        aria-label="Toggle underline">
-                        <Underline className="size-4" />
-                    </ToggleGroupItem>
-                    <ToggleGroupItem
-                        value="strikethrough"
-                        aria-label="Toggle strikethrough">
-                        <Strikethrough className="size-4" />
-                    </ToggleGroupItem>
-                </ToggleGroup>
-                <span className="bg-border block h-4 w-px"></span>
-                <Button
-                    size="icon"
-                    className="size-8"
-                    variant="ghost">
-                    <Ellipsis className="size-3" />
-                </Button>
-            </div>
-            <span>
-                <span className="bg-secondary text-secondary-foreground py-1">Tomorrow 8:30 pm</span> is our priority.
-            </span>
-        </div>
-    )
-}
-
-export const CodeIllustration = ({ className }: { className?: string }) => {
-    return (
-        <div className={cn('[mask-image:radial-gradient(ellipse_50%_50%_at_50%_50%,#000_50%,transparent_100%)]', className)}>
-            <ul className="text-muted-foreground mx-auto w-fit font-mono text-2xl font-medium">
-                {['Images', 'Variables', 'Pages', 'Components', 'Styles'].map((item, index) => (
-                    <li
-                        key={index}
-                        className={cn(index == 2 && "text-foreground before:absolute before:-translate-x-[110%] before:text-orange-500 before:content-['Import']")}>
-                        {item}
-                    </li>
-                ))}
-            </ul>
-        </div>
     )
 }

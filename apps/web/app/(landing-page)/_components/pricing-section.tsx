@@ -10,7 +10,9 @@ export default function PricingSection() {
             <div className="mx-auto w-full max-w-5xl px-6">
                 <div>
                     <h2 className="text-foreground text-balance text-5xl max-md:font-semibold md:font-normal">Plans &amp; pricing</h2>
-                    <p className="text-muted-foreground mb-8 mt-4 text-balance text-lg">Choose the plan that&apos;s right for you</p>
+                    <p className="text-muted-foreground mb-8 mt-4 text-pretty text-lg">
+                        Scale AI support and the product issues pipeline as your team grows, with the same flow from conversation to backlog.
+                    </p>
                 </div>
 
                 <div className="mx-auto mt-8 w-full max-w-screen-md">

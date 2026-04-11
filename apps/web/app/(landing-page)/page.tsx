@@ -1,5 +1,6 @@
 import { HeroHeader } from "./_components/header";
 import HeroSection from "./_components/hero-section";
+import SolutionSection from "./_components/solution-section";
 import FAQs from "./_components/faqs";
 import FeaturesSection from "./_components/features";
 import PricingSection from "./_components/pricing-section";
@@ -11,6 +12,7 @@ export default function LandingPage() {
     <>
       <HeroHeader />
       <HeroSection />
+      <SolutionSection />
       <FeaturesSection />
       <PricingSection />
       <FAQs />

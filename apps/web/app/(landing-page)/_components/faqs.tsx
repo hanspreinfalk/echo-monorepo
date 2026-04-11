@@ -11,25 +11,25 @@ const faqCategories = [
                 id: 'overview-1',
                 question: 'How do you turn conversations into engineering work?',
                 answer:
-                    'We capture support and user conversations, extract concrete problems and requests, and draft structured work items your team can act on—so nothing important gets lost in chat threads.',
+                    'We capture support and user conversations, extract concrete problems and requests, and draft structured work items your team can act on, so nothing important gets lost in chat threads.',
             },
             {
                 id: 'overview-2',
                 question: 'What happens after a user issue is captured?',
                 answer:
-                    'Each issue is normalized into a clear description with context from the thread. Your team can triage, assign owners, and move items into your existing workflow without retyping or copy-pasting.',
+                    'Each issue is normalized into a clear description with context from the thread. Your team can triage, assign owners, and move items into your existing workflow without retyping or copying and pasting.',
             },
             {
                 id: 'overview-3',
                 question: 'How does prioritization decide what to ship first?',
                 answer:
-                    'Signals from the conversation—severity, frequency, customer impact, and strategic fit—are combined into a transparent score so engineering sees a ranked backlog aligned with what matters most to users.',
+                    'Signals from the conversation, including severity, frequency, customer impact, and strategic fit, are combined into a transparent score so engineering sees a ranked backlog aligned with what matters most to users.',
             },
             {
                 id: 'overview-4',
                 question: 'Who typically uses this day to day?',
                 answer:
-                    'Support and success teams capture issues at the source; PMs refine scope and priority; engineering gets ready-made tickets with full context. Everyone stays aligned without extra meetings.',
+                    'Support and success teams capture issues at the source; PMs refine scope and priority; engineering gets prepared tickets with full context. Everyone stays aligned without extra meetings.',
             },
         ],
     },
@@ -40,19 +40,19 @@ const faqCategories = [
                 id: 'integrations-1',
                 question: 'Which chat platforms do you support?',
                 answer:
-                    'We connect to the channels where your users already talk to you—team chat, in-app messaging, and common helpdesk chat surfaces—so capture happens where the conversation lives.',
+                    'Only the Echo chatbot widget you embed in your app or site. Conversations happen inside that widget; we do not connect to Slack, team chat, help desks, or other third party chat surfaces yet.',
             },
             {
                 id: 'integrations-2',
-                question: 'Can I sync with Jira, Linear, or GitHub Issues?',
+                question: 'Can I push issues into our engineering tracker?',
                 answer:
-                    'Yes. Push prioritized items straight into the tools your engineers already use, keep statuses in sync, and avoid duplicate tracking across systems.',
+                    'Not yet. Today Echo is where issues are captured, refined, and prioritized. We are building export and deeper integrations so you can plug into your existing tools when they are ready.',
             },
             {
                 id: 'integrations-3',
                 question: 'Do you work with our existing help desk or CRM?',
                 answer:
-                    'We complement your stack: pull context from tickets and accounts where you already store customer history, and push outcomes back so records stay complete.',
+                    'Not yet. Today everything flows through the embedded widget and Echo’s dashboard. Help desk and CRM connectors are not available right now.',
             },
         ],
     },
@@ -63,7 +63,7 @@ const faqCategories = [
                 id: 'automation-1',
                 question: 'How does the AI identify engineering tasks from messy conversations?',
                 answer:
-                    'Models detect actionable problems, feature requests, and bugs from natural language, then propose titles, descriptions, and labels you can edit—automation speeds you up without removing human judgment.',
+                    'Models detect actionable problems, feature requests, and bugs from natural language, then propose titles, descriptions, and labels you can edit. Automation speeds you up without removing human judgment.',
             },
             {
                 id: 'automation-2',
@@ -75,13 +75,13 @@ const faqCategories = [
                 id: 'automation-3',
                 question: 'How does the prioritization algorithm work?',
                 answer:
-                    'Ranking combines configurable rules with learned patterns from your product and team—urgency, user segments, recurring themes, and roadmap alignment—so the queue reflects both data and your strategy.',
+                    'Ranking combines configurable rules with learned patterns from your product and team, including urgency, user segments, recurring themes, and roadmap alignment, so the queue reflects both data and your strategy.',
             },
             {
                 id: 'automation-4',
                 question: 'Is conversation data used to train public models?',
                 answer:
-                    'Your workspace data is processed to deliver the product, with strict isolation and retention controls. We do not use your customer conversations to train third-party or shared foundation models unless you explicitly opt in.',
+                    'Your workspace data is processed to deliver the product, with strict isolation and retention controls. We do not use your customer conversations to train third party or shared foundation models unless you explicitly opt in.',
             },
         ],
     },

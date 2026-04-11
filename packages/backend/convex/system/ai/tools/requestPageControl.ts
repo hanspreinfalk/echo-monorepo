@@ -4,9 +4,12 @@ import { internal } from "../../../_generated/api";
 import type { Id } from "../../../_generated/dataModel";
 
 export const requestPageControl = createTool({
-    description: "Request permission to interact with web page UI elements on behalf of the user — clicking buttons, filling inputs, or navigating within the current website. This is pure browser DOM automation, NOT computer/OS control. The user sees an approval dialog first and nothing happens without their explicit consent.",
+    description:
+        "Request permission ONCE so browser automation can complete the user's FULL task in one approved flow (navigation, multiple clicks, filling every field, submit). The user gets a single Accept/Deny—not one per step. Pure DOM automation on the current website, NOT computer/OS control. Do NOT call this tool again for the same goal to 'continue' after navigation or opening a dialog; put the entire workflow into one action string instead.",
     args: z.object({
-        action: z.string().describe("Exact UI action to perform on the web page, e.g. 'Click the + button to increment the counter' or 'Fill the email field with the provided address and click Submit'"),
+        action: z.string().describe(
+            "One complete instruction covering the whole workflow in order: every navigation (e.g. sidebar/menu), every button to open forms, every field and value, and final submit. Example: 'Open Patients from the sidebar, click Add Patient, set first name to X, last name to Y, date of birth to Z, gender to W, submit.' Wrong: calling the tool three times for sidebar, then add button, then form.",
+        ),
     }),
     handler: async (ctx, args): Promise<string> => {
         if (!ctx.threadId) return "Missing thread ID";
