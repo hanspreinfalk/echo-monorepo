@@ -160,30 +160,57 @@ export const GithubIntegrationView = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle>Product issues → GitHub Actions</CardTitle>
+            <CardTitle>Product issues → Fix now</CardTitle>
             <CardDescription>
-              From Product Issues, use <span className="text-foreground font-medium">Actions</span>{" "}
-              to send the generated fix prompt via a{" "}
+              From Product Issues, open a row’s <span className="text-foreground font-medium">⋯</span>{" "}
+              menu and choose <span className="text-foreground font-medium">Fix now</span>{" "}
+              <span className="text-muted-foreground">(with github actions)</span> to send the fix prompt via a{" "}
               <span className="text-foreground font-medium">repository_dispatch</span>{" "}
               named <code className="rounded bg-muted px-1 py-0.5 text-xs">echo_product_issue</code>.
               Add a workflow like this to the linked repository (default branch is fine):
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <pre className="max-h-[min(320px,45vh)] overflow-auto rounded-md border bg-muted/50 p-3 text-xs leading-relaxed">
-              {`on:
+            <pre className="max-h-[min(520px,60vh)] overflow-auto rounded-md border bg-muted/50 p-3 text-xs leading-relaxed">
+              {`name: Echo product issue
+
+on:
   repository_dispatch:
     types: [echo_product_issue]
 
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  id-token: write
+
 jobs:
-  handle-echo-issue:
+  claude-fix:
     runs-on: ubuntu-latest
     steps:
-      - name: Receive Echo prompt
-        run: |
-          echo "$PROMPT"
-        env:
-          PROMPT: \${{ toJson(github.event.client_payload.prompt) }}`}
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: \${{ github.event.client_payload.defaultBranch || github.event.repository.default_branch }}
+
+      - name: Run Claude Code and open PR
+        uses: anthropics/claude-code-action@v1
+        with:
+          github_token: \${{ secrets.GITHUB_TOKEN }}
+          anthropic_api_key: \${{ secrets.ANTHROPIC_API_KEY }}
+          show_full_output: true
+          base_branch: \${{ github.event.client_payload.defaultBranch || github.event.repository.default_branch }}
+          prompt: |
+            Echo product issue (issue id: \${{ github.event.client_payload.issueId }})
+            Repository: \${{ github.event.client_payload.repository }}
+
+            Implement the fix in this repository. Commit your changes to a new branch and open a pull request against the base branch. Put a concise summary of the change in the PR description.
+
+            ---
+
+            \${{ github.event.client_payload.prompt }}
+          claude_args: "--allowedTools 'Edit,MultiEdit,Write,Read,Glob,Grep,LS,Bash(git:*),Bash(gh:*),Bash(npm:*),Bash(npx:*),Bash(bun:*),Bash(node:*),Bash(pnpm:*),Bash(yarn:*)'"`}
             </pre>
           </CardContent>
         </Card>
