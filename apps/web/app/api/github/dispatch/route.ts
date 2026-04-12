@@ -101,6 +101,8 @@ export async function POST(request: Request) {
     truncated = true;
   }
 
+  const dispatchedAt = new Date().toISOString();
+
   const dispatchUrl = `https://api.github.com/repos/${integration.fullName}/dispatches`;
   const res = await fetch(dispatchUrl, {
     method: "POST",
@@ -128,6 +130,7 @@ export async function POST(request: Request) {
       repository: integration.fullName,
       truncated,
       eventType: REPOSITORY_DISPATCH_EVENT_TYPE,
+      dispatchedAt,
     });
   }
 

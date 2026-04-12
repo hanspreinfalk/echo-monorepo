@@ -27,13 +27,14 @@ import {
     ChevronDownIcon,
     ChevronRightIcon,
     CopyIcon,
+    EyeIcon,
     Loader2Icon,
     MoreHorizontalIcon,
     RotateCcwIcon,
     TrashIcon,
     WorkflowIcon,
 } from "lucide-react";
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePaginatedQuery, useMutation, useAction, useQuery } from "convex/react";
 import { toast } from "sonner";
 import { api } from "@workspace/backend/_generated/api";
@@ -41,6 +42,11 @@ import type { Doc, Id } from "@workspace/backend/_generated/dataModel";
 import { useInfiniteScroll } from "@workspace/ui/hooks/use-infinite-scroll";
 import { InfiniteScrollTrigger } from "@workspace/ui/components/infinite-scroll-trigger";
 import { DeleteIssueDialog } from "../components/delete-issue-dialog";
+import {
+    WorkflowRunDialog,
+    type IssueWorkflowSession,
+    type WorkflowPollContext,
+} from "../components/workflow-run-dialog";
 
 type IssueCategory =
     | "Bug"
@@ -173,6 +179,16 @@ function attachmentDisplayKind(
 type IssueListRow = Doc<"issues"> & {
     resolvedContactSessions?: Doc<"contactSessions">[];
 };
+
+/** Stable object key for per-issue GitHub workflow session state. */
+function workflowSessionKey(issueId: Id<"issues">): string {
+    return String(issueId);
+}
+
+const ACTIVE_RUN_STATUSES = new Set(["queued", "waiting", "in_progress"]);
+function isActiveRunStatus(status: string | null): boolean {
+    return status !== null && ACTIVE_RUN_STATUSES.has(status);
+}
 
 function docToProductIssue(row: IssueListRow): ProductIssue {
     const reportedMs = row.firstReported ?? row._creationTime;
@@ -313,6 +329,52 @@ export const IssuesView = () => {
     const [githubOAuthConnected, setGithubOAuthConnected] = useState<
         boolean | null
     >(null);
+    const [workflowDialogOpen, setWorkflowDialogOpen] = useState(false);
+    const [workflowPollContext, setWorkflowPollContext] =
+        useState<WorkflowPollContext | null>(null);
+    const [issueWorkflowByIssueId, setIssueWorkflowByIssueId] = useState<
+        Record<string, IssueWorkflowSession>
+    >({});
+
+    const handleWorkflowRunIdResolved = useCallback(
+        (issueId: Id<"issues">, runId: number) => {
+            setIssueWorkflowByIssueId((prev) => {
+                const key = workflowSessionKey(issueId);
+                const cur = prev[key];
+                if (!cur) {
+                    return prev;
+                }
+                if (cur.runId === runId) {
+                    return prev;
+                }
+                return {
+                    ...prev,
+                    [key]: { ...cur, runId },
+                };
+            });
+        },
+        [],
+    );
+
+    const handleWorkflowStatusChange = useCallback(
+        (issueId: Id<"issues">, status: string, conclusion: string | null) => {
+            setIssueWorkflowByIssueId((prev) => {
+                const key = workflowSessionKey(issueId);
+                const cur = prev[key];
+                if (!cur) {
+                    return prev;
+                }
+                if (cur.runStatus === status && cur.runConclusion === conclusion) {
+                    return prev;
+                }
+                return {
+                    ...prev,
+                    [key]: { ...cur, runStatus: status, runConclusion: conclusion },
+                };
+            });
+        },
+        [],
+    );
 
     useEffect(() => {
         let cancelled = false;
@@ -336,6 +398,76 @@ export const IssuesView = () => {
             cancelled = true;
         };
     }, []);
+
+    // Background poll for active runs so "Fix now" stays disabled while the
+    // workflow is running even when the dialog is closed.
+    const issueWorkflowRef = useRef(issueWorkflowByIssueId);
+    issueWorkflowRef.current = issueWorkflowByIssueId;
+    const workflowDialogOpenRef = useRef(workflowDialogOpen);
+    workflowDialogOpenRef.current = workflowDialogOpen;
+    const workflowPollContextRef = useRef(workflowPollContext);
+    workflowPollContextRef.current = workflowPollContext;
+
+    const hasActiveSessions = useMemo(
+        () =>
+            Object.values(issueWorkflowByIssueId).some(
+                (s) => s.runId !== null && isActiveRunStatus(s.runStatus),
+            ),
+        [issueWorkflowByIssueId],
+    );
+
+    useEffect(() => {
+        if (!hasActiveSessions) {
+            return;
+        }
+        let cancelled = false;
+        const bgPoll = async () => {
+            const sessions = issueWorkflowRef.current;
+            const dialogOpen = workflowDialogOpenRef.current;
+            const dialogCtx = workflowPollContextRef.current;
+            const dialogKey = dialogCtx
+                ? workflowSessionKey(dialogCtx.issueId)
+                : null;
+            for (const [key, session] of Object.entries(sessions) as [string, IssueWorkflowSession][]) {
+                if (cancelled) return;
+                if (!isActiveRunStatus(session.runStatus) || session.runId === null)
+                    continue;
+                // Skip if the open dialog is already polling this issue.
+                if (dialogOpen && key === dialogKey) continue;
+                try {
+                    const res = await fetch(
+                        `/api/github/actions/run?runId=${session.runId}`,
+                    );
+                    if (cancelled || !res.ok) continue;
+                    const data = (await res.json()) as {
+                        run?: { status: string; conclusion: string | null } | null;
+                    };
+                    if (cancelled || !data.run) continue;
+                    setIssueWorkflowByIssueId((prev) => {
+                        const cur = prev[key];
+                        if (!cur) return prev;
+                        if (cur.runStatus === data.run!.status) return prev;
+                        return {
+                            ...prev,
+                            [key]: {
+                                ...cur,
+                                runStatus: data.run!.status,
+                                runConclusion: data.run!.conclusion,
+                            },
+                        };
+                    });
+                } catch {
+                    // ignore – next tick will retry
+                }
+            }
+        };
+        void bgPoll();
+        const id = window.setInterval(() => void bgPoll(), 8000);
+        return () => {
+            cancelled = true;
+            window.clearInterval(id);
+        };
+    }, [hasActiveSessions]);
 
     const visibleIssues = useMemo(() => {
         const next = issues.filter((i) =>
@@ -412,6 +544,9 @@ export const IssuesView = () => {
                 );
                 return;
             }
+            if (issue.resolved) {
+                return;
+            }
             setActionsIssueId(issue.id);
             try {
                 const prompt = await generateFixPromptAction({
@@ -430,18 +565,39 @@ export const IssuesView = () => {
                     ok?: boolean;
                     truncated?: boolean;
                     repository?: string;
+                    dispatchedAt?: string;
                 };
                 if (!res.ok) {
                     toast.error(data.error ?? "Could not dispatch to GitHub.");
                     return;
                 }
+                const session: IssueWorkflowSession = {
+                    dispatchedAt:
+                        typeof data.dispatchedAt === "string"
+                            ? data.dispatchedAt
+                            : new Date().toISOString(),
+                    repository:
+                        data.repository ?? githubIntegration.fullName,
+                    runId: null,
+                    runStatus: "queued",
+                    runConclusion: null,
+                };
+                setIssueWorkflowByIssueId((prev) => ({
+                    ...prev,
+                    [workflowSessionKey(issue.id)]: session,
+                }));
+                setWorkflowPollContext({
+                    issueId: issue.id,
+                    ...session,
+                });
+                setWorkflowDialogOpen(true);
                 if (data.truncated) {
                     toast.success(
-                        `Dispatched to ${data.repository ?? githubIntegration.fullName} (prompt truncated for GitHub).`,
+                        `Dispatched to ${session.repository} (prompt truncated for GitHub).`,
                     );
                 } else {
                     toast.success(
-                        `Dispatched fix prompt to ${data.repository ?? githubIntegration.fullName}.`,
+                        `Dispatched fix prompt to ${session.repository}.`,
                     );
                 }
             } catch (error) {
@@ -494,6 +650,15 @@ export const IssuesView = () => {
         const id = selectedIssue.id;
         setExpandedIssueId((cur) => (cur === id ? null : cur));
         setSelectedIssue(null);
+        setIssueWorkflowByIssueId((prev) => {
+            const key = workflowSessionKey(id);
+            if (!(key in prev)) {
+                return prev;
+            }
+            const next = { ...prev };
+            delete next[key];
+            return next;
+        });
     }, [selectedIssue]);
 
     const colCount = 4;
@@ -513,6 +678,18 @@ export const IssuesView = () => {
                 onOpenChange={setDeleteDialogOpen}
                 open={deleteDialogOpen}
             />
+            <WorkflowRunDialog
+                context={workflowPollContext}
+                onOpenChange={(next) => {
+                    setWorkflowDialogOpen(next);
+                    if (!next) {
+                        setWorkflowPollContext(null);
+                    }
+                }}
+                onRunIdResolved={handleWorkflowRunIdResolved}
+                onStatusChange={handleWorkflowStatusChange}
+                open={workflowDialogOpen}
+            />
             <div className="flex min-h-screen min-w-0 flex-col bg-muted p-8">
                 <div className="mx-auto w-full min-w-0 max-w-3xl">
                     <div className="space-y-2">
@@ -520,10 +697,11 @@ export const IssuesView = () => {
                         <p className="text-muted-foreground">
                             Expand a row for console logs, attachments, and
                             affected sessions. Copy prompts from the Prompt column,
-                            or use the row menu (⋯) and choose{" "}
+                            or use the row menu (⋯) for{" "}
                             <span className="text-foreground font-medium">Fix now</span>{" "}
-                            to send the fix prompt via GitHub Actions for the
-                            repository linked under GitHub.
+                            and{" "}
+                            <span className="text-foreground font-medium">View workflow run</span>{" "}
+                            (per issue, after you have dispatched at least once).
                         </p>
                     </div>
 
@@ -620,6 +798,10 @@ export const IssuesView = () => {
                                         const rowTone = issue.resolved
                                             ? "opacity-70"
                                             : "";
+                                        const wfKey =
+                                            workflowSessionKey(issue.id);
+                                        const wfSession =
+                                            issueWorkflowByIssueId[wfKey];
                                         return (
                                             <Fragment key={issue.id}>
                                                 <TableRow
@@ -733,29 +915,40 @@ export const IssuesView = () => {
                                                                     className="items-start gap-2 py-1.5"
                                                                     disabled={
                                                                         !githubDispatchAvailable ||
+                                                                        issue.resolved ||
+                                                                        isActiveRunStatus(
+                                                                            wfSession?.runStatus ?? null,
+                                                                        ) ||
                                                                         actionsIssueId ===
                                                                             issue.id ||
                                                                         generatingPromptIssueId ===
                                                                             issue.id
                                                                     }
                                                                     title={
-                                                                        githubIntegration ===
-                                                                        undefined
-                                                                            ? "Loading GitHub settings…"
-                                                                            : !hasLinkedGithubRepo
-                                                                              ? "Link a repository under GitHub in the sidebar"
-                                                                              : githubOAuthConnected ===
-                                                                                  null
-                                                                                ? "Checking GitHub connection…"
+                                                                        issue.resolved
+                                                                            ? "Reopen the issue to dispatch a fix"
+                                                                            : isActiveRunStatus(
+                                                                                  wfSession?.runStatus ??
+                                                                                      null,
+                                                                              )
+                                                                              ? "Workflow is running… wait for it to finish"
+                                                                              : githubIntegration ===
+                                                                                undefined
+                                                                              ? "Loading GitHub settings…"
+                                                                              : !hasLinkedGithubRepo
+                                                                                ? "Link a repository under GitHub in the sidebar"
                                                                                 : githubOAuthConnected ===
-                                                                                    false
-                                                                                  ? "GitHub not connected. Reconnect your GitHub account, then try again."
-                                                                                  : actionsIssueId ===
-                                                                                          issue.id ||
-                                                                                      generatingPromptIssueId ===
-                                                                                          issue.id
-                                                                                    ? "Please wait…"
-                                                                                    : "Trigger repository_dispatch on your linked repo"
+                                                                                    null
+                                                                                  ? "Checking GitHub connection…"
+                                                                                  : githubOAuthConnected ===
+                                                                                      false
+                                                                                    ? "GitHub not connected. Reconnect your GitHub account, then try again."
+                                                                                    : actionsIssueId ===
+                                                                                            issue.id ||
+                                                                                        generatingPromptIssueId ===
+                                                                                            issue.id
+                                                                                      ? "Please wait…"
+                                                                                      : "Trigger repository_dispatch on your linked repo"
                                                                     }
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
@@ -791,6 +984,30 @@ export const IssuesView = () => {
                                                                         </>
                                                                     )}
                                                                 </DropdownMenuItem>
+                                                                {wfSession ? (
+                                                                    <DropdownMenuItem
+                                                                        className="gap-2"
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            setWorkflowPollContext({
+                                                                                issueId: issue.id,
+                                                                                dispatchedAt:
+                                                                                    wfSession.dispatchedAt,
+                                                                                repository:
+                                                                                    wfSession.repository,
+                                                                                runId: wfSession.runId,
+                                                                                runStatus:
+                                                                                    wfSession.runStatus,
+                                                                                runConclusion:
+                                                                                    wfSession.runConclusion,
+                                                                            });
+                                                                            setWorkflowDialogOpen(true);
+                                                                        }}
+                                                                    >
+                                                                        <EyeIcon className="size-4" />
+                                                                        View workflow run
+                                                                    </DropdownMenuItem>
+                                                                ) : null}
                                                                 <DropdownMenuSeparator />
                                                                 {issue.resolved ? (
                                                                     <DropdownMenuItem
