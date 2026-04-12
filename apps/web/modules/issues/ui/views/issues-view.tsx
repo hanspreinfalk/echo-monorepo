@@ -30,9 +30,11 @@ import {
     MoreHorizontalIcon,
     RotateCcwIcon,
     TrashIcon,
+    WorkflowIcon,
 } from "lucide-react";
 import { Fragment, useCallback, useMemo, useState } from "react";
-import { usePaginatedQuery, useMutation, useAction } from "convex/react";
+import { usePaginatedQuery, useMutation, useAction, useQuery } from "convex/react";
+import { toast } from "sonner";
 import { api } from "@workspace/backend/_generated/api";
 import type { Doc, Id } from "@workspace/backend/_generated/dataModel";
 import { useInfiniteScroll } from "@workspace/ui/hooks/use-infinite-scroll";
@@ -283,6 +285,7 @@ export const IssuesView = () => {
     const generateFixPromptAction = useAction(
         api.private.issueFixPrompt.generateFixPrompt,
     );
+    const githubIntegration = useQuery(api.private.githubIntegration.getOne);
 
     const [criticalitySort, setCriticalitySort] = useState<"asc" | "desc">(
         "desc",
@@ -302,6 +305,9 @@ export const IssuesView = () => {
     );
     const [statusFilter, setStatusFilter] = useState<"open" | "resolved">(
         "open",
+    );
+    const [actionsIssueId, setActionsIssueId] = useState<Id<"issues"> | null>(
+        null,
     );
 
     const visibleIssues = useMemo(() => {
@@ -346,6 +352,62 @@ export const IssuesView = () => {
             }
         },
         [generateFixPromptAction],
+    );
+
+    const hasLinkedGithubRepo =
+        githubIntegration !== undefined && githubIntegration !== null;
+
+    const sendToGithubActions = useCallback(
+        async (issue: ProductIssue) => {
+            if (githubIntegration === undefined) {
+                return;
+            }
+            if (githubIntegration === null) {
+                toast.error(
+                    "Link a GitHub repository under GitHub in the sidebar first.",
+                );
+                return;
+            }
+            setActionsIssueId(issue.id);
+            try {
+                const prompt = await generateFixPromptAction({
+                    issueId: issue.id,
+                });
+                const res = await fetch("/api/github/dispatch", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        prompt,
+                        issueId: issue.id,
+                    }),
+                });
+                const data = (await res.json()) as {
+                    error?: string;
+                    ok?: boolean;
+                    truncated?: boolean;
+                    repository?: string;
+                };
+                if (!res.ok) {
+                    toast.error(data.error ?? "Could not dispatch to GitHub.");
+                    return;
+                }
+                if (data.truncated) {
+                    toast.success(
+                        `Dispatched to ${data.repository ?? githubIntegration.fullName} (prompt truncated for GitHub).`,
+                    );
+                } else {
+                    toast.success(
+                        `Dispatched fix prompt to ${data.repository ?? githubIntegration.fullName}.`,
+                    );
+                }
+            } catch (error) {
+                console.error(error);
+                toast.error("Could not send prompt to GitHub Actions.");
+            } finally {
+                setActionsIssueId(null);
+            }
+        },
+        [generateFixPromptAction, githubIntegration],
     );
 
     const copyContactSessionId = useCallback(
@@ -413,7 +475,8 @@ export const IssuesView = () => {
                         <h1 className="text-2xl md:text-4xl">Product Issues</h1>
                         <p className="text-muted-foreground">
                             Expand a row for console logs, attachments, and
-                            affected sessions. Copy prompts for your assistant.
+                            affected sessions. Copy prompts or send them to GitHub
+                            Actions for the repository linked under GitHub.
                         </p>
                     </div>
 
@@ -465,7 +528,7 @@ export const IssuesView = () => {
                                             )}
                                         </button>
                                     </TableHead>
-                                    <TableHead className="px-6 py-4 font-medium w-[140px] text-right whitespace-nowrap">
+                                    <TableHead className="px-6 py-4 font-medium w-[200px] min-w-[11rem] text-right whitespace-nowrap">
                                         Prompt
                                     </TableHead>
                                     <TableHead className="px-6 py-4 font-medium whitespace-nowrap">
@@ -570,40 +633,85 @@ export const IssuesView = () => {
                                                         </Badge>
                                                     </TableCell>
                                                     <TableCell className="px-6 py-4 align-middle text-right">
-                                                        <Button
-                                                            className="gap-2"
-                                                            disabled={
-                                                                generatingPromptIssueId ===
-                                                                issue.id
-                                                            }
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                copyPrompt(
-                                                                    issue,
-                                                                );
-                                                            }}
-                                                            size="sm"
-                                                            variant="outline"
-                                                        >
-                                                            {generatingPromptIssueId ===
-                                                            issue.id ? (
-                                                                <>
-                                                                    <Loader2Icon className="size-4 animate-spin" />
-                                                                    Generating…
-                                                                </>
-                                                            ) : copiedId ===
-                                                              issue.id ? (
-                                                                <>
-                                                                    <CheckIcon className="size-4" />
-                                                                    Copied
-                                                                </>
-                                                            ) : (
-                                                                <>
-                                                                    <CopyIcon className="size-4" />
-                                                                    Copy
-                                                                </>
-                                                            )}
-                                                        </Button>
+                                                        <div className="flex flex-col items-end gap-1.5">
+                                                            <Button
+                                                                className="gap-2"
+                                                                disabled={
+                                                                    generatingPromptIssueId ===
+                                                                        issue.id ||
+                                                                    actionsIssueId ===
+                                                                        issue.id
+                                                                }
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    copyPrompt(
+                                                                        issue,
+                                                                    );
+                                                                }}
+                                                                size="sm"
+                                                                variant="outline"
+                                                            >
+                                                                {generatingPromptIssueId ===
+                                                                issue.id ? (
+                                                                    <>
+                                                                        <Loader2Icon className="size-4 animate-spin" />
+                                                                        Generating…
+                                                                    </>
+                                                                ) : copiedId ===
+                                                                  issue.id ? (
+                                                                    <>
+                                                                        <CheckIcon className="size-4" />
+                                                                        Copied
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <CopyIcon className="size-4" />
+                                                                        Copy
+                                                                    </>
+                                                                )}
+                                                            </Button>
+                                                            <Button
+                                                                className="gap-1.5"
+                                                                disabled={
+                                                                    githubIntegration ===
+                                                                        undefined ||
+                                                                    !hasLinkedGithubRepo ||
+                                                                    actionsIssueId ===
+                                                                        issue.id ||
+                                                                    generatingPromptIssueId ===
+                                                                        issue.id
+                                                                }
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    void sendToGithubActions(
+                                                                        issue,
+                                                                    );
+                                                                }}
+                                                                size="sm"
+                                                                title={
+                                                                    githubIntegration ===
+                                                                    undefined
+                                                                        ? "Loading GitHub settings…"
+                                                                        : hasLinkedGithubRepo
+                                                                          ? "Trigger repository_dispatch on your linked repo"
+                                                                          : "Link a repository under GitHub in the sidebar"
+                                                                }
+                                                                variant="secondary"
+                                                            >
+                                                                {actionsIssueId ===
+                                                                issue.id ? (
+                                                                    <>
+                                                                        <Loader2Icon className="size-4 animate-spin" />
+                                                                        Sending…
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <WorkflowIcon className="size-4" />
+                                                                        Actions
+                                                                    </>
+                                                                )}
+                                                            </Button>
+                                                        </div>
                                                     </TableCell>
                                                     <TableCell className="px-6 py-4 align-middle">
                                                         <DropdownMenu>

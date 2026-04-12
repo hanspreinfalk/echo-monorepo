@@ -4,6 +4,7 @@ import { OrganizationSwitcher, UserButton } from "@clerk/nextjs"
 import {
     BugIcon,
     CreditCardIcon,
+    GithubIcon,
     InboxIcon,
     LayoutDashboardIcon,
     LibraryBigIcon,
@@ -56,6 +57,11 @@ const configurationItems = [
         title: 'Integrations',
         url: '/integrations',
         icon: LayoutDashboardIcon,
+    },
+    {
+        title: 'GitHub Integration',
+        url: '/github-integration',
+        icon: GithubIcon,
     },
     {
         title: 'Custom Tools',

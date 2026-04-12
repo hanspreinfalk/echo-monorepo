@@ -18,6 +18,7 @@ import type * as private_agentCustomTools from "../private/agentCustomTools.js";
 import type * as private_contactSessions from "../private/contactSessions.js";
 import type * as private_conversations from "../private/conversations.js";
 import type * as private_files from "../private/files.js";
+import type * as private_githubIntegration from "../private/githubIntegration.js";
 import type * as private_issueFixPrompt from "../private/issueFixPrompt.js";
 import type * as private_issues from "../private/issues.js";
 import type * as private_messages from "../private/messages.js";
@@ -66,6 +67,7 @@ declare const fullApi: ApiFromModules<{
   "private/contactSessions": typeof private_contactSessions;
   "private/conversations": typeof private_conversations;
   "private/files": typeof private_files;
+  "private/githubIntegration": typeof private_githubIntegration;
   "private/issueFixPrompt": typeof private_issueFixPrompt;
   "private/issues": typeof private_issues;
   "private/messages": typeof private_messages;

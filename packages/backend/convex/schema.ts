@@ -137,6 +137,13 @@ export default defineSchema({
             data: v.string(), 
         })),
     }).index("by_conversation_id", ["conversationId"]),
+    githubIntegrationSettings: defineTable({
+        organizationId: v.string(),
+        fullName: v.string(),
+        githubRepoId: v.number(),
+        defaultBranch: v.string(),
+        htmlUrl: v.optional(v.string()),
+    }).index("by_organization_id", ["organizationId"]),
     agentCustomTools: defineTable({
         organizationId: v.string(),
         name: v.string(),
