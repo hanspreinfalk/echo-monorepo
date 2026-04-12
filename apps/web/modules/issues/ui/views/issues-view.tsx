@@ -1083,22 +1083,18 @@ export const IssuesView = () => {
                                                                             : "Not provided"}
                                                                     </p>
                                                                 </div>
-                                                                <div className="min-w-0">
-                                                                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                                                                        Steps to reproduce
-                                                                    </p>
-                                                                    <p
-                                                                        className={`mt-1.5 break-words text-sm leading-relaxed [overflow-wrap:anywhere] ${
-                                                                            issue.stepsToReproduce?.trim()
-                                                                                ? "text-foreground"
-                                                                                : "text-muted-foreground italic"
-                                                                        }`}
-                                                                    >
-                                                                        {issue.stepsToReproduce?.trim()
-                                                                            ? issue.stepsToReproduce
-                                                                            : "Not provided"}
-                                                                    </p>
-                                                                </div>
+                                                                {issue.stepsToReproduce?.trim() ? (
+                                                                    <div className="min-w-0">
+                                                                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                                                            Steps to reproduce
+                                                                        </p>
+                                                                        <p className="mt-1.5 break-words text-sm leading-relaxed text-foreground [overflow-wrap:anywhere]">
+                                                                            {
+                                                                                issue.stepsToReproduce
+                                                                            }
+                                                                        </p>
+                                                                    </div>
+                                                                ) : null}
                                                                 <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 text-sm">
                                                                     <div>
                                                                         <dt className="text-muted-foreground">
@@ -1131,30 +1127,26 @@ export const IssuesView = () => {
                                                                             )}
                                                                         </dd>
                                                                     </div>
-                                                                    <div className="sm:col-span-2 lg:col-span-3">
-                                                                        <dt className="text-muted-foreground">
-                                                                            Page URL
-                                                                        </dt>
-                                                                        <dd
-                                                                            className={`mt-1.5 break-all font-mono text-xs ${
-                                                                                issue.pageUrl?.trim()
-                                                                                    ? "text-foreground"
-                                                                                    : "text-muted-foreground italic"
-                                                                            }`}
-                                                                        >
-                                                                            {issue.pageUrl?.trim()
-                                                                                ? issue.pageUrl
-                                                                                : "Not provided"}
-                                                                        </dd>
-                                                                    </div>
+                                                                    {issue.pageUrl?.trim() ? (
+                                                                        <div className="sm:col-span-2 lg:col-span-3">
+                                                                            <dt className="text-muted-foreground">
+                                                                                Page URL
+                                                                            </dt>
+                                                                            <dd className="mt-1.5 break-all font-mono text-xs text-foreground">
+                                                                                {
+                                                                                    issue.pageUrl
+                                                                                }
+                                                                            </dd>
+                                                                        </div>
+                                                                    ) : null}
                                                                 </dl>
-                                                                <div>
-                                                                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                                                                        Console logs
-                                                                    </p>
-                                                                    {issue.consoleLogs &&
-                                                                    issue.consoleLogs.length >
-                                                                        0 ? (
+                                                                {issue.consoleLogs &&
+                                                                issue.consoleLogs.length >
+                                                                    0 ? (
+                                                                    <div>
+                                                                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                                                            Console logs
+                                                                        </p>
                                                                         <ScrollArea className="mt-1.5 max-h-48 rounded-md border bg-background">
                                                                             <ul className="space-y-1 p-3 font-mono text-xs leading-relaxed">
                                                                                 {issue.consoleLogs.map(
@@ -1174,12 +1166,8 @@ export const IssuesView = () => {
                                                                                 )}
                                                                             </ul>
                                                                         </ScrollArea>
-                                                                    ) : (
-                                                                        <p className="mt-1.5 text-sm text-muted-foreground italic">
-                                                                            Not provided
-                                                                        </p>
-                                                                    )}
-                                                                </div>
+                                                                    </div>
+                                                                ) : null}
                                                                 {issue.attachments &&
                                                                 issue.attachments
                                                                     .length > 0 ? (
