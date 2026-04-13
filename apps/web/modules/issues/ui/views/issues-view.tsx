@@ -919,24 +919,21 @@ export const IssuesView = () => {
                     <div className="space-y-2">
                         <h1 className="text-2xl md:text-4xl">Product Issues</h1>
                         <p className="text-muted-foreground">
-                            Expand a row for console logs, attachments, and
-                            affected sessions. Use{" "}
+                            Expand rows.{" "}
                             <span className="text-foreground font-medium">Fix</span>{" "}
-                            for the first GitHub Actions dispatch (preview the prompt,
-                            then confirm). After a run has started or finished, the
-                            table shows{" "}
+                            → Actions (preview, confirm); then{" "}
                             <span className="text-foreground font-medium">
                                 Workflow
+                            </span>
+                            {" / "}
+                            <span className="text-foreground font-medium">
+                                View workflow
                             </span>{" "}
                             or{" "}
                             <span className="text-foreground font-medium">
-                                View workflow
-                            </span>
-                            ; use{" "}
-                            <span className="text-foreground font-medium">
                                 Fix again
                             </span>{" "}
-                            in the row menu (⋯) to dispatch another run.
+                            (⋯).
                         </p>
                     </div>
 

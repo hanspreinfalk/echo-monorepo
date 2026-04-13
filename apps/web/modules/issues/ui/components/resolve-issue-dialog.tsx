@@ -160,9 +160,7 @@ export const ResolveIssueDialog = ({
                     <DialogHeader className="space-y-2 text-left">
                         <DialogTitle>Mark issue as resolved?</DialogTitle>
                         <DialogDescription>
-                            The issue will be marked resolved for your team. Choose which
-                            linked visitors receive the assistant message below (one chat per
-                            visitor — their reporting thread or latest conversation).
+                            Pick who gets the assistant message below. 
                         </DialogDescription>
                     </DialogHeader>
                 </div>
@@ -265,9 +263,7 @@ export const ResolveIssueDialog = ({
                                 value={assistantMessageDraft}
                             />
                             <p className="text-muted-foreground text-xs">
-                                Edited text is sent as the assistant in chat. If
-                                you clear it, the default message for this issue
-                                title is used.
+                                Sent as the assistant. Edit to customize the message.
                             </p>
                         </div>
                     ) : null}
