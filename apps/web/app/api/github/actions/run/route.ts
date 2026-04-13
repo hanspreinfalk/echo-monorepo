@@ -169,6 +169,7 @@ export async function GET(request: NextRequest) {
     if (!chosen) {
       return NextResponse.json({
         run: null,
+        pullRequest: null,
         jobs: [] as unknown[],
         logText: "",
         logsSkippedZip: false,
@@ -193,7 +194,23 @@ export async function GET(request: NextRequest) {
     status: string;
     conclusion: string | null;
     html_url: string;
+    pull_requests?: Array<{ number: number }>;
   };
+
+  let pullRequest: { title: string; html_url: string } | null = null;
+  const prRefs = run.pull_requests ?? [];
+  const firstPr = prRefs[0];
+  if (firstPr !== undefined) {
+    const prNum = firstPr.number;
+    const prRes = await fetch(
+      `https://api.github.com/repos/${fullName}/pulls/${prNum}`,
+      { headers: githubHeaders(githubToken) },
+    );
+    if (prRes.ok) {
+      const pr = (await prRes.json()) as { title: string; html_url: string };
+      pullRequest = { title: pr.title, html_url: pr.html_url };
+    }
+  }
 
   return NextResponse.json({
     run: {
@@ -202,5 +219,6 @@ export async function GET(request: NextRequest) {
       conclusion: run.conclusion,
       html_url: run.html_url,
     },
+    pullRequest,
   });
 }

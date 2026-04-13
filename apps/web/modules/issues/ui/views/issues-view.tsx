@@ -3,6 +3,14 @@
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
 import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@workspace/ui/components/dialog";
+import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
@@ -35,7 +43,7 @@ import {
     WorkflowIcon,
 } from "lucide-react";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { usePaginatedQuery, useMutation, useAction, useQuery } from "convex/react";
+import { usePaginatedQuery, useMutation, useQuery } from "convex/react";
 import { toast } from "sonner";
 import { api } from "@workspace/backend/_generated/api";
 import type { Doc, Id } from "@workspace/backend/_generated/dataModel";
@@ -190,6 +198,33 @@ function isActiveRunStatus(status: string | null): boolean {
     return status !== null && ACTIVE_RUN_STATUSES.has(status);
 }
 
+/** User-facing summary for persisted GitHub workflow state (table + expanded row). */
+function workflowFixSummary(session: IssueWorkflowSession): string {
+    if (isActiveRunStatus(session.runStatus)) {
+        return "Fix in progress";
+    }
+    if (session.runStatus === "completed") {
+        if (session.runConclusion === "success") {
+            return "Fix ready (PR opened)";
+        }
+        if (session.runConclusion === "cancelled") {
+            return "Fix cancelled";
+        }
+        return "Fix failed";
+    }
+    if (session.runStatus === "queued" || session.runStatus === "waiting") {
+        return "Fix starting…";
+    }
+    return "GitHub fix dispatched";
+}
+
+function isWorkflowFixReadyPrOpened(session: IssueWorkflowSession): boolean {
+    return (
+        session.runStatus === "completed" &&
+        session.runConclusion === "success"
+    );
+}
+
 function docToProductIssue(row: IssueListRow): ProductIssue {
     const reportedMs = row.firstReported ?? row._creationTime;
     const capturedIso = new Date(reportedMs).toISOString();
@@ -225,6 +260,7 @@ function buildFixPrompt(issue: ProductIssue): string {
     const lines = [
         "You are helping fix a product issue in our application.",
         "",
+        `Issue ID: ${issue.id}`,
         `Status: ${issue.resolved ? "Resolved" : "Open"}`,
         `Category: ${issue.category}`,
         `Criticality: ${issue.criticality}`,
@@ -299,17 +335,17 @@ export const IssuesView = () => {
     );
 
     const setResolvedMutation = useMutation(api.private.issues.setResolved);
-    const generateFixPromptAction = useAction(
-        api.private.issueFixPrompt.generateFixPrompt,
+    const recordGithubWorkflowDispatchMutation = useMutation(
+        api.private.issues.recordGithubWorkflowDispatch,
+    );
+    const updateGithubWorkflowRunMutation = useMutation(
+        api.private.issues.updateGithubWorkflowRun,
     );
     const githubIntegration = useQuery(api.private.githubIntegration.getOne);
 
     const [criticalitySort, setCriticalitySort] = useState<"asc" | "desc">(
         "desc",
     );
-    const [copiedId, setCopiedId] = useState<Id<"issues"> | null>(null);
-    const [generatingPromptIssueId, setGeneratingPromptIssueId] =
-        useState<Id<"issues"> | null>(null);
     const [copiedSessionKey, setCopiedSessionKey] = useState<string | null>(
         null,
     );
@@ -323,57 +359,56 @@ export const IssuesView = () => {
     const [statusFilter, setStatusFilter] = useState<"open" | "resolved">(
         "open",
     );
-    const [actionsIssueId, setActionsIssueId] = useState<Id<"issues"> | null>(
-        null,
-    );
     const [githubOAuthConnected, setGithubOAuthConnected] = useState<
         boolean | null
     >(null);
+    const [fixPromptDialogOpen, setFixPromptDialogOpen] = useState(false);
+    const [fixPromptDialogIssue, setFixPromptDialogIssue] =
+        useState<ProductIssue | null>(null);
+    const [fixDispatchingIssueId, setFixDispatchingIssueId] =
+        useState<Id<"issues"> | null>(null);
     const [workflowDialogOpen, setWorkflowDialogOpen] = useState(false);
     const [workflowPollContext, setWorkflowPollContext] =
         useState<WorkflowPollContext | null>(null);
-    const [issueWorkflowByIssueId, setIssueWorkflowByIssueId] = useState<
-        Record<string, IssueWorkflowSession>
-    >({});
+
+    const issueWorkflowByIssueId = useMemo(() => {
+        const map: Record<string, IssueWorkflowSession> = {};
+        const repoFallback = githubIntegration?.fullName?.trim() ?? "";
+        for (const row of issuesPage.results) {
+            if (!row.githubWorkflowDispatchedAt) {
+                continue;
+            }
+            const key = workflowSessionKey(row._id);
+            const conc = row.githubWorkflowRunConclusion;
+            map[key] = {
+                dispatchedAt: row.githubWorkflowDispatchedAt,
+                repository:
+                    row.githubWorkflowRepository?.trim() || repoFallback,
+                runId: row.githubWorkflowRunId ?? null,
+                runStatus: row.githubWorkflowRunStatus ?? null,
+                runConclusion:
+                    conc === undefined || conc === "" ? null : conc,
+            };
+        }
+        return map;
+    }, [issuesPage.results, githubIntegration?.fullName]);
 
     const handleWorkflowRunIdResolved = useCallback(
         (issueId: Id<"issues">, runId: number) => {
-            setIssueWorkflowByIssueId((prev) => {
-                const key = workflowSessionKey(issueId);
-                const cur = prev[key];
-                if (!cur) {
-                    return prev;
-                }
-                if (cur.runId === runId) {
-                    return prev;
-                }
-                return {
-                    ...prev,
-                    [key]: { ...cur, runId },
-                };
-            });
+            void updateGithubWorkflowRunMutation({ issueId, runId });
         },
-        [],
+        [updateGithubWorkflowRunMutation],
     );
 
     const handleWorkflowStatusChange = useCallback(
         (issueId: Id<"issues">, status: string, conclusion: string | null) => {
-            setIssueWorkflowByIssueId((prev) => {
-                const key = workflowSessionKey(issueId);
-                const cur = prev[key];
-                if (!cur) {
-                    return prev;
-                }
-                if (cur.runStatus === status && cur.runConclusion === conclusion) {
-                    return prev;
-                }
-                return {
-                    ...prev,
-                    [key]: { ...cur, runStatus: status, runConclusion: conclusion },
-                };
+            void updateGithubWorkflowRunMutation({
+                issueId,
+                runStatus: status,
+                runConclusion: conclusion,
             });
         },
-        [],
+        [updateGithubWorkflowRunMutation],
     );
 
     useEffect(() => {
@@ -443,18 +478,20 @@ export const IssuesView = () => {
                         run?: { status: string; conclusion: string | null } | null;
                     };
                     if (cancelled || !data.run) continue;
-                    setIssueWorkflowByIssueId((prev) => {
-                        const cur = prev[key];
-                        if (!cur) return prev;
-                        if (cur.runStatus === data.run!.status) return prev;
-                        return {
-                            ...prev,
-                            [key]: {
-                                ...cur,
-                                runStatus: data.run!.status,
-                                runConclusion: data.run!.conclusion,
-                            },
-                        };
+                    const cur = issueWorkflowRef.current[key];
+                    if (!cur) continue;
+                    const nextConc = data.run.conclusion ?? "";
+                    const curConc = cur.runConclusion ?? "";
+                    if (
+                        cur.runStatus === data.run.status &&
+                        curConc === nextConc
+                    ) {
+                        continue;
+                    }
+                    void updateGithubWorkflowRunMutation({
+                        issueId: key as Id<"issues">,
+                        runStatus: data.run.status,
+                        runConclusion: data.run.conclusion,
                     });
                 } catch {
                     // ignore – next tick will retry
@@ -467,7 +504,7 @@ export const IssuesView = () => {
             cancelled = true;
             window.clearInterval(id);
         };
-    }, [hasActiveSessions]);
+    }, [hasActiveSessions, updateGithubWorkflowRunMutation]);
 
     const visibleIssues = useMemo(() => {
         const next = issues.filter((i) =>
@@ -490,29 +527,6 @@ export const IssuesView = () => {
         setCriticalitySort((prev) => (prev === "desc" ? "asc" : "desc"));
     }, []);
 
-    const copyPrompt = useCallback(
-        async (issue: ProductIssue) => {
-            setGeneratingPromptIssueId(issue.id);
-            let text: string;
-            try {
-                text = await generateFixPromptAction({ issueId: issue.id });
-            } catch (error) {
-                console.error("generateFixPrompt failed, using local prompt", error);
-                text = buildFixPrompt(issue);
-            } finally {
-                setGeneratingPromptIssueId(null);
-            }
-            try {
-                await navigator.clipboard.writeText(text);
-                setCopiedId(issue.id);
-                window.setTimeout(() => setCopiedId(null), 2000);
-            } catch {
-                // Clipboard may be unavailable (permissions / non-secure context)
-            }
-        },
-        [generateFixPromptAction],
-    );
-
     const hasLinkedGithubRepo =
         githubIntegration !== undefined &&
         githubIntegration !== null &&
@@ -521,8 +535,15 @@ export const IssuesView = () => {
     const githubDispatchAvailable =
         hasLinkedGithubRepo && githubOAuthConnected === true;
 
-    const sendToGithubActions = useCallback(
-        async (issue: ProductIssue) => {
+    const fixDispatchPrompt = useMemo(() => {
+        if (!fixPromptDialogOpen || !fixPromptDialogIssue) {
+            return null;
+        }
+        return buildFixPrompt(fixPromptDialogIssue);
+    }, [fixPromptDialogOpen, fixPromptDialogIssue]);
+
+    const openFixPromptDialog = useCallback(
+        (issue: ProductIssue) => {
             if (githubIntegration === undefined) {
                 return;
             }
@@ -547,11 +568,52 @@ export const IssuesView = () => {
             if (issue.resolved) {
                 return;
             }
-            setActionsIssueId(issue.id);
+            const wfKey = workflowSessionKey(issue.id);
+            const session = issueWorkflowByIssueId[wfKey];
+            if (isActiveRunStatus(session?.runStatus ?? null)) {
+                toast.error(
+                    "A workflow is already running for this issue. Wait for it to finish.",
+                );
+                return;
+            }
+            setFixPromptDialogIssue(issue);
+            setFixPromptDialogOpen(true);
+        },
+        [
+            githubIntegration,
+            githubOAuthConnected,
+            issueWorkflowByIssueId,
+        ],
+    );
+
+    const openWorkflowDialogForSession = useCallback(
+        (issueId: Id<"issues">, session: IssueWorkflowSession) => {
+            setWorkflowPollContext({
+                issueId,
+                dispatchedAt: session.dispatchedAt,
+                repository: session.repository,
+                runId: session.runId,
+                runStatus: session.runStatus,
+                runConclusion: session.runConclusion,
+            });
+            setWorkflowDialogOpen(true);
+        },
+        [],
+    );
+
+    const dispatchFixToGithub = useCallback(
+        async (issue: ProductIssue, prompt: string) => {
+            if (githubIntegration === undefined) {
+                return;
+            }
+            if (
+                githubIntegration === null ||
+                !githubIntegration.fullName?.trim()
+            ) {
+                return;
+            }
+            setFixDispatchingIssueId(issue.id);
             try {
-                const prompt = await generateFixPromptAction({
-                    issueId: issue.id,
-                });
                 const res = await fetch("/api/github/dispatch", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -571,21 +633,26 @@ export const IssuesView = () => {
                     toast.error(data.error ?? "Could not dispatch to GitHub.");
                     return;
                 }
+                const dispatchedAt =
+                    typeof data.dispatchedAt === "string"
+                        ? data.dispatchedAt
+                        : new Date().toISOString();
+                const repository =
+                    data.repository ?? githubIntegration.fullName;
+                await recordGithubWorkflowDispatchMutation({
+                    issueId: issue.id,
+                    dispatchedAt,
+                    repository,
+                });
                 const session: IssueWorkflowSession = {
-                    dispatchedAt:
-                        typeof data.dispatchedAt === "string"
-                            ? data.dispatchedAt
-                            : new Date().toISOString(),
-                    repository:
-                        data.repository ?? githubIntegration.fullName,
+                    dispatchedAt,
+                    repository,
                     runId: null,
                     runStatus: "queued",
                     runConclusion: null,
                 };
-                setIssueWorkflowByIssueId((prev) => ({
-                    ...prev,
-                    [workflowSessionKey(issue.id)]: session,
-                }));
+                setFixPromptDialogOpen(false);
+                setFixPromptDialogIssue(null);
                 setWorkflowPollContext({
                     issueId: issue.id,
                     ...session,
@@ -604,10 +671,10 @@ export const IssuesView = () => {
                 console.error(error);
                 toast.error("Could not send prompt to GitHub Actions.");
             } finally {
-                setActionsIssueId(null);
+                setFixDispatchingIssueId(null);
             }
         },
-        [generateFixPromptAction, githubIntegration, githubOAuthConnected],
+        [githubIntegration, recordGithubWorkflowDispatchMutation],
     );
 
     const copyContactSessionId = useCallback(
@@ -650,15 +717,6 @@ export const IssuesView = () => {
         const id = selectedIssue.id;
         setExpandedIssueId((cur) => (cur === id ? null : cur));
         setSelectedIssue(null);
-        setIssueWorkflowByIssueId((prev) => {
-            const key = workflowSessionKey(id);
-            if (!(key in prev)) {
-                return prev;
-            }
-            const next = { ...prev };
-            delete next[key];
-            return next;
-        });
     }, [selectedIssue]);
 
     const colCount = 4;
@@ -690,18 +748,96 @@ export const IssuesView = () => {
                 onStatusChange={handleWorkflowStatusChange}
                 open={workflowDialogOpen}
             />
+            <Dialog
+                onOpenChange={(open) => {
+                    setFixPromptDialogOpen(open);
+                    if (!open) {
+                        setFixPromptDialogIssue(null);
+                    }
+                }}
+                open={fixPromptDialogOpen}
+            >
+                <DialogContent className="flex max-h-[85vh] max-w-[calc(100%-2rem)] flex-col gap-4 sm:max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle>Send fix to GitHub Actions</DialogTitle>
+                        <DialogDescription>
+                            Built from this issue&apos;s fields (title, description,
+                            sessions, attachments, etc.). This is the exact text that
+                            will be sent to your linked repository workflow—review it,
+                            then confirm to dispatch.
+                        </DialogDescription>
+                    </DialogHeader>
+                    {fixDispatchPrompt ? (
+                        <div className="max-h-[min(65vh,32rem)] w-full min-w-0 overflow-y-auto overflow-x-auto overscroll-y-contain rounded-lg border bg-muted/40">
+                            <pre className="whitespace-pre-wrap break-words p-4 font-mono text-xs leading-relaxed [overflow-wrap:anywhere]">
+                                {fixDispatchPrompt}
+                            </pre>
+                        </div>
+                    ) : (
+                        <p className="text-destructive text-sm">
+                            Could not build a prompt for this issue.
+                        </p>
+                    )}
+                    <DialogFooter>
+                        <Button
+                            disabled={fixDispatchingIssueId !== null}
+                            onClick={() => setFixPromptDialogOpen(false)}
+                            type="button"
+                            variant="outline"
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            className="gap-2"
+                            disabled={
+                                !fixDispatchPrompt ||
+                                fixDispatchingIssueId !== null
+                            }
+                            onClick={() => {
+                                if (fixPromptDialogIssue && fixDispatchPrompt) {
+                                    void dispatchFixToGithub(
+                                        fixPromptDialogIssue,
+                                        fixDispatchPrompt,
+                                    );
+                                }
+                            }}
+                            type="button"
+                        >
+                            {fixDispatchingIssueId !== null ? (
+                                <>
+                                    <Loader2Icon className="size-4 animate-spin shrink-0" />
+                                    Sending…
+                                </>
+                            ) : (
+                                "Send to GitHub"
+                            )}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
             <div className="flex min-h-screen min-w-0 flex-col bg-muted p-8">
                 <div className="mx-auto w-full min-w-0 max-w-3xl">
                     <div className="space-y-2">
                         <h1 className="text-2xl md:text-4xl">Product Issues</h1>
                         <p className="text-muted-foreground">
                             Expand a row for console logs, attachments, and
-                            affected sessions. Copy prompts from the Prompt column,
-                            or use the row menu (⋯) for{" "}
-                            <span className="text-foreground font-medium">Fix now</span>{" "}
-                            and{" "}
-                            <span className="text-foreground font-medium">View workflow run</span>{" "}
-                            (per issue, after you have dispatched at least once).
+                            affected sessions. Use{" "}
+                            <span className="text-foreground font-medium">Fix</span>{" "}
+                            for the first GitHub Actions dispatch (preview the prompt,
+                            then confirm). After a run has started or finished, the
+                            table shows{" "}
+                            <span className="text-foreground font-medium">
+                                Workflow
+                            </span>{" "}
+                            or{" "}
+                            <span className="text-foreground font-medium">
+                                View workflow
+                            </span>
+                            ; use{" "}
+                            <span className="text-foreground font-medium">
+                                Fix again
+                            </span>{" "}
+                            in the row menu (⋯) to dispatch another run.
                         </p>
                     </div>
 
@@ -754,7 +890,7 @@ export const IssuesView = () => {
                                         </button>
                                     </TableHead>
                                     <TableHead className="px-6 py-4 font-medium w-[140px] min-w-[7.5rem] text-right whitespace-nowrap">
-                                        Prompt
+                                        Fix
                                     </TableHead>
                                     <TableHead className="px-6 py-4 font-medium whitespace-nowrap">
                                         Actions
@@ -841,14 +977,31 @@ export const IssuesView = () => {
                                                                     />
                                                                 )}
                                                             </span>
-                                                            <span
-                                                                className={`min-w-0 flex-1 break-words font-medium leading-snug ${
-                                                                    issue.resolved
-                                                                        ? "line-through decoration-muted-foreground/70"
-                                                                        : ""
-                                                                }`}
-                                                            >
-                                                                {issue.title}
+                                                            <span className="min-w-0 flex-1 flex flex-col gap-0.5">
+                                                                <span
+                                                                    className={`break-words font-medium leading-snug ${
+                                                                        issue.resolved
+                                                                            ? "line-through decoration-muted-foreground/70"
+                                                                            : ""
+                                                                    }`}
+                                                                >
+                                                                    {issue.title}
+                                                                </span>
+                                                                {wfSession ? (
+                                                                    <span
+                                                                        className={
+                                                                            isWorkflowFixReadyPrOpened(
+                                                                                wfSession,
+                                                                            )
+                                                                                ? "text-xs font-normal leading-snug text-red-600 dark:text-red-400"
+                                                                                : "text-muted-foreground text-xs font-normal leading-snug"
+                                                                        }
+                                                                    >
+                                                                        {workflowFixSummary(
+                                                                            wfSession,
+                                                                        )}
+                                                                    </span>
+                                                                ) : null}
                                                             </span>
                                                         </button>
                                                     </TableCell>
@@ -862,40 +1015,95 @@ export const IssuesView = () => {
                                                         </Badge>
                                                     </TableCell>
                                                     <TableCell className="px-6 py-4 align-middle text-right">
-                                                        <Button
-                                                            className="gap-2"
-                                                            disabled={
-                                                                generatingPromptIssueId ===
-                                                                    issue.id ||
-                                                                actionsIssueId ===
-                                                                    issue.id
-                                                            }
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                copyPrompt(issue);
-                                                            }}
-                                                            size="sm"
-                                                            variant="outline"
-                                                        >
-                                                            {generatingPromptIssueId ===
-                                                            issue.id ? (
-                                                                <>
-                                                                    <Loader2Icon className="size-4 animate-spin" />
-                                                                    Generating…
-                                                                </>
-                                                            ) : copiedId ===
-                                                              issue.id ? (
-                                                                <>
-                                                                    <CheckIcon className="size-4" />
-                                                                    Copied
-                                                                </>
+                                                        {wfSession ? (
+                                                            isActiveRunStatus(
+                                                                wfSession.runStatus,
+                                                            ) ? (
+                                                                <Button
+                                                                    className="gap-2"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        openWorkflowDialogForSession(
+                                                                            issue.id,
+                                                                            wfSession,
+                                                                        );
+                                                                    }}
+                                                                    size="sm"
+                                                                    title="Open workflow run status"
+                                                                    type="button"
+                                                                    variant="default"
+                                                                >
+                                                                    <Loader2Icon className="size-4 shrink-0 animate-spin" />
+                                                                    Workflow
+                                                                </Button>
                                                             ) : (
-                                                                <>
-                                                                    <CopyIcon className="size-4" />
-                                                                    Copy
-                                                                </>
-                                                            )}
-                                                        </Button>
+                                                                <Button
+                                                                    className="gap-2"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        openWorkflowDialogForSession(
+                                                                            issue.id,
+                                                                            wfSession,
+                                                                        );
+                                                                    }}
+                                                                    size="sm"
+                                                                    title="Open workflow run status"
+                                                                    type="button"
+                                                                    variant="default"
+                                                                >
+                                                                    {/* <EyeIcon className="size-4 shrink-0" /> */}
+                                                                    View workflow
+                                                                </Button>
+                                                            )
+                                                        ) : (
+                                                            <Button
+                                                                className="gap-2"
+                                                                disabled={
+                                                                    !githubDispatchAvailable ||
+                                                                    issue.resolved ||
+                                                                    fixDispatchingIssueId ===
+                                                                        issue.id
+                                                                }
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    openFixPromptDialog(
+                                                                        issue,
+                                                                    );
+                                                                }}
+                                                                size="sm"
+                                                                title={
+                                                                    issue.resolved
+                                                                        ? "Reopen the issue to dispatch a fix"
+                                                                        : githubIntegration ===
+                                                                            undefined
+                                                                          ? "Loading GitHub settings…"
+                                                                          : !hasLinkedGithubRepo
+                                                                            ? "Link a repository under GitHub in the sidebar"
+                                                                            : githubOAuthConnected ===
+                                                                                null
+                                                                              ? "Checking GitHub connection…"
+                                                                              : githubOAuthConnected ===
+                                                                                  false
+                                                                                ? "GitHub not connected. Reconnect your GitHub account, then try again."
+                                                                                : "Preview the prompt and send to GitHub Actions"
+                                                                }
+                                                                type="button"
+                                                                variant="default"
+                                                            >
+                                                                {fixDispatchingIssueId ===
+                                                                issue.id ? (
+                                                                    <>
+                                                                        <Loader2Icon className="size-4 animate-spin shrink-0" />
+                                                                        Sending…
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <WorkflowIcon className="size-4 shrink-0" />
+                                                                        Fix
+                                                                    </>
+                                                                )}
+                                                            </Button>
+                                                        )}
                                                     </TableCell>
                                                     <TableCell className="px-6 py-4 align-middle">
                                                         <DropdownMenu>
@@ -911,104 +1119,59 @@ export const IssuesView = () => {
                                                                 </Button>
                                                             </DropdownMenuTrigger>
                                                             <DropdownMenuContent align="end">
-                                                                <DropdownMenuItem
-                                                                    className="items-start gap-2 py-1.5"
-                                                                    disabled={
-                                                                        !githubDispatchAvailable ||
-                                                                        issue.resolved ||
-                                                                        isActiveRunStatus(
-                                                                            wfSession?.runStatus ?? null,
-                                                                        ) ||
-                                                                        actionsIssueId ===
-                                                                            issue.id ||
-                                                                        generatingPromptIssueId ===
-                                                                            issue.id
-                                                                    }
-                                                                    title={
-                                                                        issue.resolved
-                                                                            ? "Reopen the issue to dispatch a fix"
-                                                                            : isActiveRunStatus(
-                                                                                  wfSession?.runStatus ??
-                                                                                      null,
-                                                                              )
-                                                                              ? "Workflow is running… wait for it to finish"
-                                                                              : githubIntegration ===
-                                                                                undefined
-                                                                              ? "Loading GitHub settings…"
-                                                                              : !hasLinkedGithubRepo
-                                                                                ? "Link a repository under GitHub in the sidebar"
-                                                                                : githubOAuthConnected ===
-                                                                                    null
-                                                                                  ? "Checking GitHub connection…"
-                                                                                  : githubOAuthConnected ===
-                                                                                      false
-                                                                                    ? "GitHub not connected. Reconnect your GitHub account, then try again."
-                                                                                    : actionsIssueId ===
-                                                                                            issue.id ||
-                                                                                        generatingPromptIssueId ===
-                                                                                            issue.id
-                                                                                      ? "Please wait…"
-                                                                                      : "Trigger repository_dispatch on your linked repo"
-                                                                    }
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        void sendToGithubActions(
-                                                                            issue,
-                                                                        );
-                                                                    }}
-                                                                >
-                                                                    {actionsIssueId ===
-                                                                    issue.id ? (
-                                                                        <>
-                                                                            <Loader2Icon className="mt-0.5 size-4 shrink-0 animate-spin" />
-                                                                            <div className="flex min-w-0 flex-col gap-0 leading-tight">
-                                                                                <span>
-                                                                                    Sending…
-                                                                                </span>
-                                                                                <span className="text-muted-foreground text-xs font-normal">
-                                                                                    with github actions
-                                                                                </span>
-                                                                            </div>
-                                                                        </>
-                                                                    ) : (
-                                                                        <>
+                                                                {wfSession ? (
+                                                                    <>
+                                                                        <DropdownMenuItem
+                                                                            className="items-start gap-2 py-1.5"
+                                                                            disabled={
+                                                                                !githubDispatchAvailable ||
+                                                                                issue.resolved ||
+                                                                                isActiveRunStatus(
+                                                                                    wfSession.runStatus,
+                                                                                ) ||
+                                                                                fixDispatchingIssueId ===
+                                                                                    issue.id
+                                                                            }
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                openFixPromptDialog(
+                                                                                    issue,
+                                                                                );
+                                                                            }}
+                                                                            title={
+                                                                                issue.resolved
+                                                                                    ? "Reopen the issue to dispatch again"
+                                                                                    : isActiveRunStatus(
+                                                                                          wfSession.runStatus,
+                                                                                      )
+                                                                                      ? "Wait until the current workflow finishes"
+                                                                                      : githubIntegration ===
+                                                                                        undefined
+                                                                                        ? "Loading GitHub settings…"
+                                                                                        : !hasLinkedGithubRepo
+                                                                                          ? "Link a repository under GitHub in the sidebar"
+                                                                                          : githubOAuthConnected ===
+                                                                                              null
+                                                                                            ? "Checking GitHub connection…"
+                                                                                            : githubOAuthConnected ===
+                                                                                                false
+                                                                                              ? "GitHub not connected"
+                                                                                              : "Dispatch another fix to GitHub Actions"
+                                                                            }
+                                                                        >
                                                                             <WorkflowIcon className="mt-0.5 size-4 shrink-0" />
                                                                             <div className="flex min-w-0 flex-col gap-0 leading-tight">
                                                                                 <span>
-                                                                                    Fix now
+                                                                                    Fix again
                                                                                 </span>
                                                                                 <span className="text-muted-foreground text-xs font-normal">
-                                                                                    with github actions
+                                                                                    GitHub Actions
                                                                                 </span>
                                                                             </div>
-                                                                        </>
-                                                                    )}
-                                                                </DropdownMenuItem>
-                                                                {wfSession ? (
-                                                                    <DropdownMenuItem
-                                                                        className="gap-2"
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            setWorkflowPollContext({
-                                                                                issueId: issue.id,
-                                                                                dispatchedAt:
-                                                                                    wfSession.dispatchedAt,
-                                                                                repository:
-                                                                                    wfSession.repository,
-                                                                                runId: wfSession.runId,
-                                                                                runStatus:
-                                                                                    wfSession.runStatus,
-                                                                                runConclusion:
-                                                                                    wfSession.runConclusion,
-                                                                            });
-                                                                            setWorkflowDialogOpen(true);
-                                                                        }}
-                                                                    >
-                                                                        <EyeIcon className="size-4" />
-                                                                        View workflow run
-                                                                    </DropdownMenuItem>
+                                                                        </DropdownMenuItem>
+                                                                        <DropdownMenuSeparator />
+                                                                    </>
                                                                 ) : null}
-                                                                <DropdownMenuSeparator />
                                                                 {issue.resolved ? (
                                                                     <DropdownMenuItem
                                                                         onClick={(
@@ -1067,6 +1230,60 @@ export const IssuesView = () => {
                                                             colSpan={colCount}
                                                         >
                                                             <div className="min-w-0 max-w-full space-y-6 pl-7 pr-1">
+                                                                {wfSession ? (
+                                                                    <div className="min-w-0 rounded-lg border bg-muted/40 p-4">
+                                                                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                                                            GitHub Actions fix
+                                                                        </p>
+                                                                        <p className="mt-1.5 text-sm">
+                                                                            <span
+                                                                                className={
+                                                                                    isWorkflowFixReadyPrOpened(
+                                                                                        wfSession,
+                                                                                    )
+                                                                                        ? "font-medium text-red-600 dark:text-red-400"
+                                                                                        : "font-medium text-foreground"
+                                                                                }
+                                                                            >
+                                                                                {workflowFixSummary(
+                                                                                    wfSession,
+                                                                                )}
+                                                                            </span>
+                                                                            {wfSession.runId !==
+                                                                            null ? (
+                                                                                <span className="text-muted-foreground">
+                                                                                    {" "}
+                                                                                    · run #
+                                                                                    {
+                                                                                        wfSession.runId
+                                                                                    }
+                                                                                </span>
+                                                                            ) : null}
+                                                                        </p>
+                                                                        <p className="mt-1 font-mono text-muted-foreground text-xs [overflow-wrap:anywhere]">
+                                                                            {
+                                                                                wfSession.repository
+                                                                            }
+                                                                        </p>
+                                                                        <Button
+                                                                            className="mt-3 gap-2"
+                                                                            onClick={(
+                                                                                e,
+                                                                            ) => {
+                                                                                e.stopPropagation();
+                                                                                openWorkflowDialogForSession(
+                                                                                    issue.id,
+                                                                                    wfSession,
+                                                                                );
+                                                                            }}
+                                                                            size="sm"
+                                                                            variant="outline"
+                                                                        >
+                                                                            <EyeIcon className="size-4 shrink-0" />
+                                                                            View workflow
+                                                                        </Button>
+                                                                    </div>
+                                                                ) : null}
                                                                 <div className="min-w-0">
                                                                     <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                                                                         Description

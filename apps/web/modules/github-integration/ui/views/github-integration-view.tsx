@@ -11,10 +11,12 @@ import {
   CardTitle,
 } from "@workspace/ui/components/card";
 import { Input } from "@workspace/ui/components/input";
+import { Label } from "@workspace/ui/components/label";
 import { ScrollArea } from "@workspace/ui/components/scroll-area";
 import { Separator } from "@workspace/ui/components/separator";
+import { Switch } from "@workspace/ui/components/switch";
 import { cn } from "@workspace/ui/lib/utils";
-import { ExternalLinkIcon, Loader2Icon } from "lucide-react";
+import { CopyIcon, ExternalLinkIcon, Loader2Icon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -27,6 +29,64 @@ type GitHubRepo = {
   html_url: string;
 };
 
+function buildEchoProductIssueWorkflowYaml(autoMergePr: boolean): string {
+  const autoMergeSteps = autoMergePr
+    ? `
+      - name: Enable auto-merge for Claude PR
+        run: |
+          set -euo pipefail
+          HEAD=$(git rev-parse --abbrev-ref HEAD)
+          PR_NUM=$(gh pr list --head "$HEAD" --state open --json number -q '.[0].number')
+          if [ -z "$PR_NUM" ] || [ "$PR_NUM" = "null" ]; then
+            echo "::error::No open PR for branch '$HEAD'. The Claude step should leave the repo on the PR head branch."
+            exit 1
+          fi
+          gh pr merge "$PR_NUM" --auto --squash --delete-branch
+        env:
+          GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}`
+    : "";
+
+  return `name: Echo product issue
+
+on:
+  repository_dispatch:
+    types: [echo_product_issue]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  id-token: write
+
+jobs:
+  claude-fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: \${{ github.event.client_payload.defaultBranch || github.event.repository.default_branch }}
+
+      - name: Run Claude Code and open PR
+        uses: anthropics/claude-code-action@v1
+        with:
+          github_token: \${{ secrets.GITHUB_TOKEN }}
+          anthropic_api_key: \${{ secrets.ANTHROPIC_API_KEY }}
+          show_full_output: true
+          base_branch: \${{ github.event.client_payload.defaultBranch || github.event.repository.default_branch }}
+          prompt: |
+            Echo product issue (issue id: \${{ github.event.client_payload.issueId }})
+            Repository: \${{ github.event.client_payload.repository }}
+
+            Implement the fix in this repository. Commit your changes to a new branch and open a pull request against the base branch. Put a concise summary of the change in the PR description.
+
+            ---
+
+            \${{ github.event.client_payload.prompt }}
+          claude_args: "--allowedTools 'Edit,MultiEdit,Write,Read,Glob,Grep,LS,Bash(git:*),Bash(gh:*),Bash(npm:*),Bash(npx:*),Bash(bun:*),Bash(node:*),Bash(pnpm:*),Bash(yarn:*)'"${autoMergeSteps}`;
+}
+
 export const GithubIntegrationView = () => {
   const saved = useQuery(api.private.githubIntegration.getOne);
   const setSelectedRepo = useMutation(api.private.githubIntegration.setSelectedRepo);
@@ -37,6 +97,21 @@ export const GithubIntegrationView = () => {
   const [filter, setFilter] = useState("");
   const [selected, setSelected] = useState<GitHubRepo | null>(null);
   const [saving, setSaving] = useState(false);
+  const [workflowAutoMergePr, setWorkflowAutoMergePr] = useState(false);
+
+  const workflowYaml = useMemo(
+    () => buildEchoProductIssueWorkflowYaml(workflowAutoMergePr),
+    [workflowAutoMergePr],
+  );
+
+  const copyWorkflowYaml = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(workflowYaml);
+      toast.success("Workflow YAML copied to clipboard");
+    } catch {
+      toast.error("Could not copy to clipboard");
+    }
+  }, [workflowYaml]);
 
   const loadRepos = useCallback(async () => {
     setLoadingRepos(true);
@@ -162,55 +237,49 @@ export const GithubIntegrationView = () => {
           <CardHeader>
             <CardTitle>Product issues → Fix now</CardTitle>
             <CardDescription>
-              From Product Issues, open a row’s <span className="text-foreground font-medium">⋯</span>{" "}
-              menu and choose <span className="text-foreground font-medium">Fix now</span>{" "}
-              <span className="text-muted-foreground">(with github actions)</span> to send the fix prompt via a{" "}
+              From Product Issues, use <span className="text-foreground font-medium">Fix</span> to
+              preview and send the fix prompt via{" "}
               <span className="text-foreground font-medium">repository_dispatch</span>{" "}
-              named <code className="rounded bg-muted px-1 py-0.5 text-xs">echo_product_issue</code>.
-              Add a workflow like this to the linked repository (default branch is fine):
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">echo_product_issue</code>.
+              Add a workflow file like the one below to the linked repository (default branch is
+              fine). With <span className="text-foreground font-medium">Auto-merge PR</span>, a step
+              runs <code className="rounded bg-muted px-1 py-0.5 text-xs">gh pr merge --auto</code>{" "}
+              (GitHub merges when required checks pass—no bot self-approval). Allow squash merge in
+              repo settings; adjust branch protection so auto-merge can complete (e.g. do not require
+              human approval for these PRs, or use rules that allow GitHub Actions).
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <pre className="max-h-[min(520px,60vh)] overflow-auto rounded-md border bg-muted/50 p-3 text-xs leading-relaxed">
-              {`name: Echo product issue
-
-on:
-  repository_dispatch:
-    types: [echo_product_issue]
-
-permissions:
-  contents: write
-  pull-requests: write
-  issues: write
-  id-token: write
-
-jobs:
-  claude-fix:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ref: \${{ github.event.client_payload.defaultBranch || github.event.repository.default_branch }}
-
-      - name: Run Claude Code and open PR
-        uses: anthropics/claude-code-action@v1
-        with:
-          github_token: \${{ secrets.GITHUB_TOKEN }}
-          anthropic_api_key: \${{ secrets.ANTHROPIC_API_KEY }}
-          show_full_output: true
-          base_branch: \${{ github.event.client_payload.defaultBranch || github.event.repository.default_branch }}
-          prompt: |
-            Echo product issue (issue id: \${{ github.event.client_payload.issueId }})
-            Repository: \${{ github.event.client_payload.repository }}
-
-            Implement the fix in this repository. Commit your changes to a new branch and open a pull request against the base branch. Put a concise summary of the change in the PR description.
-
-            ---
-
-            \${{ github.event.client_payload.prompt }}
-          claude_args: "--allowedTools 'Edit,MultiEdit,Write,Read,Glob,Grep,LS,Bash(git:*),Bash(gh:*),Bash(npm:*),Bash(npx:*),Bash(bun:*),Bash(node:*),Bash(pnpm:*),Bash(yarn:*)'"`}
+          <CardContent className="space-y-4">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-3">
+                <Switch
+                  checked={workflowAutoMergePr}
+                  id="workflow-auto-merge"
+                  onCheckedChange={setWorkflowAutoMergePr}
+                />
+                <div className="space-y-0.5">
+                  <Label className="text-sm font-medium" htmlFor="workflow-auto-merge">
+                    Auto-merge PR
+                  </Label>
+                  <p className="text-muted-foreground text-xs">
+                    Enables GitHub auto-merge (squash, delete branch) on the PR Claude opened—merge
+                    runs when checks pass. Requires the job to end on the PR head branch.
+                  </p>
+                </div>
+              </div>
+              <Button
+                className="shrink-0 gap-2 sm:self-start"
+                onClick={() => void copyWorkflowYaml()}
+                size="sm"
+                type="button"
+                variant="outline"
+              >
+                <CopyIcon className="size-4" />
+                Copy YAML
+              </Button>
+            </div>
+            <pre className="max-h-[min(520px,60vh)] overflow-auto rounded-md border bg-muted/50 p-3 font-mono text-xs leading-relaxed whitespace-pre">
+              {workflowYaml}
             </pre>
           </CardContent>
         </Card>

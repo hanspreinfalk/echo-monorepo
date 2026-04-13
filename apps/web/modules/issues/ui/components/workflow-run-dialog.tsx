@@ -5,6 +5,7 @@ import {
     Dialog,
     DialogContent,
     DialogDescription,
+    DialogFooter,
     DialogHeader,
     DialogTitle,
 } from "@workspace/ui/components/dialog";
@@ -33,8 +34,14 @@ type RunSummary = {
     html_url: string;
 };
 
+type PullRequestSummary = {
+    title: string;
+    html_url: string;
+};
+
 type WorkflowRunPayload = {
     run: RunSummary | null;
+    pullRequest?: PullRequestSummary | null;
     error?: string;
 };
 
@@ -97,8 +104,10 @@ export const WorkflowRunDialog = ({
     onStatusChange,
 }: WorkflowRunDialogProps) => {
     const [run, setRun] = useState<RunSummary | null>(null);
+    const [pullRequest, setPullRequest] = useState<PullRequestSummary | null>(null);
     const [fetchError, setFetchError] = useState<string | null>(null);
     const resolvedRunIdRef = useRef<number | null>(null);
+    const prWaitPollsRef = useRef(0);
     const pollIntervalRef = useRef<number | null>(null);
     const onRunIdResolvedRef = useRef(onRunIdResolved);
     onRunIdResolvedRef.current = onRunIdResolved;
@@ -116,6 +125,7 @@ export const WorkflowRunDialog = ({
         resolvedRunIdRef.current = null;
         clearPoll();
         setRun(null);
+        setPullRequest(null);
         setFetchError(null);
     }, [clearPoll]);
 
@@ -131,7 +141,9 @@ export const WorkflowRunDialog = ({
         }
 
         resolvedRunIdRef.current = context.runId ?? null;
+        prWaitPollsRef.current = 0;
         setRun(null);
+        setPullRequest(null);
         setFetchError(null);
 
         const afterIso = context.dispatchedAt;
@@ -159,6 +171,7 @@ export const WorkflowRunDialog = ({
                 }
                 setFetchError(null);
                 setRun(data.run);
+                setPullRequest(data.pullRequest ?? null);
                 if (data.run?.id) {
                     const rid = data.run.id;
                     if (resolvedRunIdRef.current === null) {
@@ -171,7 +184,18 @@ export const WorkflowRunDialog = ({
                         data.run.conclusion,
                     );
                     if (data.run.status === "completed") {
-                        clearPoll();
+                        if (
+                            data.run.conclusion === "success" &&
+                            !data.pullRequest
+                        ) {
+                            prWaitPollsRef.current += 1;
+                            if (prWaitPollsRef.current >= 25) {
+                                clearPoll();
+                            }
+                        } else {
+                            prWaitPollsRef.current = 0;
+                            clearPoll();
+                        }
                     }
                 }
             } catch {
@@ -195,30 +219,51 @@ export const WorkflowRunDialog = ({
 
     return (
         <Dialog onOpenChange={onOpenChange} open={open}>
-            <DialogContent className="max-w-md">
+            <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                     <DialogTitle>Fixing issue with AI</DialogTitle>
-                    {context ? (
-                        <DialogDescription className="font-mono text-xs">
-                            {context.repository}
-                        </DialogDescription>
-                    ) : null}
+                    <DialogDescription>
+                        Track the GitHub Actions workflow while a fix is prepared for this
+                        issue.
+                    </DialogDescription>
                 </DialogHeader>
 
-                <div className="flex flex-col gap-4 py-2">
+                <div className="space-y-4 py-4">
+                    {context ? (
+                        <div className="rounded-lg border bg-muted/50 p-4">
+                            <p className="font-mono text-sm font-medium">{context.repository}</p>
+                        </div>
+                    ) : null}
+
                     {fetchError ? (
                         <p className="text-sm text-destructive">{fetchError}</p>
                     ) : status ? (
-                        <div className="flex items-start gap-3">
-                            <div className="mt-0.5 shrink-0">{status.icon}</div>
-                            <div className="flex flex-col gap-1">
-                                <p className="font-medium leading-snug">
-                                    {status.heading}
-                                </p>
-                                <p className="text-sm text-muted-foreground leading-relaxed">
-                                    {status.body}
-                                </p>
+                        <div className="flex flex-col gap-4">
+                            <div className="flex items-start gap-3">
+                                <div className="mt-0.5 shrink-0">{status.icon}</div>
+                                <div className="flex flex-col gap-1">
+                                    <p className="font-medium leading-snug">{status.heading}</p>
+                                    <p className="text-sm text-muted-foreground leading-relaxed">
+                                        {status.body}
+                                    </p>
+                                </div>
                             </div>
+                            {pullRequest &&
+                            run?.status === "completed" &&
+                            run.conclusion === "success" ? (
+                                <div className="rounded-lg border bg-muted/50 p-4">
+                                    <p className="text-muted-foreground text-xs">Pull request</p>
+                                    <a
+                                        className="mt-1 inline-flex items-center gap-1.5 font-medium text-foreground underline-offset-4 hover:underline"
+                                        href={pullRequest.html_url}
+                                        rel="noreferrer"
+                                        target="_blank"
+                                    >
+                                        {pullRequest.title}
+                                        <ExternalLinkIcon className="size-3.5 shrink-0 text-muted-foreground" />
+                                    </a>
+                                </div>
+                            ) : null}
                         </div>
                     ) : (
                         <div className="flex items-center gap-3 text-muted-foreground text-sm">
@@ -226,33 +271,30 @@ export const WorkflowRunDialog = ({
                             Waiting for the workflow to start…
                         </div>
                     )}
-
-                    <div className="flex justify-between gap-2">
-                        {run?.html_url ? (
-                            <Button asChild variant="outline" size="sm">
-                                <a
-                                    href={run.html_url}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="inline-flex items-center gap-1.5"
-                                >
-                                    Open on GitHub
-                                    <ExternalLinkIcon className="size-3.5" />
-                                </a>
-                            </Button>
-                        ) : (
-                            <span />
-                        )}
-                        <Button
-                            onClick={() => onOpenChange(false)}
-                            type="button"
-                            variant="secondary"
-                            size="sm"
-                        >
-                            Close
-                        </Button>
-                    </div>
                 </div>
+
+                <DialogFooter>
+                    {run?.html_url ? (
+                        <Button asChild variant="outline">
+                            <a
+                                href={run.html_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1.5"
+                            >
+                                Open on GitHub
+                                <ExternalLinkIcon className="size-3.5" />
+                            </a>
+                        </Button>
+                    ) : null}
+                    <Button
+                        onClick={() => onOpenChange(false)}
+                        type="button"
+                        variant="outline"
+                    >
+                        Close
+                    </Button>
+                </DialogFooter>
             </DialogContent>
         </Dialog>
     );

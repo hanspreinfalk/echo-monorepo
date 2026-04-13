@@ -137,3 +137,122 @@ export const remove = mutation({
     await ctx.db.delete(args.issueId);
   },
 });
+
+export const recordGithubWorkflowDispatch = mutation({
+  args: {
+    issueId: v.id("issues"),
+    dispatchedAt: v.string(),
+    repository: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+
+    if (identity === null) {
+      throw new ConvexError({
+        code: "UNAUTHORIZED",
+        message: "Identity not found",
+      });
+    }
+
+    const orgId = identity.orgId as string;
+
+    if (!orgId) {
+      throw new ConvexError({
+        code: "UNAUTHORIZED",
+        message: "Organization not found",
+      });
+    }
+
+    const issue = await ctx.db.get(args.issueId);
+
+    if (!issue) {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "Issue not found",
+      });
+    }
+
+    if (issue.organizationId !== orgId) {
+      throw new ConvexError({
+        code: "UNAUTHORIZED",
+        message: "Invalid organization",
+      });
+    }
+
+    const next = { ...issue };
+    next.githubWorkflowDispatchedAt = args.dispatchedAt;
+    next.githubWorkflowRepository = args.repository;
+    next.githubWorkflowRunStatus = "queued";
+    delete next.githubWorkflowRunId;
+    delete next.githubWorkflowRunConclusion;
+
+    await ctx.db.replace(args.issueId, next);
+  },
+});
+
+export const updateGithubWorkflowRun = mutation({
+  args: {
+    issueId: v.id("issues"),
+    runId: v.optional(v.number()),
+    runStatus: v.optional(v.string()),
+    runConclusion: v.optional(v.union(v.string(), v.null())),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+
+    if (identity === null) {
+      throw new ConvexError({
+        code: "UNAUTHORIZED",
+        message: "Identity not found",
+      });
+    }
+
+    const orgId = identity.orgId as string;
+
+    if (!orgId) {
+      throw new ConvexError({
+        code: "UNAUTHORIZED",
+        message: "Organization not found",
+      });
+    }
+
+    const issue = await ctx.db.get(args.issueId);
+
+    if (!issue) {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "Issue not found",
+      });
+    }
+
+    if (issue.organizationId !== orgId) {
+      throw new ConvexError({
+        code: "UNAUTHORIZED",
+        message: "Invalid organization",
+      });
+    }
+
+    if (!issue.githubWorkflowDispatchedAt) {
+      return;
+    }
+
+    const patch: Partial<Doc<"issues">> = {};
+
+    if (args.runId !== undefined) {
+      patch.githubWorkflowRunId = args.runId;
+    }
+    if (args.runStatus !== undefined) {
+      patch.githubWorkflowRunStatus = args.runStatus;
+    }
+    if (args.runConclusion !== undefined) {
+      patch.githubWorkflowRunConclusion =
+        args.runConclusion === null ? "" : args.runConclusion;
+    }
+
+    if (Object.keys(patch).length === 0) {
+      return;
+    }
+
+    await ctx.db.patch(args.issueId, patch);
+  },
+});

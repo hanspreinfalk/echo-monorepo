@@ -44,6 +44,12 @@ export default defineSchema({
         affectedSessions: v.optional(v.array(v.id("contactSessions"))),
         /** Cached AI-generated “copy fix prompt” text (regenerated when issue context changes). */
         fixPrompt: v.optional(v.string()),
+        /** Last GitHub Actions “Fix now” dispatch (persists across refresh). */
+        githubWorkflowDispatchedAt: v.optional(v.string()),
+        githubWorkflowRepository: v.optional(v.string()),
+        githubWorkflowRunId: v.optional(v.number()),
+        githubWorkflowRunStatus: v.optional(v.string()),
+        githubWorkflowRunConclusion: v.optional(v.string()),
     })
         .index("by_organization_id", ["organizationId"])
     ,
