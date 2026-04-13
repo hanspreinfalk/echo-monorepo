@@ -17,6 +17,7 @@ import { Separator } from "@workspace/ui/components/separator";
 import { Switch } from "@workspace/ui/components/switch";
 import { cn } from "@workspace/ui/lib/utils";
 import { CopyIcon, ExternalLinkIcon, Loader2Icon } from "lucide-react";
+import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -250,6 +251,60 @@ export const GithubIntegrationView = () => {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="space-y-6 rounded-lg border bg-background/60 p-4">
+              <div className="space-y-1">
+                <h3 className="text-sm font-medium">Required GitHub settings</h3>
+                <p className="text-muted-foreground text-xs">
+                  Configure the linked repository so Actions can open PRs and the workflow can call
+                  the Anthropic API.
+                </p>
+              </div>
+              <ol className="list-decimal space-y-6 pl-5 text-sm marker:text-muted-foreground">
+                <li className="space-y-2">
+                  <p>
+                    In the repository on GitHub, go to{" "}
+                    <span className="text-foreground font-medium">Settings</span> →{" "}
+                    <span className="text-foreground font-medium">Actions</span> →{" "}
+                    <span className="text-foreground font-medium">General</span>. Under{" "}
+                    <span className="text-foreground font-medium">Workflow permissions</span>, enable{" "}
+                    <span className="text-foreground font-medium">
+                      Allow GitHub Actions to create and approve pull requests
+                    </span>
+                    , then click <span className="text-foreground font-medium">Save</span>.
+                  </p>
+                  <Image
+                    alt="GitHub Actions workflow permissions: checkbox to allow Actions to create and approve pull requests"
+                    className="h-auto w-full rounded-md border"
+                    height={288}
+                    src="/allow-github-actions.png"
+                    width={1622}
+                  />
+                </li>
+                <li className="space-y-2">
+                  <p>
+                    Still in Settings, open{" "}
+                    <span className="text-foreground font-medium">Secrets and variables</span> →{" "}
+                    <span className="text-foreground font-medium">Actions</span>. Under{" "}
+                    <span className="text-foreground font-medium">Repository secrets</span>, add{" "}
+                    <code className="rounded bg-muted px-1 py-0.5 text-xs">
+                      ANTHROPIC_API_KEY
+                    </code>{" "}
+                    with your Anthropic API key (the sample workflow reads it as{" "}
+                    <code className="rounded bg-muted px-1 py-0.5 text-xs">
+                      secrets.ANTHROPIC_API_KEY
+                    </code>
+                    ).
+                  </p>
+                  <Image
+                    alt="GitHub repository Actions secrets list showing ANTHROPIC_API_KEY"
+                    className="h-auto w-full rounded-md border"
+                    height={344}
+                    src="/repository-secrets.png"
+                    width={1628}
+                  />
+                </li>
+              </ol>
+            </div>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
                 <Switch
