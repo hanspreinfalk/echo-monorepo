@@ -30,7 +30,10 @@ type GitHubRepo = {
   html_url: string;
 };
 
-function buildEchoProductIssueWorkflowYaml(autoMergePr: boolean): string {
+function buildEchoProductIssueWorkflowYaml(
+  autoMergePr: boolean,
+  enableSupabaseMcp: boolean,
+): string {
   const autoMergeSteps = autoMergePr
     ? `
       - name: Enable auto-merge for Claude PR
@@ -45,6 +48,22 @@ function buildEchoProductIssueWorkflowYaml(autoMergePr: boolean): string {
           gh pr merge "$PR_NUM" --auto --squash --delete-branch
         env:
           GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}`
+    : "";
+
+  const supabaseMcpBlock = enableSupabaseMcp
+    ? `
+          mcp_config: |
+            {
+              "mcpServers": {
+                "supabase": {
+                  "type": "http",
+                  "url": "https://mcp.supabase.com/mcp?project_ref=\${{ secrets.SUPABASE_PROJECT_REF }}",
+                  "headers": {
+                    "Authorization": "Bearer \${{ secrets.SUPABASE_ACCESS_TOKEN }}"
+                  }
+                }
+              }
+            }`
     : "";
 
   return `name: Echo product issue
@@ -73,7 +92,7 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           github_token: \${{ secrets.GITHUB_TOKEN }}
-          anthropic_api_key: \${{ secrets.ANTHROPIC_API_KEY }}
+          anthropic_api_key: \${{ secrets.ANTHROPIC_API_KEY }}${supabaseMcpBlock}
           show_full_output: true
           base_branch: \${{ github.event.client_payload.defaultBranch || github.event.repository.default_branch }}
           prompt: |
@@ -99,10 +118,12 @@ export const GithubIntegrationView = () => {
   const [selected, setSelected] = useState<GitHubRepo | null>(null);
   const [saving, setSaving] = useState(false);
   const [workflowAutoMergePr, setWorkflowAutoMergePr] = useState(false);
+  const [workflowSupabaseMcp, setWorkflowSupabaseMcp] = useState(false);
 
   const workflowYaml = useMemo(
-    () => buildEchoProductIssueWorkflowYaml(workflowAutoMergePr),
-    [workflowAutoMergePr],
+    () =>
+      buildEchoProductIssueWorkflowYaml(workflowAutoMergePr, workflowSupabaseMcp),
+    [workflowAutoMergePr, workflowSupabaseMcp],
   );
 
   const copyWorkflowYaml = useCallback(async () => {
@@ -243,7 +264,10 @@ export const GithubIntegrationView = () => {
               <span className="text-foreground font-medium">repository_dispatch</span>{" "}
               <code className="rounded bg-muted px-1 py-0.5 text-xs">echo_product_issue</code>.
               Add a workflow file like the one below to the linked repository (default branch is
-              fine). With <span className="text-foreground font-medium">Auto-merge PR</span>, a step
+              fine). Turn on <span className="text-foreground font-medium">Supabase MCP</span> to
+              append <code className="rounded bg-muted px-1 py-0.5 text-xs">mcp_config</code> to the
+              Claude Code step (add the Supabase repository secrets when you do). With{" "}
+              <span className="text-foreground font-medium">Auto-merge PR</span>, a step
               runs <code className="rounded bg-muted px-1 py-0.5 text-xs">gh pr merge --auto</code>{" "}
               (GitHub merges when required checks pass—no bot self-approval). Allow squash merge in
               repo settings; adjust branch protection so auto-merge can complete (e.g. do not require
@@ -303,27 +327,102 @@ export const GithubIntegrationView = () => {
                     width={1628}
                   />
                 </li>
+                <li className="space-y-3">
+                  <p>
+                    <span className="text-foreground font-medium">Supabase MCP</span> (optional):
+                    enable <span className="text-foreground font-medium">Supabase MCP</span> under
+                    the sample workflow to include <code className="rounded bg-muted px-1 py-0.5 text-xs">mcp_config</code>{" "}
+                    in the YAML.
+                    {workflowSupabaseMcp ? (
+                      <>
+                        {" "}
+                        Open Supabase with{" "}
+                        <span className="text-foreground font-medium">Connect to Supabase</span>, then
+                        in your project go to{" "}
+                        <span className="text-foreground font-medium">Project Settings</span> →{" "}
+                        <span className="text-foreground font-medium">General</span> for the{" "}
+                        <span className="text-foreground font-medium">Reference ID</span> (secret{" "}
+                        <code className="rounded bg-muted px-1 py-0.5 text-xs">
+                          SUPABASE_PROJECT_REF
+                        </code>
+                        ). Create a{" "}
+                        <span className="text-foreground font-medium">personal access token</span>{" "}
+                        under your Supabase account settings if needed, and add it as{" "}
+                        <code className="rounded bg-muted px-1 py-0.5 text-xs">SUPABASE_ACCESS_TOKEN</code>{" "}
+                        in GitHub{" "}
+                        <span className="text-foreground font-medium">Repository secrets</span>. If
+                        you rename secrets, edit the YAML to match.
+                      </>
+                    ) : (
+                      <>
+                        {" "}
+                        When it is on, add <code className="rounded bg-muted px-1 py-0.5 text-xs">
+                          SUPABASE_PROJECT_REF
+                        </code>{" "}
+                        and{" "}
+                        <code className="rounded bg-muted px-1 py-0.5 text-xs">SUPABASE_ACCESS_TOKEN</code>{" "}
+                        as repository secrets (see full steps after you enable the switch).
+                      </>
+                    )}
+                  </p>
+                  <Button asChild className="w-fit gap-2" size="sm" variant="outline">
+                    <a
+                      href="https://supabase.com/dashboard"
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      Connect to Supabase
+                      <ExternalLinkIcon className="size-3.5" />
+                    </a>
+                  </Button>
+                </li>
               </ol>
             </div>
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-3">
-                <Switch
-                  checked={workflowAutoMergePr}
-                  id="workflow-auto-merge"
-                  onCheckedChange={setWorkflowAutoMergePr}
-                />
-                <div className="space-y-0.5">
-                  <Label className="text-sm font-medium" htmlFor="workflow-auto-merge">
-                    Auto-merge PR
-                  </Label>
-                  <p className="text-muted-foreground text-xs">
-                    Enables GitHub auto-merge (squash, delete branch) on the PR Claude opened—merge
-                    runs when checks pass. Requires the job to end on the PR head branch.
-                  </p>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex min-w-0 flex-1 flex-col gap-4">
+                <div className="flex items-center gap-3">
+                  <Switch
+                    checked={workflowAutoMergePr}
+                    id="workflow-auto-merge"
+                    onCheckedChange={setWorkflowAutoMergePr}
+                  />
+                  <div className="space-y-0.5">
+                    <Label className="text-sm font-medium" htmlFor="workflow-auto-merge">
+                      Auto-merge PR
+                    </Label>
+                    <p className="text-muted-foreground text-xs">
+                      Enables GitHub auto-merge (squash, delete branch) on the PR Claude opened—merge
+                      runs when checks pass. Requires the job to end on the PR head branch.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Switch
+                    checked={workflowSupabaseMcp}
+                    id="workflow-supabase-mcp"
+                    onCheckedChange={setWorkflowSupabaseMcp}
+                  />
+                  <div className="space-y-0.5">
+                    <Label className="text-sm font-medium" htmlFor="workflow-supabase-mcp">
+                      Supabase MCP
+                    </Label>
+                    <p className="text-muted-foreground text-xs">
+                      Adds <code className="rounded bg-muted px-1 py-0.5 text-[0.7rem]">mcp_config</code>{" "}
+                      for the Supabase HTTP MCP server; set{" "}
+                      <code className="rounded bg-muted px-1 py-0.5 text-[0.7rem]">
+                        SUPABASE_PROJECT_REF
+                      </code>{" "}
+                      and{" "}
+                      <code className="rounded bg-muted px-1 py-0.5 text-[0.7rem]">
+                        SUPABASE_ACCESS_TOKEN
+                      </code>{" "}
+                      in repository secrets when enabled.
+                    </p>
+                  </div>
                 </div>
               </div>
               <Button
-                className="shrink-0 gap-2 sm:self-start"
+                className="shrink-0 gap-2 sm:mt-0.5"
                 onClick={() => void copyWorkflowYaml()}
                 size="sm"
                 type="button"
