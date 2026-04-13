@@ -235,8 +235,11 @@ export function GithubIntegrationGuideDialog({
                       npx @sentry/mcp-server@latest
                     </code>{" "}
                     over stdio and injects{" "}
-                    <code className="rounded bg-muted px-1 py-0.5 text-xs">SENTRY_ACCESS_TOKEN</code> from{" "}
-                    <code className="rounded bg-muted px-1 py-0.5 text-xs">secrets.SENTRY_ACCESS_TOKEN</code>.
+                    <code className="rounded bg-muted px-1 py-0.5 text-xs">SENTRY_ACCESS_TOKEN</code>,{" "}
+                    <code className="rounded bg-muted px-1 py-0.5 text-xs">EMBEDDED_AGENT_PROVIDER=anthropic</code>, and{" "}
+                    <code className="rounded bg-muted px-1 py-0.5 text-xs">ANTHROPIC_API_KEY</code> (from{" "}
+                    <code className="rounded bg-muted px-1 py-0.5 text-xs">secrets.SENTRY_ACCESS_TOKEN</code> and{" "}
+                    <code className="rounded bg-muted px-1 py-0.5 text-xs">secrets.ANTHROPIC_API_KEY</code>).
                     Create the token in Sentry under{" "}
                     <span className="text-foreground font-medium">User Settings → Auth Tokens</span> (or your
                     org’s policy) with the scopes you need—see the{" "}
@@ -254,12 +257,24 @@ export function GithubIntegrationGuideDialog({
                     env) to the MCP <code className="rounded bg-muted px-1 py-0.5 text-xs">env</code> in the
                     YAML, backed by repository secrets.
                   </p>
-                  <div className="rounded-md bg-accent p-2 text-sm">Optional: AI search tools</div>
+                  <div className="rounded-md bg-accent p-2 text-sm">AI search tools</div>
                   <p className="text-muted-foreground text-sm leading-relaxed">
-                    For stdio, <code className="rounded bg-muted px-1 py-0.5 text-xs">search_events</code> /{" "}
-                    <code className="rounded bg-muted px-1 py-0.5 text-xs">search_issues</code> may require{" "}
-                    <code className="rounded bg-muted px-1 py-0.5 text-xs">OPENAI_API_KEY</code> in the same{" "}
-                    <code className="rounded bg-muted px-1 py-0.5 text-xs">env</code> block.
+                    Natural-language <code className="rounded bg-muted px-1 py-0.5 text-xs">search_events</code> /{" "}
+                    <code className="rounded bg-muted px-1 py-0.5 text-xs">search_issues</code> use the embedded agent;
+                    the generated workflow sets{" "}
+                    <code className="rounded bg-muted px-1 py-0.5 text-xs">EMBEDDED_AGENT_PROVIDER=anthropic</code> and{" "}
+                    <code className="rounded bg-muted px-1 py-0.5 text-xs">ANTHROPIC_API_KEY</code>. To use OpenAI
+                    instead, change the provider and swap in{" "}
+                    <code className="rounded bg-muted px-1 py-0.5 text-xs">OPENAI_API_KEY</code> per{" "}
+                    <a
+                      className="text-primary font-medium underline-offset-4 hover:underline"
+                      href="https://github.com/getsentry/sentry-mcp/blob/main/docs/embedded-agents.md"
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      Sentry embedded-agents docs
+                    </a>
+                    .
                   </p>
                 </div>
               ) : null}

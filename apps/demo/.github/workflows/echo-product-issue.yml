@@ -36,4 +36,4 @@ jobs:
             ---
 
             ${{ github.event.client_payload.prompt }}
-          claude_args: "--allowedTools 'Edit,MultiEdit,Write,Read,Glob,Grep,LS,Bash(git:*),Bash(gh:*),Bash(npm:*),Bash(npx:*),Bash(bun:*),Bash(node:*),Bash(pnpm:*),Bash(yarn:*)'"
+          claude_args: "--allowedTools 'Edit,MultiEdit,Write,Read,Glob,Grep,LS,WebFetch,WebSearch,Bash(git:*),Bash(gh:*),Bash(npm:*),Bash(npx:*),Bash(bun:*),Bash(node:*),Bash(pnpm:*),Bash(yarn:*)'"

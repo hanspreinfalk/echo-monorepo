@@ -65,6 +65,8 @@ function buildEchoProductIssueWorkflowYaml(
     "Glob",
     "Grep",
     "LS",
+    "WebFetch",
+    "WebSearch",
     "Bash(git:*)",
     "Bash(gh:*)",
     "Bash(npm:*)",
@@ -130,6 +132,8 @@ function buildEchoProductIssueWorkflowYaml(
         args: ["-y", "@sentry/mcp-server@latest"],
         env: {
           SENTRY_ACCESS_TOKEN: "${{ secrets.SENTRY_ACCESS_TOKEN }}",
+          EMBEDDED_AGENT_PROVIDER: "anthropic",
+          ANTHROPIC_API_KEY: "${{ secrets.ANTHROPIC_API_KEY }}",
         },
       };
     }
@@ -770,7 +774,9 @@ export const GithubIntegrationView = () => {
                         <p className="text-sm font-medium">Sentry MCP</p>
                         <p className="text-muted-foreground text-xs">
                           Stdio MCP + <code className="text-[0.7rem]">mcp__sentry__*</code> with{" "}
-                          <code className="text-[0.7rem]">SENTRY_ACCESS_TOKEN</code> from repo secrets.
+                          <code className="text-[0.7rem]">SENTRY_ACCESS_TOKEN</code>,{" "}
+                          <code className="text-[0.7rem]">EMBEDDED_AGENT_PROVIDER=anthropic</code>, and{" "}
+                          <code className="text-[0.7rem]">ANTHROPIC_API_KEY</code> (same secret as the Claude step).
                         </p>
                       </div>
                     </div>
