@@ -18,6 +18,7 @@ import {
     DropdownMenuTrigger,
 } from "@workspace/ui/components/dropdown-menu";
 import { ScrollArea } from "@workspace/ui/components/scroll-area";
+import { Textarea } from "@workspace/ui/components/textarea";
 import {
     Table,
     TableBody,
@@ -424,6 +425,7 @@ export const IssuesView = () => {
     const [fixPromptDialogOpen, setFixPromptDialogOpen] = useState(false);
     const [fixPromptDialogIssue, setFixPromptDialogIssue] =
         useState<ProductIssue | null>(null);
+    const [fixPromptDraft, setFixPromptDraft] = useState("");
     const [fixDispatchingIssueId, setFixDispatchingIssueId] =
         useState<Id<"issues"> | null>(null);
     const [workflowDialogOpen, setWorkflowDialogOpen] = useState(false);
@@ -594,13 +596,6 @@ export const IssuesView = () => {
     const githubDispatchAvailable =
         hasLinkedGithubRepo && githubOAuthConnected === true;
 
-    const fixDispatchPrompt = useMemo(() => {
-        if (!fixPromptDialogOpen || !fixPromptDialogIssue) {
-            return null;
-        }
-        return buildFixPrompt(fixPromptDialogIssue);
-    }, [fixPromptDialogOpen, fixPromptDialogIssue]);
-
     const openFixPromptDialog = useCallback(
         (issue: ProductIssue) => {
             if (githubIntegration === undefined) {
@@ -635,6 +630,7 @@ export const IssuesView = () => {
                 );
                 return;
             }
+            setFixPromptDraft(buildFixPrompt(issue));
             setFixPromptDialogIssue(issue);
             setFixPromptDialogOpen(true);
         },
@@ -712,6 +708,7 @@ export const IssuesView = () => {
                 };
                 setFixPromptDialogOpen(false);
                 setFixPromptDialogIssue(null);
+                setFixPromptDraft("");
                 setWorkflowPollContext({
                     issueId: issue.id,
                     ...session,
@@ -852,6 +849,7 @@ export const IssuesView = () => {
                     setFixPromptDialogOpen(open);
                     if (!open) {
                         setFixPromptDialogIssue(null);
+                        setFixPromptDraft("");
                     }
                 }}
                 open={fixPromptDialogOpen}
@@ -860,17 +858,34 @@ export const IssuesView = () => {
                     <DialogHeader>
                         <DialogTitle>Send fix to GitHub Actions</DialogTitle>
                         <DialogDescription>
-                            Built from this issue&apos;s fields (title, description,
-                            sessions, attachments, etc.). This is the exact text that
-                            will be sent to your linked repository workflow—review it,
-                            then confirm to dispatch.
+                            Starts from this issue&apos;s fields (title, description,
+                            sessions, attachments, etc.). Edit the prompt below if you want
+                            to add context or change instructions—this exact text is sent
+                            to your linked repository workflow.
                         </DialogDescription>
                     </DialogHeader>
-                    {fixDispatchPrompt ? (
-                        <div className="max-h-[min(65vh,32rem)] w-full min-w-0 overflow-y-auto overflow-x-auto overscroll-y-contain rounded-lg border bg-muted/40">
-                            <pre className="whitespace-pre-wrap break-words p-4 font-mono text-xs leading-relaxed [overflow-wrap:anywhere]">
-                                {fixDispatchPrompt}
-                            </pre>
+                    {fixPromptDialogIssue ? (
+                        <div className="flex min-h-0 flex-1 flex-col gap-2">
+                            <div className="flex flex-wrap items-center justify-end gap-2">
+                                <Button
+                                    className="text-muted-foreground h-auto py-1 text-xs"
+                                    onClick={() =>
+                                        setFixPromptDraft(
+                                            buildFixPrompt(fixPromptDialogIssue),
+                                        )
+                                    }
+                                    type="button"
+                                    variant="ghost"
+                                >
+                                    Reset to default
+                                </Button>
+                            </div>
+                            <Textarea
+                                className="max-h-[min(65vh,32rem)] min-h-[12rem] w-full min-w-0 resize-y font-mono text-xs leading-relaxed focus-visible:border-input focus-visible:ring-0"
+                                onChange={(e) => setFixPromptDraft(e.target.value)}
+                                spellCheck={false}
+                                value={fixPromptDraft}
+                            />
                         </div>
                     ) : (
                         <p className="text-destructive text-sm">
@@ -889,14 +904,15 @@ export const IssuesView = () => {
                         <Button
                             className="gap-2"
                             disabled={
-                                !fixDispatchPrompt ||
+                                !fixPromptDialogIssue ||
+                                !fixPromptDraft.trim() ||
                                 fixDispatchingIssueId !== null
                             }
                             onClick={() => {
-                                if (fixPromptDialogIssue && fixDispatchPrompt) {
+                                if (fixPromptDialogIssue) {
                                     void dispatchFixToGithub(
                                         fixPromptDialogIssue,
-                                        fixDispatchPrompt,
+                                        fixPromptDraft.trim(),
                                     );
                                 }
                             }}

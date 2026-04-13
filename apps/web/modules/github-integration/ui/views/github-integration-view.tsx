@@ -50,21 +50,30 @@ function buildEchoProductIssueWorkflowYaml(
           GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}`
     : "";
 
-  const supabaseMcpBlock = enableSupabaseMcp
-    ? `
-          mcp_config: |
-            {
-              "mcpServers": {
-                "supabase": {
-                  "type": "http",
-                  "url": "https://mcp.supabase.com/mcp?project_ref=\${{ secrets.SUPABASE_PROJECT_REF }}",
-                  "headers": {
-                    "Authorization": "Bearer \${{ secrets.SUPABASE_ACCESS_TOKEN }}"
-                  }
-                }
-              }
-            }`
-    : "";
+  const allowedToolsList = [
+    "Edit",
+    "MultiEdit",
+    "Write",
+    "Read",
+    "Glob",
+    "Grep",
+    "LS",
+    "Bash(git:*)",
+    "Bash(gh:*)",
+    "Bash(npm:*)",
+    "Bash(npx:*)",
+    "Bash(bun:*)",
+    "Bash(node:*)",
+    "Bash(pnpm:*)",
+    "Bash(yarn:*)",
+    ...(enableSupabaseMcp ? ["mcp__supabase__*"] : []),
+  ].join(",");
+
+  const claudeArgsYaml = enableSupabaseMcp
+    ? `          claude_args: |
+            --mcp-config '{"mcpServers":{"supabase":{"type":"http","url":"https://mcp.supabase.com/mcp?project_ref=\${{ secrets.SUPABASE_PROJECT_REF }}","headers":{"Authorization":"Bearer \${{ secrets.SUPABASE_ACCESS_TOKEN }}"}}}}'
+            --allowedTools '${allowedToolsList}'`
+    : `          claude_args: "--allowedTools '${allowedToolsList}'"`;
 
   return `name: Echo product issue
 
@@ -92,7 +101,7 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           github_token: \${{ secrets.GITHUB_TOKEN }}
-          anthropic_api_key: \${{ secrets.ANTHROPIC_API_KEY }}${supabaseMcpBlock}
+          anthropic_api_key: \${{ secrets.ANTHROPIC_API_KEY }}
           show_full_output: true
           base_branch: \${{ github.event.client_payload.defaultBranch || github.event.repository.default_branch }}
           prompt: |
@@ -104,7 +113,7 @@ jobs:
             ---
 
             \${{ github.event.client_payload.prompt }}
-          claude_args: "--allowedTools 'Edit,MultiEdit,Write,Read,Glob,Grep,LS,Bash(git:*),Bash(gh:*),Bash(npm:*),Bash(npx:*),Bash(bun:*),Bash(node:*),Bash(pnpm:*),Bash(yarn:*)'"${autoMergeSteps}`;
+${claudeArgsYaml}${autoMergeSteps}`;
 }
 
 export const GithubIntegrationView = () => {
@@ -264,9 +273,11 @@ export const GithubIntegrationView = () => {
               <span className="text-foreground font-medium">repository_dispatch</span>{" "}
               <code className="rounded bg-muted px-1 py-0.5 text-xs">echo_product_issue</code>.
               Add a workflow file like the one below to the linked repository (default branch is
-              fine). Turn on <span className="text-foreground font-medium">Supabase MCP</span> to
-              append <code className="rounded bg-muted px-1 py-0.5 text-xs">mcp_config</code> to the
-              Claude Code step (add the Supabase repository secrets when you do). With{" "}
+              fine).               Turn on <span className="text-foreground font-medium">Supabase MCP</span> to
+              add <code className="rounded bg-muted px-1 py-0.5 text-xs">--mcp-config</code> in{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">claude_args</code> (and{" "}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">mcp__supabase__*</code> in{" "}
+              allowed tools). Add the Supabase repository secrets when you do. With{" "}
               <span className="text-foreground font-medium">Auto-merge PR</span>, a step
               runs <code className="rounded bg-muted px-1 py-0.5 text-xs">gh pr merge --auto</code>{" "}
               (GitHub merges when required checks pass—no bot self-approval). Allow squash merge in
@@ -331,8 +342,11 @@ export const GithubIntegrationView = () => {
                   <p>
                     <span className="text-foreground font-medium">Supabase MCP</span> (optional):
                     enable <span className="text-foreground font-medium">Supabase MCP</span> under
-                    the sample workflow to include <code className="rounded bg-muted px-1 py-0.5 text-xs">mcp_config</code>{" "}
-                    in the YAML.
+                    the sample workflow to add <code className="rounded bg-muted px-1 py-0.5 text-xs">
+                      --mcp-config
+                    </code>{" "}
+                    via <code className="rounded bg-muted px-1 py-0.5 text-xs">claude_args</code> in
+                    the YAML.
                     {workflowSupabaseMcp ? (
                       <>
                         {" "}
@@ -407,7 +421,10 @@ export const GithubIntegrationView = () => {
                       Supabase MCP
                     </Label>
                     <p className="text-muted-foreground text-xs">
-                      Adds <code className="rounded bg-muted px-1 py-0.5 text-[0.7rem]">mcp_config</code>{" "}
+                      Adds <code className="rounded bg-muted px-1 py-0.5 text-[0.7rem]">
+                        --mcp-config
+                      </code>{" "}
+                      in <code className="rounded bg-muted px-1 py-0.5 text-[0.7rem]">claude_args</code>{" "}
                       for the Supabase HTTP MCP server; set{" "}
                       <code className="rounded bg-muted px-1 py-0.5 text-[0.7rem]">
                         SUPABASE_PROJECT_REF
@@ -496,7 +513,7 @@ export const GithubIntegrationView = () => {
                           <li key={repo.id}>
                             <button
                               className={cn(
-                                "hover:bg-accent flex w-full flex-col items-start gap-0.5 rounded-md px-3 py-2 text-left text-sm transition-colors",
+                                "hover:bg-accent flex w-full flex-col items-start gap-0.5 rounded-md px-3 py-2 text-left text-sm transition-colors outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0",
                                 isActive && "bg-accent",
                               )}
                               onClick={() => setSelected(repo)}
