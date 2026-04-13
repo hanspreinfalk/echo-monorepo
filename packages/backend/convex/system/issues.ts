@@ -8,6 +8,7 @@ const issueCategory = v.union(
   v.literal("Accessibility"),
   v.literal("Security"),
   v.literal("Data"),
+  v.literal("Feature Request"),
 );
 
 const issueCriticality = v.union(

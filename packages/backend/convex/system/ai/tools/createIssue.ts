@@ -11,6 +11,7 @@ const issueCategorySchema = z.enum([
   "Accessibility",
   "Security",
   "Data",
+  "Feature Request",
 ]);
 
 const issueCriticalitySchema = z.enum([

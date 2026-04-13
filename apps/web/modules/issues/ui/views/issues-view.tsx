@@ -50,6 +50,7 @@ import type { Doc, Id } from "@workspace/backend/_generated/dataModel";
 import { useInfiniteScroll } from "@workspace/ui/hooks/use-infinite-scroll";
 import { InfiniteScrollTrigger } from "@workspace/ui/components/infinite-scroll-trigger";
 import { DeleteIssueDialog } from "../components/delete-issue-dialog";
+import { ResolveIssueDialog } from "../components/resolve-issue-dialog";
 import {
     WorkflowRunDialog,
     type IssueWorkflowSession,
@@ -62,7 +63,8 @@ type IssueCategory =
     | "Performance"
     | "Accessibility"
     | "Security"
-    | "Data";
+    | "Data"
+    | "Feature Request";
 
 type IssueCriticality = "Critical" | "High" | "Medium" | "Low";
 
@@ -198,6 +200,18 @@ function isActiveRunStatus(status: string | null): boolean {
     return status !== null && ACTIVE_RUN_STATUSES.has(status);
 }
 
+/** Dispatch in flight or GitHub Actions run not finished yet. */
+function isIssueGithubWorkflowBusy(
+    issueId: Id<"issues">,
+    wfSession: IssueWorkflowSession | undefined,
+    fixDispatchingIssueId: Id<"issues"> | null,
+): boolean {
+    return (
+        fixDispatchingIssueId === issueId ||
+        Boolean(wfSession && isActiveRunStatus(wfSession.runStatus))
+    );
+}
+
 /** User-facing summary for persisted GitHub workflow state (table + expanded row). */
 function workflowFixSummary(session: IssueWorkflowSession): string {
     if (isActiveRunStatus(session.runStatus)) {
@@ -218,11 +232,30 @@ function workflowFixSummary(session: IssueWorkflowSession): string {
     return "GitHub fix dispatched";
 }
 
-function isWorkflowFixReadyPrOpened(session: IssueWorkflowSession): boolean {
+/** Red when the run finished unsuccessfully; green for success, in progress, or not yet finished. */
+function isWorkflowFixFailed(session: IssueWorkflowSession): boolean {
     return (
         session.runStatus === "completed" &&
-        session.runConclusion === "success"
+        session.runConclusion !== null &&
+        session.runConclusion !== "success"
     );
+}
+
+function workflowFixSummaryTextClassName(
+    session: IssueWorkflowSession,
+): string {
+    return isWorkflowFixFailed(session)
+        ? "text-red-600 dark:text-red-400"
+        : "text-green-600 dark:text-green-400";
+}
+
+/** Outline Fix-column actions: green when not failed, red when failed. */
+function workflowFixActionButtonClassName(
+    session: IssueWorkflowSession,
+): string {
+    return isWorkflowFixFailed(session)
+        ? "border-red-600/70 text-red-700 hover:bg-red-50 hover:text-red-800 dark:border-red-500 dark:text-red-400 dark:hover:bg-red-950/50 dark:hover:text-red-300"
+        : "border-green-600/70 text-green-700 hover:bg-green-50 hover:text-green-800 dark:border-green-500 dark:text-green-400 dark:hover:bg-green-950/50 dark:hover:text-green-300";
 }
 
 function docToProductIssue(row: IssueListRow): ProductIssue {
@@ -350,6 +383,9 @@ export const IssuesView = () => {
         null,
     );
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [resolveDialogOpen, setResolveDialogOpen] = useState(false);
+    const [resolveDialogIssue, setResolveDialogIssue] =
+        useState<ProductIssue | null>(null);
     const [selectedIssue, setSelectedIssue] = useState<ProductIssue | null>(
         null,
     );
@@ -695,6 +731,11 @@ export const IssuesView = () => {
         setDeleteDialogOpen(true);
     };
 
+    const handleResolveClick = (issue: ProductIssue) => {
+        setResolveDialogIssue(issue);
+        setResolveDialogOpen(true);
+    };
+
     const setIssueResolved = useCallback(
         async (id: Id<"issues">, resolved: boolean) => {
             try {
@@ -719,6 +760,15 @@ export const IssuesView = () => {
         setSelectedIssue(null);
     }, [selectedIssue]);
 
+    const handleIssueResolvedFromDialog = useCallback(() => {
+        if (!resolveDialogIssue) {
+            return;
+        }
+        const id = resolveDialogIssue.id;
+        setExpandedIssueId((cur) => (cur === id ? null : cur));
+        setResolveDialogIssue(null);
+    }, [resolveDialogIssue]);
+
     const colCount = 4;
 
     return (
@@ -735,6 +785,26 @@ export const IssuesView = () => {
                 onDeleted={handleIssueDeleted}
                 onOpenChange={setDeleteDialogOpen}
                 open={deleteDialogOpen}
+            />
+            <ResolveIssueDialog
+                issue={
+                    resolveDialogIssue
+                        ? {
+                              id: resolveDialogIssue.id,
+                              title: resolveDialogIssue.title,
+                              affectedSessionsCount:
+                                  resolveDialogIssue.affectedSessionsCount,
+                          }
+                        : null
+                }
+                onOpenChange={(open) => {
+                    setResolveDialogOpen(open);
+                    if (!open) {
+                        setResolveDialogIssue(null);
+                    }
+                }}
+                onResolved={handleIssueResolvedFromDialog}
+                open={resolveDialogOpen}
             />
             <WorkflowRunDialog
                 context={workflowPollContext}
@@ -938,6 +1008,12 @@ export const IssuesView = () => {
                                             workflowSessionKey(issue.id);
                                         const wfSession =
                                             issueWorkflowByIssueId[wfKey];
+                                        const githubWorkflowBusy =
+                                            isIssueGithubWorkflowBusy(
+                                                issue.id,
+                                                wfSession,
+                                                fixDispatchingIssueId,
+                                            );
                                         return (
                                             <Fragment key={issue.id}>
                                                 <TableRow
@@ -989,13 +1065,7 @@ export const IssuesView = () => {
                                                                 </span>
                                                                 {wfSession ? (
                                                                     <span
-                                                                        className={
-                                                                            isWorkflowFixReadyPrOpened(
-                                                                                wfSession,
-                                                                            )
-                                                                                ? "text-xs font-normal leading-snug text-red-600 dark:text-red-400"
-                                                                                : "text-muted-foreground text-xs font-normal leading-snug"
-                                                                        }
+                                                                        className={`text-xs font-normal leading-snug ${workflowFixSummaryTextClassName(wfSession)}`}
                                                                     >
                                                                         {workflowFixSummary(
                                                                             wfSession,
@@ -1020,7 +1090,7 @@ export const IssuesView = () => {
                                                                 wfSession.runStatus,
                                                             ) ? (
                                                                 <Button
-                                                                    className="gap-2"
+                                                                    className={`gap-2 ${workflowFixActionButtonClassName(wfSession)}`}
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
                                                                         openWorkflowDialogForSession(
@@ -1031,14 +1101,14 @@ export const IssuesView = () => {
                                                                     size="sm"
                                                                     title="Open workflow run status"
                                                                     type="button"
-                                                                    variant="default"
+                                                                    variant="outline"
                                                                 >
                                                                     <Loader2Icon className="size-4 shrink-0 animate-spin" />
                                                                     Workflow
                                                                 </Button>
                                                             ) : (
                                                                 <Button
-                                                                    className="gap-2"
+                                                                    className={`gap-2 ${workflowFixActionButtonClassName(wfSession)}`}
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
                                                                         openWorkflowDialogForSession(
@@ -1049,7 +1119,7 @@ export const IssuesView = () => {
                                                                     size="sm"
                                                                     title="Open workflow run status"
                                                                     type="button"
-                                                                    variant="default"
+                                                                    variant="outline"
                                                                 >
                                                                     {/* <EyeIcon className="size-4 shrink-0" /> */}
                                                                     View workflow
@@ -1189,21 +1259,31 @@ export const IssuesView = () => {
                                                                     </DropdownMenuItem>
                                                                 ) : (
                                                                     <DropdownMenuItem
+                                                                        disabled={
+                                                                            githubWorkflowBusy
+                                                                        }
                                                                         onClick={(
                                                                             e,
                                                                         ) => {
                                                                             e.stopPropagation();
-                                                                            setIssueResolved(
-                                                                                issue.id,
-                                                                                true,
+                                                                            handleResolveClick(
+                                                                                issue,
                                                                             );
                                                                         }}
+                                                                        title={
+                                                                            githubWorkflowBusy
+                                                                                ? "Wait until the GitHub workflow finishes"
+                                                                                : undefined
+                                                                        }
                                                                     >
                                                                         <CheckCircle2Icon className="size-4 mr-2" />
                                                                         Resolved
                                                                     </DropdownMenuItem>
                                                                 )}
                                                                 <DropdownMenuItem
+                                                                    disabled={
+                                                                        githubWorkflowBusy
+                                                                    }
                                                                     variant="destructive"
                                                                     onClick={(
                                                                         e,
@@ -1213,6 +1293,11 @@ export const IssuesView = () => {
                                                                             issue,
                                                                         );
                                                                     }}
+                                                                    title={
+                                                                        githubWorkflowBusy
+                                                                            ? "Wait until the GitHub workflow finishes"
+                                                                            : undefined
+                                                                    }
                                                                 >
                                                                     <TrashIcon className="size-4 mr-2" />
                                                                     Delete
@@ -1237,13 +1322,7 @@ export const IssuesView = () => {
                                                                         </p>
                                                                         <p className="mt-1.5 text-sm">
                                                                             <span
-                                                                                className={
-                                                                                    isWorkflowFixReadyPrOpened(
-                                                                                        wfSession,
-                                                                                    )
-                                                                                        ? "font-medium text-red-600 dark:text-red-400"
-                                                                                        : "font-medium text-foreground"
-                                                                                }
+                                                                                className={`font-medium ${workflowFixSummaryTextClassName(wfSession)}`}
                                                                             >
                                                                                 {workflowFixSummary(
                                                                                     wfSession,
@@ -1266,7 +1345,7 @@ export const IssuesView = () => {
                                                                             }
                                                                         </p>
                                                                         <Button
-                                                                            className="mt-3 gap-2"
+                                                                            className={`mt-3 gap-2 ${workflowFixActionButtonClassName(wfSession)}`}
                                                                             onClick={(
                                                                                 e,
                                                                             ) => {
