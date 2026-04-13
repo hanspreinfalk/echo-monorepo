@@ -96,6 +96,7 @@ export const setResolved = mutation({
   },
 });
 
+/** In sync: `resolveNotificationPreviewForTitle` in apps/web resolve-issue-dialog.tsx */
 function issueResolvedAssistantMessage(title: string): string {
   const trimmed = title.trim();
   if (trimmed.length === 0) {
@@ -107,6 +108,13 @@ function issueResolvedAssistantMessage(title: string): string {
 export const resolveAndNotifyAffectedChats = mutation({
   args: {
     issueId: v.id("issues"),
+    /** Only these linked contact sessions receive the in-chat message (may be empty). */
+    notifyContactSessionIds: v.array(v.id("contactSessions")),
+    /**
+     * Text the assistant sends in chat. Whitespace-only falls back to the default
+     * template from the issue title (same as `issueResolvedAssistantMessage`).
+     */
+    assistantMessage: v.string(),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -147,13 +155,36 @@ export const resolveAndNotifyAffectedChats = mutation({
       return { notifiedConversationCount: 0, alreadyResolved: true as const };
     }
 
-    const title = issue.title ?? "";
-    const content = issueResolvedAssistantMessage(title);
+    const linked = new Set(issue.affectedSessions ?? []);
+    for (const sessionId of args.notifyContactSessionIds) {
+      if (!linked.has(sessionId)) {
+        throw new ConvexError({
+          code: "BAD_REQUEST",
+          message: "Selected visitor is not linked to this issue",
+        });
+      }
+    }
 
-    let notifiedConversationCount = 0;
-    const seenThreadIds = new Set<string>();
+    const title = issue.title ?? "";
+    const trimmedAssistant = args.assistantMessage.trim();
+    const content =
+      trimmedAssistant.length > 0
+        ? trimmedAssistant
+        : issueResolvedAssistantMessage(title);
+
+    const filingConversation =
+      issue.conversationId !== undefined
+        ? await ctx.db.get(issue.conversationId)
+        : null;
+
+    const threadIdsToNotify = new Set<string>();
+    const notifySet = new Set(args.notifyContactSessionIds);
 
     for (const sessionId of issue.affectedSessions ?? []) {
+      if (!notifySet.has(sessionId)) {
+        continue;
+      }
+
       const session = await ctx.db.get(sessionId);
       if (!session || session.organizationId !== orgId) {
         continue;
@@ -166,23 +197,35 @@ export const resolveAndNotifyAffectedChats = mutation({
         )
         .collect();
 
-      for (const conv of conversations) {
-        if (conv.organizationId !== orgId) {
-          continue;
-        }
-        if (seenThreadIds.has(conv.threadId)) {
-          continue;
-        }
-        seenThreadIds.add(conv.threadId);
-        await supportAgent.saveMessage(ctx, {
-          threadId: conv.threadId,
-          message: {
-            role: "assistant",
-            content,
-          },
-        });
-        notifiedConversationCount += 1;
+      const orgConvs = conversations.filter(
+        (c) => c.organizationId === orgId,
+      );
+      if (orgConvs.length === 0) {
+        continue;
       }
+
+      const chosen =
+        filingConversation !== null &&
+        filingConversation.organizationId === orgId &&
+        filingConversation.contactSessionId === sessionId
+          ? filingConversation
+          : orgConvs.reduce((a, b) =>
+              a._creationTime >= b._creationTime ? a : b,
+            );
+
+      threadIdsToNotify.add(chosen.threadId);
+    }
+
+    let notifiedConversationCount = 0;
+    for (const threadId of threadIdsToNotify) {
+      await supportAgent.saveMessage(ctx, {
+        threadId,
+        message: {
+          role: "assistant",
+          content,
+        },
+      });
+      notifiedConversationCount += 1;
     }
 
     await ctx.db.patch(args.issueId, { resolved: true });

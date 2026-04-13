@@ -69,8 +69,8 @@ type IssueCategory =
 type IssueCriticality = "Critical" | "High" | "Medium" | "Low";
 
 type AffectedSession = {
-    /** Anonymized session or user bucket */
-    id: string;
+    id: Id<"contactSessions">;
+    name: string;
     email: string;
     /** ISO 8601 — when this contact session was created (per reporter) */
     lastSeen: string;
@@ -232,7 +232,7 @@ function workflowFixSummary(session: IssueWorkflowSession): string {
     return "GitHub fix dispatched";
 }
 
-/** Red when the run finished unsuccessfully; green for success, in progress, or not yet finished. */
+/** Run finished without success (failure, cancelled, etc.). */
 function isWorkflowFixFailed(session: IssueWorkflowSession): boolean {
     return (
         session.runStatus === "completed" &&
@@ -241,21 +241,43 @@ function isWorkflowFixFailed(session: IssueWorkflowSession): boolean {
     );
 }
 
+type WorkflowFixTone = "failure" | "progress" | "success";
+
+function workflowFixTone(session: IssueWorkflowSession): WorkflowFixTone {
+    if (isWorkflowFixFailed(session)) {
+        return "failure";
+    }
+    if (isActiveRunStatus(session.runStatus)) {
+        return "progress";
+    }
+    return "success";
+}
+
 function workflowFixSummaryTextClassName(
     session: IssueWorkflowSession,
 ): string {
-    return isWorkflowFixFailed(session)
-        ? "text-red-600 dark:text-red-400"
-        : "text-green-600 dark:text-green-400";
+    switch (workflowFixTone(session)) {
+        case "failure":
+            return "text-red-600 dark:text-red-400";
+        case "progress":
+            return "text-blue-600 dark:text-blue-400";
+        default:
+            return "text-green-600 dark:text-green-400";
+    }
 }
 
-/** Outline Fix-column actions: green when not failed, red when failed. */
+/** Outline Fix-column actions: blue in progress, red failed, green succeeded / idle. */
 function workflowFixActionButtonClassName(
     session: IssueWorkflowSession,
 ): string {
-    return isWorkflowFixFailed(session)
-        ? "border-red-600/70 text-red-700 hover:bg-red-50 hover:text-red-800 dark:border-red-500 dark:text-red-400 dark:hover:bg-red-950/50 dark:hover:text-red-300"
-        : "border-green-600/70 text-green-700 hover:bg-green-50 hover:text-green-800 dark:border-green-500 dark:text-green-400 dark:hover:bg-green-950/50 dark:hover:text-green-300";
+    switch (workflowFixTone(session)) {
+        case "failure":
+            return "border-red-600/70 text-red-700 hover:bg-red-50 hover:text-red-800 dark:border-red-500 dark:text-red-400 dark:hover:bg-red-950/50 dark:hover:text-red-300";
+        case "progress":
+            return "border-blue-600/70 text-blue-700 hover:bg-blue-50 hover:text-blue-800 dark:border-blue-500 dark:text-blue-400 dark:hover:bg-blue-950/50 dark:hover:text-blue-300";
+        default:
+            return "border-green-600/70 text-green-700 hover:bg-green-50 hover:text-green-800 dark:border-green-500 dark:text-green-400 dark:hover:bg-green-950/50 dark:hover:text-green-300";
+    }
 }
 
 function docToProductIssue(row: IssueListRow): ProductIssue {
@@ -280,6 +302,7 @@ function docToProductIssue(row: IssueListRow): ProductIssue {
         })),
         affectedSessions: row.resolvedContactSessions?.map((s) => ({
             id: s._id,
+            name: s.name,
             email: s.email,
             lastSeen: new Date(s._creationTime).toISOString(),
             browser: formatBrowserLine(s.metadata?.userAgent),
@@ -332,7 +355,7 @@ function buildFixPrompt(issue: ProductIssue): string {
             "Sample affected sessions:",
             ...issue.affectedSessions.map(
                 (s) =>
-                    `  ${s.id} · ${s.email} · ${s.browser} · ${s.os}${s.region ? ` · ${s.region}` : ""} · last ${formatIssueDateTime(s.lastSeen)}`,
+                    `  ${s.id} · ${s.name} · ${s.email} · ${s.browser} · ${s.os}${s.region ? ` · ${s.region}` : ""} · last ${formatIssueDateTime(s.lastSeen)}`,
             ),
         );
     }
@@ -792,8 +815,14 @@ export const IssuesView = () => {
                         ? {
                               id: resolveDialogIssue.id,
                               title: resolveDialogIssue.title,
-                              affectedSessionsCount:
-                                  resolveDialogIssue.affectedSessionsCount,
+                              affectedSessions:
+                                  resolveDialogIssue.affectedSessions?.map(
+                                      (s) => ({
+                                          id: s.id,
+                                          name: s.name,
+                                          email: s.email,
+                                      }),
+                                  ) ?? [],
                           }
                         : null
                 }
@@ -1597,7 +1626,7 @@ export const IssuesView = () => {
                                                                                         Session
                                                                                     </TableHead>
                                                                                     <TableHead className="h-10 px-3 text-xs font-medium">
-                                                                                        Email
+                                                                                        User
                                                                                     </TableHead>
                                                                                     <TableHead className="h-10 px-3 text-xs font-medium whitespace-nowrap">
                                                                                         Captured
@@ -1654,10 +1683,15 @@ export const IssuesView = () => {
                                                                                                         )}
                                                                                                     </Button>
                                                                                                 </TableCell>
-                                                                                                <TableCell className="max-w-[200px] px-3 py-2 break-all text-xs">
-                                                                                                    {
-                                                                                                        s.email
-                                                                                                    }
+                                                                                                <TableCell className="max-w-[min(14rem,100%)] px-3 py-2 whitespace-normal">
+                                                                                                    <span className="block text-xs leading-snug font-medium text-foreground">
+                                                                                                        {s.name?.trim() ||
+                                                                                                            "Visitor"}
+                                                                                                    </span>
+                                                                                                    <span className="text-muted-foreground mt-0.5 block break-all text-xs leading-snug">
+                                                                                                        {s.email?.trim() ||
+                                                                                                            "—"}
+                                                                                                    </span>
                                                                                                 </TableCell>
                                                                                                 <TableCell className="px-3 py-2 tabular-nums text-xs whitespace-normal">
                                                                                                     {formatShortCapturedAt(
