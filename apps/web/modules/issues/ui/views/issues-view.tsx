@@ -201,6 +201,33 @@ function isActiveRunStatus(status: string | null): boolean {
     return status !== null && ACTIVE_RUN_STATUSES.has(status);
 }
 
+type GithubWorkflowPrefsManualFields = {
+    manualGithubWorkflowDispatchedAt?: string;
+    manualGithubWorkflowRepository?: string;
+    manualGithubWorkflowRunId?: number;
+    manualGithubWorkflowRunStatus?: string;
+    manualGithubWorkflowRunConclusion?: string;
+};
+
+function manualGithubWorkflowSessionFromPrefs(
+    prefs: GithubWorkflowPrefsManualFields | null | undefined,
+    repoFallback: string,
+): IssueWorkflowSession | null {
+    if (!prefs?.manualGithubWorkflowDispatchedAt) {
+        return null;
+    }
+    const conc = prefs.manualGithubWorkflowRunConclusion;
+    return {
+        dispatchedAt: prefs.manualGithubWorkflowDispatchedAt,
+        repository:
+            prefs.manualGithubWorkflowRepository?.trim() || repoFallback,
+        runId: prefs.manualGithubWorkflowRunId ?? null,
+        runStatus: prefs.manualGithubWorkflowRunStatus ?? null,
+        runConclusion:
+            conc === undefined || conc === "" ? null : conc,
+    };
+}
+
 /** Dispatch in flight or GitHub Actions run not finished yet. */
 function isIssueGithubWorkflowBusy(
     issueId: Id<"issues">,
@@ -398,7 +425,14 @@ export const IssuesView = () => {
     const updateGithubWorkflowRunMutation = useMutation(
         api.private.issues.updateGithubWorkflowRun,
     );
+    const recordManualGithubWorkflowDispatchMutation = useMutation(
+        api.private.githubIntegration.recordManualGithubWorkflowDispatch,
+    );
+    const updateManualGithubWorkflowRunMutation = useMutation(
+        api.private.githubIntegration.updateManualGithubWorkflowRun,
+    );
     const githubIntegration = useQuery(api.private.githubIntegration.getOne);
+    const workflowPrefs = useQuery(api.private.githubIntegration.getWorkflowPrefs);
 
     const [criticalitySort, setCriticalitySort] = useState<"asc" | "desc">(
         "desc",
@@ -428,6 +462,10 @@ export const IssuesView = () => {
     const [fixPromptDraft, setFixPromptDraft] = useState("");
     const [fixDispatchingIssueId, setFixDispatchingIssueId] =
         useState<Id<"issues"> | null>(null);
+    const [manualDispatchDialogOpen, setManualDispatchDialogOpen] =
+        useState(false);
+    const [manualDispatchDraft, setManualDispatchDraft] = useState("");
+    const [manualDispatchPending, setManualDispatchPending] = useState(false);
     const [workflowDialogOpen, setWorkflowDialogOpen] = useState(false);
     const [workflowPollContext, setWorkflowPollContext] =
         useState<WorkflowPollContext | null>(null);
@@ -454,22 +492,46 @@ export const IssuesView = () => {
         return map;
     }, [issuesPage.results, githubIntegration?.fullName]);
 
+    const manualWorkflowSessionFromDb = useMemo(
+        () =>
+            manualGithubWorkflowSessionFromPrefs(
+                workflowPrefs,
+                githubIntegration?.fullName?.trim() ?? "",
+            ),
+        [workflowPrefs, githubIntegration?.fullName],
+    );
+
     const handleWorkflowRunIdResolved = useCallback(
-        (issueId: Id<"issues">, runId: number) => {
-            void updateGithubWorkflowRunMutation({ issueId, runId });
+        (issueId: Id<"issues"> | undefined, runId: number) => {
+            if (issueId !== undefined) {
+                void updateGithubWorkflowRunMutation({ issueId, runId });
+            } else {
+                void updateManualGithubWorkflowRunMutation({ runId });
+            }
         },
-        [updateGithubWorkflowRunMutation],
+        [updateGithubWorkflowRunMutation, updateManualGithubWorkflowRunMutation],
     );
 
     const handleWorkflowStatusChange = useCallback(
-        (issueId: Id<"issues">, status: string, conclusion: string | null) => {
-            void updateGithubWorkflowRunMutation({
-                issueId,
-                runStatus: status,
-                runConclusion: conclusion,
-            });
+        (
+            issueId: Id<"issues"> | undefined,
+            status: string,
+            conclusion: string | null,
+        ) => {
+            if (issueId !== undefined) {
+                void updateGithubWorkflowRunMutation({
+                    issueId,
+                    runStatus: status,
+                    runConclusion: conclusion,
+                });
+            } else {
+                void updateManualGithubWorkflowRunMutation({
+                    runStatus: status,
+                    runConclusion: conclusion,
+                });
+            }
         },
-        [updateGithubWorkflowRunMutation],
+        [updateGithubWorkflowRunMutation, updateManualGithubWorkflowRunMutation],
     );
 
     useEffect(() => {
@@ -503,8 +565,14 @@ export const IssuesView = () => {
     workflowDialogOpenRef.current = workflowDialogOpen;
     const workflowPollContextRef = useRef(workflowPollContext);
     workflowPollContextRef.current = workflowPollContext;
+    const workflowPrefsRef = useRef(workflowPrefs);
+    workflowPrefsRef.current = workflowPrefs;
+    const githubIntegrationFullNameRef = useRef(
+        githubIntegration?.fullName ?? "",
+    );
+    githubIntegrationFullNameRef.current = githubIntegration?.fullName ?? "";
 
-    const hasActiveSessions = useMemo(
+    const hasActiveIssueWorkflowSessions = useMemo(
         () =>
             Object.values(issueWorkflowByIssueId).some(
                 (s) => s.runId !== null && isActiveRunStatus(s.runStatus),
@@ -512,8 +580,19 @@ export const IssuesView = () => {
         [issueWorkflowByIssueId],
     );
 
+    const hasActiveManualWorkflowForBackground = useMemo(() => {
+        const manual = manualGithubWorkflowSessionFromPrefs(
+            workflowPrefs,
+            githubIntegration?.fullName?.trim() ?? "",
+        );
+        return manual !== null && isActiveRunStatus(manual.runStatus);
+    }, [workflowPrefs, githubIntegration?.fullName]);
+
     useEffect(() => {
-        if (!hasActiveSessions) {
+        if (
+            !hasActiveIssueWorkflowSessions &&
+            !hasActiveManualWorkflowForBackground
+        ) {
             return;
         }
         let cancelled = false;
@@ -521,9 +600,10 @@ export const IssuesView = () => {
             const sessions = issueWorkflowRef.current;
             const dialogOpen = workflowDialogOpenRef.current;
             const dialogCtx = workflowPollContextRef.current;
-            const dialogKey = dialogCtx
-                ? workflowSessionKey(dialogCtx.issueId)
-                : null;
+            const dialogKey =
+                dialogCtx?.issueId !== undefined
+                    ? workflowSessionKey(dialogCtx.issueId)
+                    : null;
             for (const [key, session] of Object.entries(sessions) as [string, IssueWorkflowSession][]) {
                 if (cancelled) return;
                 if (!isActiveRunStatus(session.runStatus) || session.runId === null)
@@ -558,6 +638,75 @@ export const IssuesView = () => {
                     // ignore – next tick will retry
                 }
             }
+
+            const prefs = workflowPrefsRef.current;
+            const repoFb = githubIntegrationFullNameRef.current.trim();
+            const manual = manualGithubWorkflowSessionFromPrefs(prefs, repoFb);
+            const manualDialogPolling =
+                dialogOpen &&
+                dialogCtx !== null &&
+                dialogCtx.issueId === undefined;
+            if (
+                manual &&
+                isActiveRunStatus(manual.runStatus) &&
+                !manualDialogPolling &&
+                !cancelled
+            ) {
+                try {
+                    const params = new URLSearchParams();
+                    if (manual.runId !== null) {
+                        params.set("runId", String(manual.runId));
+                    } else {
+                        params.set("after", manual.dispatchedAt);
+                    }
+                    const res = await fetch(
+                        `/api/github/actions/run?${params.toString()}`,
+                    );
+                    if (cancelled || !res.ok) {
+                        return;
+                    }
+                    const data = (await res.json()) as {
+                        run?: {
+                            id?: number;
+                            status: string;
+                            conclusion: string | null;
+                        } | null;
+                    };
+                    if (cancelled || !data.run) {
+                        return;
+                    }
+                    const rid = data.run.id;
+                    const status = data.run.status;
+                    const conclusion = data.run.conclusion;
+                    const cur = manualGithubWorkflowSessionFromPrefs(
+                        workflowPrefsRef.current,
+                        githubIntegrationFullNameRef.current.trim(),
+                    );
+                    if (!cur) {
+                        return;
+                    }
+                    const nextConc = conclusion ?? "";
+                    const curConc = cur.runConclusion ?? "";
+                    if (
+                        cur.runStatus === status &&
+                        curConc === nextConc &&
+                        (rid === undefined ||
+                            rid === null ||
+                            cur.runId === rid)
+                    ) {
+                        return;
+                    }
+                    void updateManualGithubWorkflowRunMutation({
+                        ...(rid !== undefined && rid !== null
+                            ? { runId: rid }
+                            : {}),
+                        runStatus: status,
+                        runConclusion: conclusion,
+                    });
+                } catch {
+                    /* next interval */
+                }
+            }
         };
         void bgPoll();
         const id = window.setInterval(() => void bgPoll(), 8000);
@@ -565,7 +714,12 @@ export const IssuesView = () => {
             cancelled = true;
             window.clearInterval(id);
         };
-    }, [hasActiveSessions, updateGithubWorkflowRunMutation]);
+    }, [
+        hasActiveIssueWorkflowSessions,
+        hasActiveManualWorkflowForBackground,
+        updateGithubWorkflowRunMutation,
+        updateManualGithubWorkflowRunMutation,
+    ]);
 
     const visibleIssues = useMemo(() => {
         const next = issues.filter((i) =>
@@ -733,6 +887,104 @@ export const IssuesView = () => {
         [githubIntegration, recordGithubWorkflowDispatchMutation],
     );
 
+    const openManualDispatchDialog = useCallback(() => {
+        if (githubIntegration === undefined) {
+            return;
+        }
+        if (
+            githubIntegration === null ||
+            !githubIntegration.fullName?.trim()
+        ) {
+            toast.error(
+                "Link a GitHub repository under GitHub in the sidebar first.",
+            );
+            return;
+        }
+        if (githubOAuthConnected === null) {
+            return;
+        }
+        if (githubOAuthConnected === false) {
+            toast.error(
+                "GitHub not connected. Reconnect your GitHub account, then try again.",
+            );
+            return;
+        }
+        setManualDispatchDraft("");
+        setManualDispatchDialogOpen(true);
+    }, [githubIntegration, githubOAuthConnected]);
+
+    const dispatchManualWorkflow = useCallback(async () => {
+        const prompt = manualDispatchDraft.trim();
+        if (!prompt) {
+            return;
+        }
+        if (githubIntegration === undefined) {
+            return;
+        }
+        if (
+            githubIntegration === null ||
+            !githubIntegration.fullName?.trim()
+        ) {
+            return;
+        }
+        setManualDispatchPending(true);
+        try {
+            const res = await fetch("/api/github/dispatch", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ prompt }),
+            });
+            const data = (await res.json()) as {
+                error?: string;
+                ok?: boolean;
+                truncated?: boolean;
+                repository?: string;
+                dispatchedAt?: string;
+            };
+            if (!res.ok) {
+                toast.error(data.error ?? "Could not dispatch to GitHub.");
+                return;
+            }
+            const dispatchedAt =
+                typeof data.dispatchedAt === "string"
+                    ? data.dispatchedAt
+                    : new Date().toISOString();
+            const repository =
+                data.repository ?? githubIntegration.fullName;
+            const session: IssueWorkflowSession = {
+                dispatchedAt,
+                repository,
+                runId: null,
+                runStatus: "queued",
+                runConclusion: null,
+            };
+            setManualDispatchDialogOpen(false);
+            setManualDispatchDraft("");
+            await recordManualGithubWorkflowDispatchMutation({
+                dispatchedAt,
+                repository,
+            });
+            setWorkflowPollContext(session);
+            setWorkflowDialogOpen(true);
+            if (data.truncated) {
+                toast.success(
+                    `Dispatched to ${repository} (prompt truncated for GitHub).`,
+                );
+            } else {
+                toast.success(`Dispatched workflow to ${repository}.`);
+            }
+        } catch (error) {
+            console.error(error);
+            toast.error("Could not send prompt to GitHub Actions.");
+        } finally {
+            setManualDispatchPending(false);
+        }
+    }, [
+        githubIntegration,
+        manualDispatchDraft,
+        recordManualGithubWorkflowDispatchMutation,
+    ]);
+
     const copyContactSessionId = useCallback(
         async (sessionId: string, rowKey: string) => {
             try {
@@ -892,8 +1144,9 @@ export const IssuesView = () => {
                             Could not build a prompt for this issue.
                         </p>
                     )}
-                    <DialogFooter>
+                    <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
                         <Button
+                            className="w-full sm:w-auto"
                             disabled={fixDispatchingIssueId !== null}
                             onClick={() => setFixPromptDialogOpen(false)}
                             type="button"
@@ -902,7 +1155,7 @@ export const IssuesView = () => {
                             Cancel
                         </Button>
                         <Button
-                            className="gap-2"
+                            className="w-full gap-2 sm:w-auto"
                             disabled={
                                 !fixPromptDialogIssue ||
                                 !fixPromptDraft.trim() ||
@@ -930,11 +1183,68 @@ export const IssuesView = () => {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-            <div className="flex min-h-screen min-w-0 flex-col bg-muted p-8">
+            <Dialog
+                onOpenChange={(open) => {
+                    setManualDispatchDialogOpen(open);
+                    if (!open) {
+                        setManualDispatchDraft("");
+                    }
+                }}
+                open={manualDispatchDialogOpen}
+            >
+                <DialogContent className="flex max-h-[85vh] max-w-[calc(100%-2rem)] flex-col gap-4 sm:max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle>Dispatch GitHub Actions</DialogTitle>
+                        <DialogDescription>
+                            Sends a <span className="font-medium">repository_dispatch</span> to
+                            your linked repo with only the prompt below—no product issue is
+                            attached. Use the same workflow as &quot;Fix&quot; on a row when you
+                            want full control over the instructions.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <Textarea
+                        className="max-h-[min(65vh,32rem)] min-h-[12rem] w-full min-w-0 resize-y font-mono text-xs leading-relaxed focus-visible:border-input focus-visible:ring-0"
+                        onChange={(e) => setManualDispatchDraft(e.target.value)}
+                        placeholder="Describe what you want Claude to implement in the repository…"
+                        spellCheck={false}
+                        value={manualDispatchDraft}
+                    />
+                    <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
+                        <Button
+                            className="w-full sm:w-auto"
+                            disabled={manualDispatchPending}
+                            onClick={() => setManualDispatchDialogOpen(false)}
+                            type="button"
+                            variant="outline"
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            className="w-full gap-2 sm:w-auto"
+                            disabled={
+                                !manualDispatchDraft.trim() ||
+                                manualDispatchPending
+                            }
+                            onClick={() => void dispatchManualWorkflow()}
+                            type="button"
+                        >
+                            {manualDispatchPending ? (
+                                <>
+                                    <Loader2Icon className="size-4 animate-spin shrink-0" />
+                                    Dispatching…
+                                </>
+                            ) : (
+                                "Dispatch workflow"
+                            )}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+            <div className="flex min-h-screen min-w-0 flex-col overflow-x-hidden bg-muted px-4 py-6 sm:p-8">
                 <div className="mx-auto w-full min-w-0 max-w-3xl">
                     <div className="space-y-2">
                         <h1 className="text-2xl md:text-4xl">Product Issues</h1>
-                        <p className="text-muted-foreground">
+                        <p className="text-muted-foreground text-sm leading-relaxed sm:text-base">
                             Expand rows.{" "}
                             <span className="text-foreground font-medium">Fix</span>{" "}
                             → Actions (preview, confirm); then{" "}
@@ -953,36 +1263,132 @@ export const IssuesView = () => {
                         </p>
                     </div>
 
-                    <div className="mt-8 min-w-0 overflow-hidden rounded-lg border bg-background">
-                        <div className="flex flex-wrap items-center gap-2 border-b px-6 py-4">
-                            <Button
-                                onClick={() => switchStatusFilter("open")}
-                                variant={
-                                    statusFilter === "open"
-                                        ? "default"
-                                        : "outline"
-                                }
-                            >
-                                Open
-                            </Button>
-                            <Button
-                                onClick={() => switchStatusFilter("resolved")}
-                                variant={
-                                    statusFilter === "resolved"
-                                        ? "default"
-                                        : "outline"
-                                }
-                            >
-                                Resolved
-                            </Button>
+                    <div className="mt-6 w-full min-w-0 max-w-full overflow-hidden rounded-lg border bg-background sm:mt-8">
+                        <div className="flex min-w-0 flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2 sm:px-6 sm:py-4">
+                            <div className="flex min-w-0 flex-wrap items-center gap-2">
+                                <Button
+                                    onClick={() => switchStatusFilter("open")}
+                                    variant={
+                                        statusFilter === "open"
+                                            ? "default"
+                                            : "outline"
+                                    }
+                                >
+                                    Open
+                                </Button>
+                                <Button
+                                    onClick={() => switchStatusFilter("resolved")}
+                                    variant={
+                                        statusFilter === "resolved"
+                                            ? "default"
+                                            : "outline"
+                                    }
+                                >
+                                    Resolved
+                                </Button>
+                            </div>
+                            <div className="grid w-full min-w-0 max-w-full grid-cols-1 gap-2 sm:ml-auto sm:flex sm:w-auto sm:max-w-none sm:flex-row sm:flex-wrap sm:justify-end">
+                                {manualDispatchPending ? (
+                                    <Button
+                                        className={`min-w-0 max-w-full justify-center gap-2 sm:max-w-none sm:shrink-0 sm:justify-start ${workflowFixActionButtonClassName(
+                                            {
+                                                dispatchedAt: "",
+                                                repository: "",
+                                                runId: null,
+                                                runStatus: "queued",
+                                                runConclusion: null,
+                                            },
+                                        )}`}
+                                        disabled
+                                        type="button"
+                                        variant="outline"
+                                    >
+                                        <Loader2Icon className="size-4 shrink-0 animate-spin" />
+                                        Dispatching…
+                                    </Button>
+                                ) : null}
+                                {!manualDispatchPending &&
+                                manualWorkflowSessionFromDb !== null &&
+                                isActiveRunStatus(
+                                    manualWorkflowSessionFromDb.runStatus,
+                                ) ? (
+                                    <Button
+                                        className={`min-w-0 max-w-full gap-2 sm:max-w-none sm:shrink-0 ${workflowFixActionButtonClassName(
+                                            manualWorkflowSessionFromDb,
+                                        )} justify-center sm:justify-start`}
+                                        disabled={
+                                            githubIntegration === undefined ||
+                                            !githubDispatchAvailable
+                                        }
+                                        onClick={() => {
+                                            setWorkflowPollContext({
+                                                ...manualWorkflowSessionFromDb,
+                                            });
+                                            setWorkflowDialogOpen(true);
+                                        }}
+                                        title="Open workflow run status"
+                                        type="button"
+                                        variant="outline"
+                                    >
+                                        <Loader2Icon className="size-4 shrink-0 animate-spin" />
+                                        Workflow
+                                    </Button>
+                                ) : null}
+                                {!manualDispatchPending &&
+                                manualWorkflowSessionFromDb !== null &&
+                                !isActiveRunStatus(
+                                    manualWorkflowSessionFromDb.runStatus,
+                                ) ? (
+                                    <Button
+                                        className={`min-w-0 max-w-full gap-2 sm:max-w-none sm:shrink-0 ${workflowFixActionButtonClassName(
+                                            manualWorkflowSessionFromDb,
+                                        )} justify-center sm:justify-start`}
+                                        disabled={
+                                            githubIntegration === undefined ||
+                                            !githubDispatchAvailable
+                                        }
+                                        onClick={() => {
+                                            setWorkflowPollContext({
+                                                ...manualWorkflowSessionFromDb,
+                                            });
+                                            setWorkflowDialogOpen(true);
+                                        }}
+                                        title="Open workflow run status"
+                                        type="button"
+                                        variant="outline"
+                                    >
+                                        View workflow
+                                    </Button>
+                                ) : null}
+                                {!manualDispatchPending &&
+                                (manualWorkflowSessionFromDb === null ||
+                                    !isActiveRunStatus(
+                                        manualWorkflowSessionFromDb.runStatus,
+                                    )) ? (
+                                    <Button
+                                        className="min-w-0 max-w-full justify-center gap-2 sm:w-auto sm:max-w-none sm:shrink-0 sm:justify-start"
+                                        disabled={
+                                            githubIntegration === undefined ||
+                                            !githubDispatchAvailable
+                                        }
+                                        onClick={openManualDispatchDialog}
+                                        type="button"
+                                        variant="outline"
+                                    >
+                                        <WorkflowIcon className="size-4 shrink-0" />
+                                        Custom dispatch
+                                    </Button>
+                                ) : null}
+                            </div>
                         </div>
-                        <Table className="table-fixed">
+                        <div className="w-full min-w-0 max-w-full overflow-x-auto [-webkit-overflow-scrolling:touch]">
+                            <Table className="w-full min-w-0 table-fixed sm:min-w-[36rem]">
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead className="w-[45%] min-w-0 px-6 py-4 font-medium">
+                                    <TableHead className="w-[45%] min-w-0 px-3 py-3 font-medium sm:px-6 sm:py-4">
                                         Issue
                                     </TableHead>
-                                    <TableHead className="w-[22%] px-6 py-4 font-medium whitespace-nowrap">
+                                    <TableHead className="w-[22%] px-3 py-3 font-medium whitespace-nowrap sm:px-6 sm:py-4">
                                         <button
                                             aria-label={`Sort by criticality, ${
                                                 criticalitySort === "desc"
@@ -1001,10 +1407,10 @@ export const IssuesView = () => {
                                             )}
                                         </button>
                                     </TableHead>
-                                    <TableHead className="px-6 py-4 font-medium w-[140px] min-w-[7.5rem] text-right whitespace-nowrap">
+                                    <TableHead className="w-[140px] min-w-[7.5rem] px-3 py-3 text-right font-medium whitespace-nowrap sm:px-6 sm:py-4">
                                         Fix
                                     </TableHead>
-                                    <TableHead className="px-6 py-4 font-medium whitespace-nowrap">
+                                    <TableHead className="px-3 py-3 font-medium whitespace-nowrap sm:px-6 sm:py-4">
                                         Actions
                                     </TableHead>
                                 </TableRow>
@@ -1065,7 +1471,7 @@ export const IssuesView = () => {
                                                             : `hover:bg-muted/50 ${rowTone}`
                                                     }
                                                 >
-                                                    <TableCell className="min-w-0 max-w-full px-6 py-4 align-middle whitespace-normal">
+                                                    <TableCell className="min-w-0 max-w-full px-3 py-3 align-middle whitespace-normal sm:px-6 sm:py-4">
                                                         <button
                                                             aria-expanded={
                                                                 isExpanded
@@ -1117,7 +1523,7 @@ export const IssuesView = () => {
                                                             </span>
                                                         </button>
                                                     </TableCell>
-                                                    <TableCell className="px-6 py-4 align-middle">
+                                                    <TableCell className="px-3 py-3 align-middle sm:px-6 sm:py-4">
                                                         <Badge
                                                             variant={criticalityBadgeVariant(
                                                                 issue.criticality,
@@ -1126,7 +1532,7 @@ export const IssuesView = () => {
                                                             {issue.criticality}
                                                         </Badge>
                                                     </TableCell>
-                                                    <TableCell className="px-6 py-4 align-middle text-right">
+                                                    <TableCell className="px-3 py-3 align-middle text-right sm:px-6 sm:py-4">
                                                         {wfSession ? (
                                                             isActiveRunStatus(
                                                                 wfSession.runStatus,
@@ -1217,7 +1623,7 @@ export const IssuesView = () => {
                                                             </Button>
                                                         )}
                                                     </TableCell>
-                                                    <TableCell className="px-6 py-4 align-middle">
+                                                    <TableCell className="px-3 py-3 align-middle sm:px-6 sm:py-4">
                                                         <DropdownMenu>
                                                             <DropdownMenuTrigger
                                                                 asChild
@@ -1763,6 +2169,7 @@ export const IssuesView = () => {
                                 )}
                             </TableBody>
                         </Table>
+                        </div>
                         {!isLoadingFirstPage && issues.length > 0 ? (
                             <div className="border-t">
                                 <InfiniteScrollTrigger

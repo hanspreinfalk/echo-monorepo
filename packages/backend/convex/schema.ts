@@ -155,6 +155,12 @@ export default defineSchema({
         convexMcp: v.boolean(),
         vercelMcp: v.optional(v.boolean()),
         sentryMcp: v.optional(v.boolean()),
+        /** Custom “dispatch without product issue” workflow (same semantics as `issues.githubWorkflow*`). */
+        manualGithubWorkflowDispatchedAt: v.optional(v.string()),
+        manualGithubWorkflowRepository: v.optional(v.string()),
+        manualGithubWorkflowRunId: v.optional(v.number()),
+        manualGithubWorkflowRunStatus: v.optional(v.string()),
+        manualGithubWorkflowRunConclusion: v.optional(v.string()),
     }).index("by_organization_id", ["organizationId"]),
     agentCustomTools: defineTable({
         organizationId: v.string(),

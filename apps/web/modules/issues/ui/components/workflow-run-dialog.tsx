@@ -24,7 +24,8 @@ export type IssueWorkflowSession = {
 };
 
 export type WorkflowPollContext = IssueWorkflowSession & {
-    issueId: Id<"issues">;
+    /** Omitted when the workflow was started from a manual prompt (not tied to a product issue). */
+    issueId?: Id<"issues">;
 };
 
 type RunSummary = {
@@ -49,9 +50,13 @@ type WorkflowRunDialogProps = {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     context: WorkflowPollContext | null;
-    onRunIdResolved?: (issueId: Id<"issues">, runId: number) => void;
+    /** `issueId` is undefined for custom (manual) dispatches not tied to a product issue. */
+    onRunIdResolved?: (
+        issueId: Id<"issues"> | undefined,
+        runId: number,
+    ) => void;
     onStatusChange?: (
-        issueId: Id<"issues">,
+        issueId: Id<"issues"> | undefined,
         status: string,
         conclusion: string | null,
     ) => void;
@@ -216,15 +221,21 @@ export const WorkflowRunDialog = ({
     }, [open, context?.issueId, context?.dispatchedAt, context?.repository, clearPoll]);
 
     const status = run ? statusMessage(run) : null;
+    const tiedToIssue = context?.issueId !== undefined;
 
     return (
         <Dialog onOpenChange={onOpenChange} open={open}>
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
-                    <DialogTitle>Fixing issue with AI</DialogTitle>
+                    <DialogTitle>
+                        {tiedToIssue
+                            ? "Fixing issue with AI"
+                            : "GitHub Actions workflow"}
+                    </DialogTitle>
                     <DialogDescription>
-                        Track the GitHub Actions workflow while a fix is prepared for this
-                        issue.
+                        {tiedToIssue
+                            ? "Track the GitHub Actions workflow while a fix is prepared for this issue."
+                            : "Track the workflow run for your custom prompt. Progress is not linked to a product issue row."}
                     </DialogDescription>
                 </DialogHeader>
 
