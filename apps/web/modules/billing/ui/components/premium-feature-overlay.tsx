@@ -5,6 +5,7 @@ import {
   BookOpenIcon,
   BotIcon,
   GemIcon,
+  Github,
   MicIcon,
   PaletteIcon,
   PhoneIcon,
@@ -72,6 +73,11 @@ const features: Feature[] = [
     icon: SquareMousePointer,
     label: "Page Control",
     description: "Control the page from the chat",
+  },
+  {
+    icon: Github,
+    label: "GitHub Integration",
+    description: "Integrate your GitHub repository with your AI",
   }
 ];
 

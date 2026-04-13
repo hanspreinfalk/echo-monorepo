@@ -9,7 +9,9 @@ const Page = () => {
       condition={(has) => has({ plan: "pro" })}
       fallback={
         <PremiumFeatureOverlay>
-          <CustomizationView />
+          <div className="h-svh overflow-hidden">
+            <CustomizationView />
+          </div>
         </PremiumFeatureOverlay>
       }
     >
