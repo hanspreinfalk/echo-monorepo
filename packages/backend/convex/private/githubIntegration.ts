@@ -29,6 +29,97 @@ export const getOne = query({
   },
 });
 
+export const getWorkflowPrefs = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+
+    if (identity === null) {
+      throw new ConvexError({
+        code: "UNAUTHORIZED",
+        message: "Identity not found",
+      });
+    }
+
+    const orgId = identity.orgId as string;
+
+    if (!orgId) {
+      throw new ConvexError({
+        code: "UNAUTHORIZED",
+        message: "Organization not found",
+      });
+    }
+
+    const row = await ctx.db
+      .query("githubIntegrationWorkflowPrefs")
+      .withIndex("by_organization_id", (q) => q.eq("organizationId", orgId))
+      .unique();
+
+    return {
+      autoMergePr: row?.autoMergePr ?? false,
+      supabaseMcp: row?.supabaseMcp ?? false,
+      convexMcp: row?.convexMcp ?? false,
+      vercelMcp: row?.vercelMcp ?? false,
+      sentryMcp: row?.sentryMcp ?? false,
+    };
+  },
+});
+
+export const setWorkflowPrefs = mutation({
+  args: {
+    autoMergePr: v.boolean(),
+    supabaseMcp: v.boolean(),
+    convexMcp: v.boolean(),
+    vercelMcp: v.boolean(),
+    sentryMcp: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+
+    if (identity === null) {
+      throw new ConvexError({
+        code: "UNAUTHORIZED",
+        message: "Identity not found",
+      });
+    }
+
+    const orgId = identity.orgId as string;
+
+    if (!orgId) {
+      throw new ConvexError({
+        code: "UNAUTHORIZED",
+        message: "Organization not found",
+      });
+    }
+
+    const existing = await ctx.db
+      .query("githubIntegrationWorkflowPrefs")
+      .withIndex("by_organization_id", (q) => q.eq("organizationId", orgId))
+      .unique();
+
+    const payload = {
+      organizationId: orgId,
+      autoMergePr: args.autoMergePr,
+      supabaseMcp: args.supabaseMcp,
+      convexMcp: args.convexMcp,
+      vercelMcp: args.vercelMcp,
+      sentryMcp: args.sentryMcp,
+    };
+
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        autoMergePr: args.autoMergePr,
+        supabaseMcp: args.supabaseMcp,
+        convexMcp: args.convexMcp,
+        vercelMcp: args.vercelMcp,
+        sentryMcp: args.sentryMcp,
+      });
+    } else {
+      await ctx.db.insert("githubIntegrationWorkflowPrefs", payload);
+    }
+  },
+});
+
 export const setSelectedRepo = mutation({
   args: {
     fullName: v.string(),

@@ -148,6 +148,14 @@ export default defineSchema({
         defaultBranch: v.string(),
         htmlUrl: v.optional(v.string()),
     }).index("by_organization_id", ["organizationId"]),
+    githubIntegrationWorkflowPrefs: defineTable({
+        organizationId: v.string(),
+        autoMergePr: v.boolean(),
+        supabaseMcp: v.boolean(),
+        convexMcp: v.boolean(),
+        vercelMcp: v.optional(v.boolean()),
+        sentryMcp: v.optional(v.boolean()),
+    }).index("by_organization_id", ["organizationId"]),
     agentCustomTools: defineTable({
         organizationId: v.string(),
         name: v.string(),
