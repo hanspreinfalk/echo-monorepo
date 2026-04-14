@@ -116,6 +116,17 @@ function parseMessageAttachments(content: string): {
     return { textContent, attachments };
 }
 
+function formatMessageTime(createdAt: Date) {
+    return createdAt.toLocaleTimeString(undefined, {
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+    });
+}
+
+const messageTimeClassName =
+    "mt-0.5 w-max max-w-full shrink-0 self-end text-right text-[10px] leading-none text-muted-foreground tabular-nums";
+
 const formSchema = z.object({
     message: z.string(),
 })
@@ -389,6 +400,11 @@ export function ConversationIdView({ conversationId }: { conversationId: Id<"con
                                             <AIResponse>{parsedMessage.textContent}</AIResponse>
                                         </AIMessageContent>
                                     )}
+                                    {row.createdAt != null && (
+                                        <p className={messageTimeClassName}>
+                                            {formatMessageTime(row.createdAt)}
+                                        </p>
+                                    )}
                                 </div>
                                 <DicebearAvatar
                                     seed={conversation?.contactSessionId ?? "user"}
@@ -407,11 +423,16 @@ export function ConversationIdView({ conversationId }: { conversationId: Id<"con
                                 req.status === "approved" && req.result ? "done" : "running";
                             return (
                                 <AIMessage from="user" key={row.id}>
-                                    <div className="flex flex-col gap-1">
+                                    <div className="flex min-w-0 w-fit max-w-[80%] flex-col items-start gap-1">
                                         <PageAgentStepsToolCard
                                             phase={agentPhase}
                                             steps={req.steps ?? []}
                                         />
+                                        {row.createdAt != null && (
+                                            <p className={messageTimeClassName}>
+                                                {formatMessageTime(row.createdAt)}
+                                            </p>
+                                        )}
                                     </div>
                                 </AIMessage>
                             );
@@ -423,12 +444,21 @@ export function ConversationIdView({ conversationId }: { conversationId: Id<"con
                                 return null;
                             }
                             const actionLabel = req.action || row.action;
+                            const pageControlTime =
+                                row.createdAt != null ? (
+                                    <p
+                                        className={`${messageTimeClassName} grow-0 basis-auto`}
+                                    >
+                                        {formatMessageTime(row.createdAt)}
+                                    </p>
+                                ) : null;
                             return (
                                 <PageControlCard
                                     key={row.id}
                                     from="user"
                                     action={actionLabel}
                                     requestStatus={req.status}
+                                    requestTrailing={pageControlTime}
                                     colors={{
                                         text: "text-white",
                                         mutedText: "text-white/70",
@@ -447,6 +477,11 @@ export function ConversationIdView({ conversationId }: { conversationId: Id<"con
                                                 {row.content}
                                             </AIResponse>
                                         </AIMessageContent>
+                                        {row.createdAt != null && (
+                                            <p className={messageTimeClassName}>
+                                                {formatMessageTime(row.createdAt)}
+                                            </p>
+                                        )}
                                     </div>
                                 </AIMessage>
                             );
@@ -482,6 +517,11 @@ export function ConversationIdView({ conversationId }: { conversationId: Id<"con
                                                 )}
                                             </div>
                                         </div>
+                                        {row.createdAt != null && (
+                                            <p className={messageTimeClassName}>
+                                                {formatMessageTime(row.createdAt)}
+                                            </p>
+                                        )}
                                     </div>
                                 </AIMessage>
                             );
@@ -528,6 +568,11 @@ export function ConversationIdView({ conversationId }: { conversationId: Id<"con
                                         <AIMessageContent>
                                             <AIResponse>{parsedMessage.textContent}</AIResponse>
                                         </AIMessageContent>
+                                    )}
+                                    {row.createdAt != null && (
+                                        <p className={messageTimeClassName}>
+                                            {formatMessageTime(row.createdAt)}
+                                        </p>
                                     )}
                                 </div>
                             </AIMessage>
