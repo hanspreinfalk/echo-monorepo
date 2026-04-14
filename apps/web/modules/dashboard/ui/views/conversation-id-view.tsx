@@ -466,11 +466,6 @@ export function ConversationIdView({ conversationId }: { conversationId: Id<"con
                                     action={actionLabel}
                                     requestStatus={req.status}
                                     requestTrailing={pageControlTime}
-                                    colors={{
-                                        text: "text-white",
-                                        mutedText: "text-white/70",
-                                        icon: "text-white",
-                                    }}
                                 />
                             );
                         }

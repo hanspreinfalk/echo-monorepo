@@ -116,7 +116,6 @@ export const AIInputTextarea = ({
     return (
         <Textarea
             className={cn(
-                "text-sm!",
                 "w-full resize-none rounded-none border-none p-3 shadow-none outline-none ring-0",
                 "bg-transparent dark:bg-transparent",
                 "focus-visible:ring-0",
