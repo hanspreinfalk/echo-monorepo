@@ -63,6 +63,7 @@ import {
     parseMessageAttachments,
 } from "@workspace/ui/lib/attachment-markdown";
 import { cn } from "@workspace/ui/lib/utils";
+import { SidebarTrigger } from "@workspace/ui/components/sidebar";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -304,8 +305,9 @@ export function ConversationIdView({ conversationId }: { conversationId: Id<"con
             open={isDeleteDialogOpen}
         />
         <div className="flex h-full flex-col bg-background">
-            <header className="flex h-11 shrink-0 items-center justify-between border-b border-border bg-background px-3 text-foreground">
+            <header className="sticky top-0 z-20 flex h-11 shrink-0 items-center justify-between border-b border-border bg-background px-3 text-foreground">
                 <div className="flex items-center gap-1">
+                    <SidebarTrigger className="md:hidden -ml-1" />
                     {/* Mobile-only: back to conversations list */}
                     <Button asChild size="sm" variant="ghost" className="md:hidden -ml-1">
                         <Link href="/conversations">
@@ -728,8 +730,9 @@ export function ConversationIdView({ conversationId }: { conversationId: Id<"con
 export function ConversationIdViewLoading() {
     return (
         <div className="flex h-full flex-col bg-background">
-            <header className="flex h-11 shrink-0 items-center justify-between border-b border-border bg-background px-3 text-foreground">
+            <header className="sticky top-0 z-20 flex h-11 shrink-0 items-center justify-between border-b border-border bg-background px-3 text-foreground">
                 <div className="flex items-center gap-1">
+                    <SidebarTrigger className="md:hidden -ml-1" />
                     <Button asChild size="sm" variant="ghost" className="md:hidden -ml-1">
                         <Link href="/conversations">
                             <ChevronLeftIcon className="size-4" />

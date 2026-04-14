@@ -8,17 +8,20 @@ interface ConversationStatusIconProps {
 
 const statusConfig = {
     resolved: {
-        icon: CheckIcon, 
-        bgColor: "bg-[#3FB62F]"
+        icon: CheckIcon,
+        bgColor: "bg-[#3FB62F]",
+        iconClassName: "text-white",
     },
     unresolved: {
         icon: ArrowRightIcon,
-        bgColor: "bg-border"
+        bgColor: "bg-border",
+        iconClassName: "text-black dark:text-white",
     },
     escalated: {
         icon: ArrowUpIcon,
-        bgColor: "bg-yellow-500"
-    }
+        bgColor: "bg-yellow-500",
+        iconClassName: "text-white",
+    },
 } as const;
 
 export const ConversationStatusIcon = ({
@@ -30,7 +33,7 @@ export const ConversationStatusIcon = ({
 
     return (
         <div className={cn("flex shrink-0 items-center justify-center rounded-full size-6", config.bgColor, className)}>
-            <Icon className="size-3 stroke-3 text-white" />
+            <Icon className={cn("size-3 stroke-3", config.iconClassName)} />
         </div>
     )
 }

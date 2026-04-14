@@ -4,6 +4,7 @@ import { SidebarProvider } from "@workspace/ui/components/sidebar";
 import { TooltipProvider } from "@workspace/ui/components/tooltip";
 import { cookies } from "next/headers";
 import { DashboardSidebar } from "@/modules/dashboard/ui/components/dashboard-sidebar";
+import { DashboardMobileSidebarBar } from "@/modules/dashboard/ui/components/dashboard-mobile-sidebar-bar";
 import { Provider } from "jotai";
 
 export async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -17,8 +18,11 @@ export async function DashboardLayout({ children }: { children: React.ReactNode 
                     <TooltipProvider>
                         <SidebarProvider defaultOpen={defaultOpen} className="h-svh overflow-hidden">
                             <DashboardSidebar />
-                            <main className="flex min-w-0 flex-1 flex-col overflow-y-auto">
-                                {children}
+                            <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+                                <DashboardMobileSidebarBar />
+                                <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
+                                    {children}
+                                </div>
                             </main>
                         </SidebarProvider>
                     </TooltipProvider>
