@@ -5,6 +5,7 @@ import { supportAgent } from "../system/ai/agents/supportAgent";
 import { MessageDoc, saveMessage } from "@convex-dev/agent";
 import { paginationOptsValidator } from "convex/server";
 import { Id } from "../_generated/dataModel";
+import { ATTACHMENT_MARKDOWN_URL_REGEX } from "../lib/attachmentMarkdown";
 
 export const getIsAiTyping = query({
     args: {
@@ -308,7 +309,7 @@ export const deleteConversation = mutation({
 
             for (const msg of result.page) {
                 const text = msg.text ?? "";
-                const regex = /\[📎[^\]]*\]\((https?:\/\/[^\s)]+)\)/g;
+                const regex = new RegExp(ATTACHMENT_MARKDOWN_URL_REGEX.source, "g");
                 let match;
                 while ((match = regex.exec(text)) !== null) {
                     const url = match[1];

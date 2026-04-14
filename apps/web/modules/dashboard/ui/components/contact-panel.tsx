@@ -17,6 +17,7 @@ import { ClockIcon, GlobeIcon, MailIcon, MonitorIcon } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useMemo } from "react";
+import { cn } from "@workspace/ui/lib/utils";
 
 type InfoItem = {
     label: string;
@@ -174,9 +175,10 @@ export const ContactPanel = () => {
     }
 
     return (
-        <div className="flex h-full w-full flex-col bg-background text-foreground">
-            <div className="flex flex-col gap-y-4 p-4">
-                <div className="flex items-center gap-x-2">
+        <div className="flex h-full w-full flex-col bg-sidebar text-sidebar-foreground">
+            {/* Contact header */}
+            <div className="border-b border-sidebar-border px-4 py-4">
+                <div className="flex items-center gap-3">
                     <DicebearAvatar
                         badgeImageUrl={
                             countryInfo?.code
@@ -184,65 +186,64 @@ export const ContactPanel = () => {
                                 : undefined
                         }
                         seed={contactSession._id}
-                        size={42}
+                        size={36}
                     />
-                    <div className="flex-1 overflow-hidden">
-                        <div className="flex items-center gap-x-2">
-                            <h4 className="line-clamp-1">
-                                {contactSession.name}
-                            </h4>
-                        </div>
-                        <p className="line-clamp-1 text-muted-foreground text-sm">
+                    <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">
+                            {contactSession.name}
+                        </p>
+                        <p className="truncate text-xs text-muted-foreground">
                             {contactSession.email}
                         </p>
                     </div>
                 </div>
-                <Button asChild className="w-full" size="lg">
+                <Button asChild className="mt-3 w-full" size="sm" variant="outline">
                     <Link href={`mailto:${contactSession.email}`}>
-                        <MailIcon />
+                        <MailIcon className="size-3.5" />
                         <span>Send Email</span>
                     </Link>
                 </Button>
             </div>
 
-            <div>
-                {contactSession.metadata && (
-                    <Accordion
-                        className="w-full rounded-none border-y"
-                        collapsible
-                        type="single"
-                    >
-                        {accordionSections.map((section) => (
-                            <AccordionItem
-                                className="rounded-none outline-none has-focus-visible:z-10 has-focus-visible:border-ring has-focus-visible:ring-[3px] has-focus-visible:ring-ring/50"
-                                key={section.id}
-                                value={section.id}
+            {contactSession.metadata && (
+                <Accordion
+                    className="w-full"
+                    collapsible
+                    type="single"
+                >
+                    {accordionSections.map((section) => (
+                        <AccordionItem
+                            className="border-b border-sidebar-border outline-none"
+                            key={section.id}
+                            value={section.id}
+                        >
+                            <AccordionTrigger
+                                className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-medium outline-none transition-colors hover:bg-sidebar-accent hover:no-underline"
                             >
-                                <AccordionTrigger
-                                    className="flex w-full flex-1 items-start justify-between gap-4 rounded-none bg-accent px-5 py-4 text-left font-medium text-sm outline-none transition-all hover:no-underline disabled:pointer-events-none disabled:opacity-50"
-                                >
-                                    <div className="flex items-center gap-4">
-                                        <section.icon className="size-4 shrink-0" />
-                                        <span>{section.title}</span>
-                                    </div>
-                                </AccordionTrigger>
-                                <AccordionContent className="px-5 py-4">
-                                    <div className="space-y-2 text-sm">
-                                        {section.items.map((item) => (
-                                            <div className="flex justify-between" key={`${section.id}-${item.label}`}>
-                                                <span className="text-muted-foreground">
-                                                    {item.label}:
-                                                </span>
-                                                <span className={item.className}>{item.value}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </AccordionContent>
-                            </AccordionItem>
-                        ))}
-                    </Accordion>
-                )}
-            </div>
+                                <section.icon className="size-3.5 shrink-0 text-muted-foreground" />
+                                <span>{section.title}</span>
+                            </AccordionTrigger>
+                            <AccordionContent className="px-4 pb-3 pt-1">
+                                <div className="space-y-1.5">
+                                    {section.items.map((item) => (
+                                        <div
+                                            className="flex items-start justify-between gap-3 text-xs"
+                                            key={`${section.id}-${item.label}`}
+                                        >
+                                            <span className="shrink-0 text-muted-foreground">
+                                                {item.label}
+                                            </span>
+                                            <span className={cn("text-right", item.className)}>
+                                                {item.value}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </AccordionContent>
+                        </AccordionItem>
+                    ))}
+                </Accordion>
+            )}
         </div>
     );
 };

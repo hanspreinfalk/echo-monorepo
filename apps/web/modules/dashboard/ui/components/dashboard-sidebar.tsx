@@ -1,6 +1,6 @@
 'use client'
 
-import { OrganizationSwitcher, UserButton } from "@clerk/nextjs"
+import { OrganizationSwitcher } from "@clerk/nextjs"
 import {
     BugIcon,
     CreditCardIcon,
@@ -11,7 +11,6 @@ import {
     PaletteIcon,
     WrenchIcon,
 } from "lucide-react"
-import Image from "next/image"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
@@ -28,6 +27,7 @@ import {
     SidebarRail
 } from "@workspace/ui/components/sidebar"
 import { cn } from "@workspace/ui/lib/utils"
+import { DashboardUserButton } from "./dashboard-user-button"
 
 const customerSupportItems = [
     {
@@ -68,11 +68,6 @@ const configurationItems = [
         url: '/custom-tools',
         icon: WrenchIcon,
     },
-    // {
-    //     title: 'Voice Assistant',
-    //     url: '/plugins/vapi',
-    //     icon: Mic,
-    // },
 ]
 
 const accountItems = [
@@ -90,13 +85,14 @@ export const DashboardSidebar = () => {
         if (url === '/') {
             return pathname === '/'
         }
-        
         return pathname.startsWith(url)
     }
 
+    const activeClass = 'bg-black! text-white! font-medium! dark:bg-white! dark:text-black!'
+
     return (
-        <Sidebar className="group" collapsible="icon">
-            <SidebarHeader>
+        <Sidebar className="group border-r border-sidebar-border" collapsible="icon">
+            <SidebarHeader className="pt-3">
                 <SidebarMenu>
                     <SidebarMenuItem>
                         <SidebarMenuButton asChild size="lg">
@@ -119,10 +115,11 @@ export const DashboardSidebar = () => {
                 </SidebarMenu>
             </SidebarHeader>
 
-            <SidebarContent>
-                {/* Customer Support */}
-                <SidebarGroup>
-                    <SidebarGroupLabel>Customer Support</SidebarGroupLabel>
+            <SidebarContent className="gap-0 py-2">
+                <SidebarGroup className="py-2">
+                    <SidebarGroupLabel className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+                        Support
+                    </SidebarGroupLabel>
                     <SidebarGroupContent>
                         <SidebarMenu>
                             {customerSupportItems.map((item) => (
@@ -132,11 +129,12 @@ export const DashboardSidebar = () => {
                                         tooltip={item.title}
                                         isActive={isActive(item.url)}
                                         className={cn(
-                                            isActive(item.url) && 'bg-linear-to-b from-sidebar-primary to-[#0b63f3]! text-sidebar-primary-foreground! hover:to-[#0b63f3]/90!'
+                                            'text-sm text-sidebar-foreground/80 transition-colors',
+                                            isActive(item.url) && activeClass
                                         )}
                                     >
                                         <Link href={item.url}>
-                                            <item.icon className="size-4" />
+                                            <item.icon className="size-4 shrink-0" />
                                             <span>{item.title}</span>
                                         </Link>
                                     </SidebarMenuButton>
@@ -146,9 +144,10 @@ export const DashboardSidebar = () => {
                     </SidebarGroupContent>
                 </SidebarGroup>
 
-                {/* Configuration */}
-                <SidebarGroup>
-                    <SidebarGroupLabel>Configuration</SidebarGroupLabel>
+                <SidebarGroup className="py-2">
+                    <SidebarGroupLabel className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+                        Configuration
+                    </SidebarGroupLabel>
                     <SidebarGroupContent>
                         <SidebarMenu>
                             {configurationItems.map((item) => (
@@ -158,11 +157,12 @@ export const DashboardSidebar = () => {
                                         tooltip={item.title}
                                         isActive={isActive(item.url)}
                                         className={cn(
-                                            isActive(item.url) && 'bg-linear-to-b from-sidebar-primary to-[#0b63f3]! text-sidebar-primary-foreground! hover:to-[#0b63f3]/90!'
+                                            'text-sm text-sidebar-foreground/80 transition-colors',
+                                            isActive(item.url) && activeClass
                                         )}
                                     >
                                         <Link href={item.url}>
-                                            <item.icon className="size-4" />
+                                            <item.icon className="size-4 shrink-0" />
                                             <span>{item.title}</span>
                                         </Link>
                                     </SidebarMenuButton>
@@ -172,9 +172,10 @@ export const DashboardSidebar = () => {
                     </SidebarGroupContent>
                 </SidebarGroup>
 
-                {/* Account */}
-                <SidebarGroup>
-                    <SidebarGroupLabel>Account</SidebarGroupLabel>
+                <SidebarGroup className="py-2">
+                    <SidebarGroupLabel className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+                        Account
+                    </SidebarGroupLabel>
                     <SidebarGroupContent>
                         <SidebarMenu>
                             {accountItems.map((item) => (
@@ -184,11 +185,12 @@ export const DashboardSidebar = () => {
                                         tooltip={item.title}
                                         isActive={isActive(item.url)}
                                         className={cn(
-                                            isActive(item.url) && 'bg-linear-to-b from-sidebar-primary to-[#0b63f3]! text-sidebar-primary-foreground! hover:to-[#0b63f3]/90!'
+                                            'text-sm text-sidebar-foreground/80 transition-colors',
+                                            isActive(item.url) && activeClass
                                         )}
                                     >
                                         <Link href={item.url}>
-                                            <item.icon className="size-4" />
+                                            <item.icon className="size-4 shrink-0" />
                                             <span>{item.title}</span>
                                         </Link>
                                     </SidebarMenuButton>
@@ -198,21 +200,11 @@ export const DashboardSidebar = () => {
                     </SidebarGroupContent>
                 </SidebarGroup>
             </SidebarContent>
-            <SidebarFooter>
+
+            <SidebarFooter className="py-3">
                 <SidebarMenu>
                     <SidebarMenuItem>
-                        <UserButton 
-                            showName
-                            appearance={{
-                                elements: {
-                                    rootBox: 'w-full! h-8!',
-                                    userButtonTrigger: 'w-full! p-2! hover:bg-sidebar-accent! hover:text-sidebar-accent-foreground! group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-2!',
-                                    userButtonBox: 'w-full! flex-row-reverse! justify-end! gap-2! group-data-[collapsible=icon]:justify-center! text-sidebar-foreground!',
-                                    userButtonOuterIdentifier: 'pl-0! group-data-[collapsible=icon]:hidden!',
-                                    avatarBox: 'size-5!'
-                                }
-                            }}
-                        />
+                        <DashboardUserButton />
                     </SidebarMenuItem>
                 </SidebarMenu>
             </SidebarFooter>

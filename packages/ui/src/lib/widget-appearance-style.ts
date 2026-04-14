@@ -22,17 +22,25 @@ export function widgetAppearanceToStyle(
   if (appearance.primaryColor) {
     s["--primary"] = appearance.primaryColor;
     s["--ring"] = appearance.primaryColor;
+    s["--chat-bubble-outbound-from"] = appearance.primaryColor;
   }
   if (appearance.primaryGradientEndColor) {
     s["--widget-gradient-end"] = appearance.primaryGradientEndColor;
+    s["--chat-bubble-outbound-to"] = appearance.primaryGradientEndColor;
+  } else if (appearance.primaryColor) {
+    s["--chat-bubble-outbound-to"] = appearance.primaryColor;
   }
   if (appearance.headerForegroundColor) {
     s["--primary-foreground"] = appearance.headerForegroundColor;
   }
   if (appearance.backgroundColor) {
     s["--background"] = appearance.backgroundColor;
+    /* Layered surfaces so the widget still feels like the dashboard when org sets a base color */
     s["--card"] = appearance.backgroundColor;
     s["--popover"] = appearance.backgroundColor;
+    s["--muted"] = `color-mix(in oklch, ${appearance.backgroundColor} 88%, white 12%)`;
+    s["--sidebar"] = `color-mix(in oklch, ${appearance.backgroundColor} 92%, white 8%)`;
+    s["--sidebar-accent"] = `color-mix(in oklch, ${appearance.backgroundColor} 78%, white 22%)`;
   }
   if (appearance.mutedColor) {
     s["--muted"] = appearance.mutedColor;

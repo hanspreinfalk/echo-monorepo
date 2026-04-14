@@ -10,9 +10,12 @@ import { api } from "@workspace/backend/_generated/api";
 import { Button } from "@workspace/ui/components/button";
 import {
     CheckIcon,
+    ChevronLeftIcon,
     FileIcon,
     Loader2Icon,
     MoreHorizontalIcon,
+    PanelRightClose,
+    PanelRightOpen,
     PaperclipIcon,
     Trash2Icon,
     Wand2Icon,
@@ -53,15 +56,22 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { DicebearAvatar } from "@workspace/ui/components/dicebear-avatar";
 import { ConversationStatusButton } from "../components/conversation-status-button";
+import { useContactPanelVisibility } from "../components/contact-panel-visibility-context";
 import { DeleteConversationDialog } from "../components/delete-conversation-dialog";
+import {
+    formatAttachmentMarkdownLink,
+    parseMessageAttachments,
+} from "@workspace/ui/lib/attachment-markdown";
 import { cn } from "@workspace/ui/lib/utils";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
+    DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@workspace/ui/components/dropdown-menu";
 
@@ -78,12 +88,6 @@ interface AttachedFile {
     error?: string;
 }
 
-interface ParsedAttachment {
-    name: string;
-    url: string;
-    isImage: boolean;
-}
-
 const IMAGE_MIME_TYPE_PREFIX = "image/";
 const IMAGE_FILE_EXTENSION_REGEX = /\.(png|jpe?g|webp|gif|bmp|svg)$/i;
 
@@ -92,28 +96,6 @@ function isImageAttachment(fileName: string, mimeType?: string) {
         return true;
     }
     return IMAGE_FILE_EXTENSION_REGEX.test(fileName);
-}
-
-function parseMessageAttachments(content: string): {
-    textContent: string;
-    attachments: ParsedAttachment[];
-} {
-    const attachmentRegex = /\[📎\s*([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;
-    const attachments: ParsedAttachment[] = [];
-
-    const textContent = content
-        .replace(attachmentRegex, (_match, name: string, url: string) => {
-            attachments.push({
-                name,
-                url,
-                isImage: isImageAttachment(name),
-            });
-            return "";
-        })
-        .replace(/\n{3,}/g, "\n\n")
-        .trim();
-
-    return { textContent, attachments };
 }
 
 function formatMessageTime(createdAt: Date) {
@@ -133,6 +115,8 @@ const formSchema = z.object({
 
 export function ConversationIdView({ conversationId }: { conversationId: Id<"conversations"> }) {
     const router = useRouter();
+    const { contactPanelHidden, toggle: toggleContactPanelVisibility } =
+        useContactPanelVisibility();
     const conversation = useQuery(api.private.conversations.getOne, {
         conversationId,
     });
@@ -255,7 +239,7 @@ export function ConversationIdView({ conversationId }: { conversationId: Id<"con
 
         if (validAttachments.length > 0) {
             const attachmentText = validAttachments
-                .map(f => `[📎 ${f.name}](${f.url})`)
+                .map((f) => formatAttachmentMarkdownLink(f.name, f.url!))
                 .join('\n');
             prompt = prompt ? `${prompt}\n\n${attachmentText}` : attachmentText;
         }
@@ -319,24 +303,47 @@ export function ConversationIdView({ conversationId }: { conversationId: Id<"con
             onOpenChange={setIsDeleteDialogOpen}
             open={isDeleteDialogOpen}
         />
-        <div className="flex h-full flex-col bg-muted">
-            <header className="flex items-center justify-between border-b bg-background p-2.5">
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button size="sm" variant="ghost">
-                            <MoreHorizontalIcon />
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start">
-                        <DropdownMenuItem
-                            variant="destructive"
-                            onClick={() => setIsDeleteDialogOpen(true)}
-                        >
-                            <Trash2Icon className="size-4" />
-                            Delete
-                        </DropdownMenuItem>
-                    </DropdownMenuContent>
-                </DropdownMenu>
+        <div className="flex h-full flex-col bg-background">
+            <header className="flex h-11 shrink-0 items-center justify-between border-b border-border bg-background px-3 text-foreground">
+                <div className="flex items-center gap-1">
+                    {/* Mobile-only: back to conversations list */}
+                    <Button asChild size="sm" variant="ghost" className="md:hidden -ml-1">
+                        <Link href="/conversations">
+                            <ChevronLeftIcon className="size-4" />
+                        </Link>
+                    </Button>
+                    {/* Options dropdown */}
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button size="sm" variant="ghost">
+                                <MoreHorizontalIcon />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start">
+                            <DropdownMenuItem
+                                className="hidden lg:flex"
+                                onClick={toggleContactPanelVisibility}
+                            >
+                                {contactPanelHidden ? (
+                                    <PanelRightOpen className="size-4" />
+                                ) : (
+                                    <PanelRightClose className="size-4" />
+                                )}
+                                {contactPanelHidden
+                                    ? "Show Panel"
+                                    : "Hide Panel"}
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator className="hidden lg:block" />
+                            <DropdownMenuItem
+                                variant="destructive"
+                                onClick={() => setIsDeleteDialogOpen(true)}
+                            >
+                                <Trash2Icon className="size-4" />
+                                Delete
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
                 {!!conversation && (
                     <ConversationStatusButton
                         onClick={handleToggleStatus}
@@ -345,7 +352,7 @@ export function ConversationIdView({ conversationId }: { conversationId: Id<"con
                     />
                 )}
             </header>
-            <AIConversation className="max-h-[calc(100vh-180px)]">
+            <AIConversation className="min-h-0">
                 <AIConversationContent>
                     <InfiniteScrollTrigger 
                         canLoadMore={canLoadMore}
@@ -725,13 +732,20 @@ export function ConversationIdView({ conversationId }: { conversationId: Id<"con
 
 export function ConversationIdViewLoading() {
     return (
-        <div className="flex h-full flex-col bg-muted">
-            <header className="flex items-center justify-between border-b bg-background p-2.5">
-                <Button disabled size="sm" variant="ghost">
-                    <MoreHorizontalIcon />
-                </Button>
+        <div className="flex h-full flex-col bg-background">
+            <header className="flex h-11 shrink-0 items-center justify-between border-b border-border bg-background px-3 text-foreground">
+                <div className="flex items-center gap-1">
+                    <Button asChild size="sm" variant="ghost" className="md:hidden -ml-1">
+                        <Link href="/conversations">
+                            <ChevronLeftIcon className="size-4" />
+                        </Link>
+                    </Button>
+                    <Button disabled size="sm" variant="ghost">
+                        <MoreHorizontalIcon />
+                    </Button>
+                </div>
             </header>
-            <AIConversation className="max-h-[calc(100vh-180px)]">
+            <AIConversation className="min-h-0">
                 <AIConversationContent>
                     {Array.from({ length: 8 }, (_, index) => {
                         const isUser = index % 2 === 0;
@@ -746,8 +760,8 @@ export function ConversationIdViewLoading() {
                                 )}
                                 key={index}
                             >
-                                <Skeleton className={`h-9 ${width} rounded-lg bg-neutral-200`} />
-                                <Skeleton className="size-8 rounded-full bg-neutral-200" /> 
+                                <Skeleton className={cn("h-9 rounded-lg", width)} />
+                                <Skeleton className="size-8 rounded-full" /> 
                             </div>
                         )
                     })}

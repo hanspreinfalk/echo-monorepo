@@ -15,9 +15,9 @@ export async function DashboardLayout({ children }: { children: React.ReactNode 
             <OrganizationGuard>
                 <Provider>
                     <TooltipProvider>
-                        <SidebarProvider defaultOpen={defaultOpen}>
+                        <SidebarProvider defaultOpen={defaultOpen} className="h-svh overflow-hidden">
                             <DashboardSidebar />
-                            <main className="flex min-w-0 flex-1 flex-col overflow-x-hidden">
+                            <main className="flex min-w-0 flex-1 flex-col overflow-y-auto">
                                 {children}
                             </main>
                         </SidebarProvider>

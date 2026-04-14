@@ -1,4 +1,4 @@
-import { Card } from '@workspace/ui/components/card'
+import { Card, CardContent } from '@workspace/ui/components/card'
 import {
     Bot,
     ClipboardCheck,
@@ -49,31 +49,32 @@ const features = [
 
 export default function FeaturesSection() {
     return (
-        <section id="features">
-            <div className="bg-muted/50 py-24">
-                <div className="mx-auto w-full max-w-5xl px-6">
-                    <div className="max-w-2xl">
-                        <h2 className="text-foreground text-balance text-5xl max-md:font-semibold md:font-normal">
-                            Everything between “help” and “ship”
-                        </h2>
-                        <p className="text-muted-foreground mb-12 mt-4 text-pretty text-lg">
-                            Echo is customer support that does not stop at closing tickets. It makes sure real product problems become visible, owned, and ordered for the people who build the product.
-                        </p>
-                    </div>
+        <section id="features" className="border-b border-border bg-background py-16 md:py-24">
+            <div className="mx-auto w-full max-w-5xl px-6">
+                <div className="max-w-2xl">
+                    <p className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">Features</p>
+                    <h2 className="text-foreground mt-3 text-balance text-4xl font-semibold tracking-tight md:text-5xl">
+                        Everything between "help" and "ship"
+                    </h2>
+                    <p className="text-muted-foreground mb-12 mt-4 text-pretty text-lg">
+                        Echo is customer support that does not stop at closing tickets. It makes sure real product problems become visible, owned, and ordered for the people who build the product.
+                    </p>
+                </div>
 
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                        {features.map(({ icon: Icon, title, description }) => (
-                            <Card
-                                key={title}
-                                className="flex flex-col p-6">
-                                <span className="bg-primary/10 text-primary mb-4 flex size-10 items-center justify-center rounded-lg">
-                                    <Icon className="size-5" strokeWidth={2} aria-hidden />
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {features.map(({ icon: Icon, title, description }) => (
+                        <Card
+                            key={title}
+                            className="flex flex-col p-0 shadow-none">
+                            <CardContent className="flex flex-col p-5">
+                                <span className="border border-border bg-muted text-foreground mb-4 flex size-9 items-center justify-center rounded-lg">
+                                    <Icon className="size-4" strokeWidth={1.5} aria-hidden />
                                 </span>
-                                <h3 className="text-foreground text-lg font-semibold">{title}</h3>
-                                <p className="text-muted-foreground mt-3 flex-1 text-pretty text-base leading-relaxed">{description}</p>
-                            </Card>
-                        ))}
-                    </div>
+                                <h3 className="text-foreground text-sm font-semibold">{title}</h3>
+                                <p className="text-muted-foreground mt-2 flex-1 text-pretty text-sm leading-relaxed">{description}</p>
+                            </CardContent>
+                        </Card>
+                    ))}
                 </div>
             </div>
         </section>

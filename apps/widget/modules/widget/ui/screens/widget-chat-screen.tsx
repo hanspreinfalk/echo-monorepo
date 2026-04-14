@@ -65,6 +65,10 @@ import {
     threadMessagesToSeparateChatRows,
     toolRowIsComplete,
 } from "@workspace/ui/lib/agent-thread-chat-rows";
+import {
+    formatAttachmentMarkdownLink,
+    parseMessageAttachments,
+} from "@workspace/ui/lib/attachment-markdown";
 import { cn } from "@workspace/ui/lib/utils";
 import { motion } from "motion/react";
 import { useRef, useState, useMemo, useEffect } from "react";
@@ -87,33 +91,12 @@ interface AttachedFile {
     error?: string;
 }
 
-interface ParsedAttachment {
-    name: string;
-    url: string;
-    isImage: boolean;
-}
-
 const IMAGE_MIME_TYPE_PREFIX = "image/";
 const IMAGE_FILE_EXTENSION_REGEX = /\.(png|jpe?g|webp|gif|bmp|svg)$/i;
 
 function isImageAttachment(fileName: string, mimeType?: string) {
     if (mimeType?.startsWith(IMAGE_MIME_TYPE_PREFIX)) return true;
     return IMAGE_FILE_EXTENSION_REGEX.test(fileName);
-}
-
-function parseMessageAttachments(content: string): { textContent: string; attachments: ParsedAttachment[] } {
-    const attachmentRegex = /\[📎\s*([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;
-    const attachments: ParsedAttachment[] = [];
-
-    const textContent = content
-        .replace(attachmentRegex, (_match, name: string, url: string) => {
-            attachments.push({ name, url, isImage: isImageAttachment(name) });
-            return "";
-        })
-        .replace(/\n{3,}/g, "\n\n")
-        .trim();
-
-    return { textContent, attachments };
 }
 
 /** Message timestamp for chat bubbles. */
@@ -416,7 +399,7 @@ export const WidgetChatScreen = () => {
 
         if (validAttachments.length > 0) {
             const attachmentText = validAttachments
-                .map(f => `[📎 ${f.name}](${f.url})`)
+                .map((f) => formatAttachmentMarkdownLink(f.name, f.url!))
                 .join('\n');
             prompt = prompt ? `${prompt}\n\n${attachmentText}` : attachmentText;
         }
@@ -449,7 +432,7 @@ export const WidgetChatScreen = () => {
     }, [messages.results, requestsById]);
 
     return (
-        <>
+        <div className="flex h-full min-h-0 flex-1 flex-col">
             <Dialog onOpenChange={setIsDeleteDialogOpen} open={isDeleteDialogOpen}>
                 <DialogContent className="sm:max-w-sm">
                     <DialogHeader>
@@ -505,7 +488,8 @@ export const WidgetChatScreen = () => {
                     </DropdownMenuContent>
                 </DropdownMenu>
             </WidgetHeader>
-            <AIConversation>
+            <div className="flex min-h-0 flex-1 flex-col bg-muted">
+            <AIConversation className="min-h-0 flex-1">
                 <AIConversationContent>
                     <InfiniteScrollTrigger
                         canLoadMore={canLoadMore}
@@ -798,6 +782,7 @@ export const WidgetChatScreen = () => {
                     })}
                 </AISuggestions>
             )}
+            </div>
             <div className="relative">
                 <input
                     accept=".pdf,.txt,.csv,.doc,.docx,.png,.jpg,.jpeg,.webp"
@@ -922,6 +907,6 @@ export const WidgetChatScreen = () => {
                     </AIInput>
                 </Form>
             </div>
-        </>
+        </div>
     );
 };

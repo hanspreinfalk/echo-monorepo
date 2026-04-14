@@ -13,7 +13,7 @@ const statusConfig = {
     },
     unresolved: {
         icon: ArrowRightIcon,
-        bgColor: "bg-destructive"
+        bgColor: "bg-border"
     },
     escalated: {
         icon: ArrowUpIcon,
@@ -29,7 +29,7 @@ export const ConversationStatusIcon = ({
     const Icon = config.icon;
 
     return (
-        <div className={cn("flex items-center justify-center rounded-full size-6", config.bgColor, className)}>
+        <div className={cn("flex shrink-0 items-center justify-center rounded-full size-6", config.bgColor, className)}>
             <Icon className="size-3 stroke-3 text-white" />
         </div>
     )

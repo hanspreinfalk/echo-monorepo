@@ -31,11 +31,11 @@ export default function SolutionSection() {
     return (
         <section
             id="solution"
-            className="border-border/60 border-y bg-background py-16 md:py-24">
+            className="border-b border-border bg-background py-16 md:py-24">
             <div className="mx-auto max-w-5xl px-6">
                 <div className="max-w-2xl">
-                    <p className="text-primary text-sm font-medium tracking-wide uppercase">How it works</p>
-                    <h2 className="text-foreground mt-3 text-balance text-4xl max-md:font-semibold md:text-5xl md:font-normal">
+                    <p className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">How it works</p>
+                    <h2 className="text-foreground mt-3 text-balance text-4xl font-semibold tracking-tight md:text-5xl">
                         Support, product issues, and engineering priorities in one flow
                     </h2>
                     <p className="text-muted-foreground mt-4 text-pretty text-lg">
@@ -50,17 +50,17 @@ export default function SolutionSection() {
                             <li
                                 key={step.title}
                                 className="flex gap-5">
-                                <span className="text-muted-foreground bg-muted flex size-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold tabular-nums">
+                                <span className="text-muted-foreground border border-border bg-muted flex size-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold tabular-nums">
                                     {index + 1}
                                 </span>
                                 <div>
                                     <div className="flex flex-wrap items-center gap-3">
-                                        <span className="bg-primary/10 text-primary flex size-9 items-center justify-center rounded-lg">
-                                            <Icon className="size-4" strokeWidth={2} aria-hidden />
+                                        <span className="border border-border bg-muted text-foreground flex size-9 items-center justify-center rounded-lg">
+                                            <Icon className="size-4" strokeWidth={1.5} aria-hidden />
                                         </span>
-                                        <h3 className="text-foreground text-lg font-semibold">{step.title}</h3>
+                                        <h3 className="text-foreground text-base font-semibold">{step.title}</h3>
                                     </div>
-                                    <p className="text-muted-foreground mt-3 text-pretty leading-relaxed">{step.description}</p>
+                                    <p className="text-muted-foreground mt-3 text-pretty text-sm leading-relaxed">{step.description}</p>
                                 </div>
                             </li>
                         )

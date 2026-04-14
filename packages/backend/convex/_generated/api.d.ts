@@ -13,6 +13,7 @@ import type * as customToolTestHttp from "../customToolTestHttp.js";
 import type * as embedOpenai from "../embedOpenai.js";
 import type * as embedWidgetAppearance from "../embedWidgetAppearance.js";
 import type * as http from "../http.js";
+import type * as lib_attachmentMarkdown from "../lib/attachmentMarkdown.js";
 import type * as lib_extractTextContent from "../lib/extractTextContent.js";
 import type * as private_agentCustomTools from "../private/agentCustomTools.js";
 import type * as private_contactSessions from "../private/contactSessions.js";
@@ -62,6 +63,7 @@ declare const fullApi: ApiFromModules<{
   embedOpenai: typeof embedOpenai;
   embedWidgetAppearance: typeof embedWidgetAppearance;
   http: typeof http;
+  "lib/attachmentMarkdown": typeof lib_attachmentMarkdown;
   "lib/extractTextContent": typeof lib_extractTextContent;
   "private/agentCustomTools": typeof private_agentCustomTools;
   "private/contactSessions": typeof private_contactSessions;

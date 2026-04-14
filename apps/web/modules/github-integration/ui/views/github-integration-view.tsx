@@ -350,7 +350,7 @@ export const GithubIntegrationView = () => {
           }
         }}
       />
-      <div className="flex min-h-screen flex-col bg-muted p-8">
+      <div className="flex flex-1 flex-col bg-muted p-8">
       <div className="mx-auto w-full max-w-screen-md space-y-8">
         <div className="space-y-2">
           <h1 className="text-2xl md:text-4xl">GitHub</h1>
@@ -706,13 +706,15 @@ export const GithubIntegrationView = () => {
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start gap-3">
                       <div className="bg-muted text-foreground relative flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-md p-1.5">
-                        <Image
-                          alt="Vercel"
-                          className="object-contain"
-                          height={28}
-                          src="/vercel-logo.svg"
-                          width={28}
-                        />
+                        <svg
+                          aria-hidden
+                          className="size-7 shrink-0"
+                          fill="currentColor"
+                          viewBox="0 0 24 24"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path d="M12 1 1 22h22L12 1Z" />
+                        </svg>
                       </div>
                       <div className="min-w-0 space-y-0.5">
                         <p className="text-sm font-medium">Vercel MCP</p>

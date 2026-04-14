@@ -28,14 +28,14 @@ export const AIMessageContent = ({
     <div
         className={cn(
             "wrap-break-word",
-            "flex flex-col gap-2 rounded-lg border border-border px-3 py-2 text-sm",
-            "bg-background text-foreground",
-            "group-[.is-user]:border-transparent group-[.is-user]:bg-linear-to-b group-[.is-user]:from-primary group-[.is-user]:to-[var(--widget-gradient-end)] group-[.is-user]:text-primary-foreground",
+            "flex flex-col gap-2 rounded-md border px-3 py-2 text-sm",
+            "border-[var(--chat-bubble-inbound-border)] bg-[var(--chat-bubble-inbound-bg)] text-foreground",
+            "group-[.is-user]:border-transparent group-[.is-user]:bg-linear-to-b group-[.is-user]:from-[var(--chat-bubble-outbound-from)] group-[.is-user]:to-[var(--chat-bubble-outbound-to)] group-[.is-user]:text-foreground",
             className
         )}
         {...props}
     >
-        <div className="is-user:dark">{children}</div>
+        {children}
     </div>
 );
 

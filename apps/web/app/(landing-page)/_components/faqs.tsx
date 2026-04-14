@@ -52,7 +52,7 @@ const faqCategories = [
                 id: 'integrations-3',
                 question: 'Do you work with our existing help desk or CRM?',
                 answer:
-                    'Not yet. Today everything flows through the embedded widget and Echo’s dashboard. Help desk and CRM connectors are not available right now.',
+                    'Not yet. Today everything flows through the embedded widget and Echo\'s dashboard. Help desk and CRM connectors are not available right now.',
             },
         ],
     },
@@ -91,28 +91,29 @@ export default function FAQs() {
     return (
         <section
             id="faqs"
-            className="bg-muted/50 py-16 md:py-24">
+            className="border-b border-border bg-background py-16 md:py-24">
             <div className="mx-auto max-w-5xl px-6">
                 <div className="grid gap-12 md:grid-cols-5 md:gap-16 lg:gap-20">
                     <div className="md:col-span-2">
-                        <h2 className="text-foreground text-balance text-5xl max-md:font-semibold md:font-normal">FAQs</h2>
-                        <p className="text-muted-foreground mt-4 text-balance text-lg">
+                        <p className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">FAQ</p>
+                        <h2 className="text-foreground mt-3 text-balance text-4xl font-semibold tracking-tight md:text-5xl">Frequently asked</h2>
+                        <p className="text-muted-foreground mt-4 text-balance text-base">
                             From live conversations to a prioritized backlog, so your team ships what matters.
                         </p>
-                        <p className="text-muted-foreground mt-6 hidden md:block text-pretty">
+                        <p className="text-muted-foreground mt-6 hidden md:block text-pretty text-sm">
                             Still unsure?{' '}
                             <Link
                                 href="#"
-                                className="text-primary font-medium hover:underline">
+                                className="text-foreground font-medium underline underline-offset-4 hover:no-underline">
                                 Talk to our team
                             </Link>
                         </p>
                     </div>
 
-                    <div className="flex flex-col gap-12 md:col-span-3">
+                    <div className="flex flex-col gap-10 md:col-span-3">
                         {faqCategories.map((category) => (
                             <div key={category.title}>
-                                <h3 className="text-foreground mb-4 text-lg font-semibold">{category.title}</h3>
+                                <h3 className="text-foreground mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">{category.title}</h3>
                                 <Accordion
                                     type="single"
                                     collapsible
@@ -122,11 +123,11 @@ export default function FAQs() {
                                             key={item.id}
                                             value={item.id}
                                             className="border-border">
-                                            <AccordionTrigger className="text-foreground cursor-pointer py-5 text-left text-base font-medium hover:no-underline [&>svg]:text-muted-foreground">
+                                            <AccordionTrigger className="text-foreground cursor-pointer py-4 text-left text-sm font-medium hover:no-underline [&>svg]:text-muted-foreground">
                                                 {item.question}
                                             </AccordionTrigger>
                                             <AccordionContent>
-                                                <p className="text-muted-foreground pb-2 text-base leading-relaxed">{item.answer}</p>
+                                                <p className="text-muted-foreground pb-2 text-sm leading-relaxed">{item.answer}</p>
                                             </AccordionContent>
                                         </AccordionItem>
                                     ))}
@@ -135,11 +136,11 @@ export default function FAQs() {
                         ))}
                     </div>
 
-                    <p className="text-muted-foreground md:col-span-2 md:hidden text-pretty">
+                    <p className="text-muted-foreground md:col-span-2 md:hidden text-pretty text-sm">
                         Still unsure?{' '}
                         <Link
                             href="#"
-                            className="text-primary font-medium hover:underline">
+                            className="text-foreground font-medium underline underline-offset-4 hover:no-underline">
                             Talk to our team
                         </Link>
                     </p>

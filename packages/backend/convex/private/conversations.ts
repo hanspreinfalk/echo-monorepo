@@ -4,6 +4,7 @@ import { supportAgent } from "../system/ai/agents/supportAgent";
 import { MessageDoc } from "@convex-dev/agent";
 import { paginationOptsValidator, PaginationResult } from "convex/server";
 import { Doc, Id } from "../_generated/dataModel";
+import { ATTACHMENT_MARKDOWN_URL_REGEX } from "../lib/attachmentMarkdown";
 
 export const updateStatus = mutation({
     args: {
@@ -229,7 +230,7 @@ export const deleteConversation = mutation({
         }
 
         // Collect attachment storage IDs from all messages before deleting them
-        const attachmentUrlRegex = /\[📎[^\]]*\]\((https?:\/\/[^\s)]+)\)/g;
+        const attachmentUrlRegex = ATTACHMENT_MARKDOWN_URL_REGEX;
         const storageIds: string[] = [];
 
         let cursor: string | null = null;

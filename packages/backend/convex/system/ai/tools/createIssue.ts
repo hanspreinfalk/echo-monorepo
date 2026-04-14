@@ -65,13 +65,13 @@ const createIssueArgs = z.object({
     .array(attachmentSchema)
     .optional()
     .describe(
-      "Every image/video URL the customer shared ([📎 name](url)). Include whenever attachments exist in messages.",
+      "Every image/video URL the customer shared (`[Attachment: name](url)` markdown). Include whenever attachments exist in messages.",
     ),
 });
 
 export const createIssue = createTool<typeof createIssueArgs, string>({
   description:
-    "File a **new** product issue ONLY after follow-ups across multiple turns (one question per message). **Before this tool (same assistant turn):** (1) Call **listOpenIssuesTool** (titles/ids only). For any plausible duplicate title, call **readOpenIssueDetailsTool** with that **issueId** and compare full description, steps, **pageUrl**, and **consoleLogs** to the current report. If one is the **same defect**, call **appendSessionToIssueTool** instead—do **not** create a duplicate. (2) If the visitor environment includes **Host page console** or the issue is a technical bug/error on an embedded page, call **readConsoleLogsTool** first and pass **consoleLogs** with the important lines (uncaught/rejection lines, pasted stack traces). Set **pageUrl** from visitor environment when present; **attachments** from every 📎 link; **stepsToReproduce** from the customer's flow (numbered). Do not omit fields when data exists. Do not ask about device/browser. After enough detail, invite a screenshot in its own message if needed; when they are done, call this tool only when no open issue matches after **readOpenIssueDetailsTool**.",
+    "File a **new** product issue ONLY after follow-ups across multiple turns (one question per message). **Before this tool (same assistant turn):** (1) Call **listOpenIssuesTool** (titles/ids only). For any plausible duplicate title, call **readOpenIssueDetailsTool** with that **issueId** and compare full description, steps, **pageUrl**, and **consoleLogs** to the current report. If one is the **same defect**, call **appendSessionToIssueTool** instead—do **not** create a duplicate. (2) If the visitor environment includes **Host page console** or the issue is a technical bug/error on an embedded page, call **readConsoleLogsTool** first and pass **consoleLogs** with the important lines (uncaught/rejection lines, pasted stack traces). Set **pageUrl** from visitor environment when present; **attachments** from every `[Attachment: …](url)` link in messages; **stepsToReproduce** from the customer's flow (numbered). Do not omit fields when data exists. Do not ask about device/browser. After enough detail, invite a screenshot in its own message if needed; when they are done, call this tool only when no open issue matches after **readOpenIssueDetailsTool**.",
   args: createIssueArgs,
   handler: async (ctx, args): Promise<string> => {
     if (!ctx.threadId) {

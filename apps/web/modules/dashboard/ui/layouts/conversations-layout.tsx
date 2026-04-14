@@ -1,23 +1,23 @@
-import {
-    ResizableHandle,
-    ResizablePanel,
-    ResizablePanelGroup,
-} from "@workspace/ui/components/resizable"
-import { ConversationsPanel } from "../components/conversations-panel"
+import { cookies } from "next/headers";
 
-export function ConversationsLayout({ children }: { children: React.ReactNode }) {
+import { CONTACT_PANEL_HIDDEN_COOKIE } from "../../constants";
+import { ContactPanelVisibilityProvider } from "../components/contact-panel-visibility-context";
+import { ConversationsLayoutClient } from "./conversations-layout-client";
+
+export async function ConversationsLayout({
+    children,
+}: {
+    children: React.ReactNode;
+}) {
+    const cookieStore = await cookies();
+    const initialContactPanelHidden =
+        cookieStore.get(CONTACT_PANEL_HIDDEN_COOKIE)?.value === "true";
+
     return (
-        <ResizablePanelGroup
-            className="h-full min-h-0 w-full flex-1"
-            orientation="horizontal"
+        <ContactPanelVisibilityProvider
+            initialContactPanelHidden={initialContactPanelHidden}
         >
-            <ResizablePanel defaultSize="30%" maxSize="30%" minSize="20%">
-                <ConversationsPanel />
-            </ResizablePanel>
-            <ResizableHandle />
-            <ResizablePanel className="h-full min-h-0" defaultSize="70%">
-                {children}
-            </ResizablePanel>
-        </ResizablePanelGroup>
-    )
+            <ConversationsLayoutClient>{children}</ConversationsLayoutClient>
+        </ContactPanelVisibilityProvider>
+    );
 }
