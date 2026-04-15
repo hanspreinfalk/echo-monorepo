@@ -7,7 +7,9 @@ const Page = () => {
     <SubscriptionProtect
       fallback={
         <PremiumFeatureOverlay>
-          <GithubIntegrationView />
+          <div className="h-svh overflow-hidden">
+            <GithubIntegrationView />
+          </div>
         </PremiumFeatureOverlay>
       }
     >
