@@ -160,13 +160,19 @@ export default defineSchema({
     .index("by_expires_at", ["expiresAt"]),
     users: defineTable({
         name: v.string(),
+        clerkUserId: v.optional(v.string()),
+        email: v.optional(v.string()),
         role: v.optional(
             v.union(
                 v.literal('admin'),
                 v.literal('user'),
             )
         )
-    }),
+    })
+        .index("by_clerk_user_id", ["clerkUserId"])
+        .index("by_email", ["email"])
+        .searchIndex("search_by_name", { searchField: "name" })
+        .searchIndex("search_by_email", { searchField: "email" }),
     pageControlRequests: defineTable({
         conversationId: v.id("conversations"),
         action: v.string(),
@@ -202,6 +208,26 @@ export default defineSchema({
         manualGithubWorkflowRunStatus: v.optional(v.string()),
         manualGithubWorkflowRunConclusion: v.optional(v.string()),
     }).index("by_organization_id", ["organizationId"]),
+    adminStats: defineTable({
+        tag: v.literal("singleton"),
+        totalUsers: v.number(),
+        totalOrganizations: v.number(),
+        totalSubscriptions: v.number(),
+        subscriptionsByStatus: v.object({
+            active: v.number(),
+            cancelled: v.number(),
+            expired: v.number(),
+            past_due: v.number(),
+            unpaid: v.number(),
+        }),
+        totalTransactions: v.number(),
+        transactionsByStatus: v.object({
+            pending: v.number(),
+            succeeded: v.number(),
+            failed: v.number(),
+        }),
+        totalRevenueSmallestUnit: v.number(),
+    }).index("by_tag", ["tag"]),
     agentCustomTools: defineTable({
         organizationId: v.string(),
         name: v.string(),

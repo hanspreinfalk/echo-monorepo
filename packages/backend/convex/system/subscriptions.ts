@@ -1,6 +1,11 @@
 import { v } from "convex/values";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { ConvexError } from "convex/values";
+import {
+    statsOnSubscriptionInsert,
+    statsOnSubscriptionReplace,
+    statsOnSubscriptionStatusChange,
+} from "./adminStats";
 
 export const upsert = internalMutation({
   args: {
@@ -30,6 +35,7 @@ export const upsert = internalMutation({
       .unique();
 
     if (existingSubscription) {
+      const oldStatus = existingSubscription.status;
       await ctx.db.replace(existingSubscription._id, {
         organizationId: args.organizationId,
         stripeCustomerId: args.stripeCustomerId,
@@ -40,10 +46,11 @@ export const upsert = internalMutation({
         status: args.status,
         // explicitly omitted: cancelledAt, cancelAt — cleared on every upsert
       });
+      await statsOnSubscriptionReplace(ctx, oldStatus, args.status);
       return existingSubscription._id;
     }
 
-    return await ctx.db.insert("subscriptions", {
+    const id = await ctx.db.insert("subscriptions", {
       organizationId: args.organizationId,
       stripeCustomerId: args.stripeCustomerId,
       stripeSubscriptionId: args.stripeSubscriptionId,
@@ -52,6 +59,8 @@ export const upsert = internalMutation({
       plan: args.plan,
       status: args.status,
     });
+    await statsOnSubscriptionInsert(ctx, args.status, true);
+    return id;
   },
 });
 
@@ -79,10 +88,12 @@ export const updateStatus = internalMutation({
         });
       }
 
+      const oldStatus = subscription.status;
       await ctx.db.patch(subscription._id, {
         status: args.status,
         cancelledAt: args.status === 'cancelled' ? Date.now() : undefined,
       });
+      await statsOnSubscriptionStatusChange(ctx, oldStatus, args.status);
   },
 })
 

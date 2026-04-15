@@ -1,6 +1,8 @@
 'use client'
 
 import { OrganizationSwitcher } from "@clerk/nextjs"
+import { api } from "@workspace/backend/_generated/api"
+import { useMutation, useQuery } from "convex/react"
 import {
     BugIcon,
     CreditCardIcon,
@@ -9,10 +11,12 @@ import {
     LayoutDashboardIcon,
     LibraryBigIcon,
     PaletteIcon,
+    ShieldIcon,
     WrenchIcon,
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useEffect } from "react"
 import {
     Sidebar,
     SidebarContent,
@@ -78,8 +82,24 @@ const accountItems = [
     }
 ]
 
+const adminItems = [
+    {
+        title: 'Admin',
+        url: '/admin',
+        icon: ShieldIcon,
+    },
+]
+
 export const DashboardSidebar = () => {
     const pathname = usePathname()
+    const me = useQuery(api.users.getMe)
+    const ensureCurrentUser = useMutation(api.users.ensureCurrentUser)
+
+    useEffect(() => {
+        void ensureCurrentUser()
+    }, [ensureCurrentUser])
+
+    const showAdmin = me?.role === 'admin'
     
     const isActive = (url: string) => {
         if (url === '/') {
@@ -199,6 +219,36 @@ export const DashboardSidebar = () => {
                         </SidebarMenu>
                     </SidebarGroupContent>
                 </SidebarGroup>
+
+                {showAdmin ? (
+                    <SidebarGroup className="py-2">
+                        <SidebarGroupLabel className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+                            Administration
+                        </SidebarGroupLabel>
+                        <SidebarGroupContent>
+                            <SidebarMenu>
+                                {adminItems.map((item) => (
+                                    <SidebarMenuItem key={item.title}>
+                                        <SidebarMenuButton
+                                            asChild
+                                            tooltip={item.title}
+                                            isActive={isActive(item.url)}
+                                            className={cn(
+                                                'text-sm text-sidebar-foreground/80 transition-colors',
+                                                isActive(item.url) && activeClass
+                                            )}
+                                        >
+                                            <Link href={item.url}>
+                                                <item.icon className="size-4 shrink-0" />
+                                                <span>{item.title}</span>
+                                            </Link>
+                                        </SidebarMenuButton>
+                                    </SidebarMenuItem>
+                                ))}
+                            </SidebarMenu>
+                        </SidebarGroupContent>
+                    </SidebarGroup>
+                ) : null}
             </SidebarContent>
 
             <SidebarFooter className="py-3">

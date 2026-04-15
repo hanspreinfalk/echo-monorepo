@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { ConvexError } from "convex/values";
+import { statsOnTransactionInsert, statsOnTransactionStatusChange } from "./adminStats";
 
 export const insert = internalMutation({
   args: {
@@ -22,6 +23,7 @@ export const insert = internalMutation({
         currency: args.currency,
         status: args.status,
       });
+    await statsOnTransactionInsert(ctx, args.status, args.amount);
   },
 });
 
@@ -44,9 +46,10 @@ export const updateStatus = internalMutation({
         });
       }
 
-      await ctx.db.patch(transaction._id, {
-        status: args.status,
-      });
+      const oldStatus = transaction.status;
+      const amount = transaction.amount;
+      await ctx.db.patch(transaction._id, { status: args.status });
+      await statsOnTransactionStatusChange(ctx, oldStatus, args.status, amount);
   },
 })
 

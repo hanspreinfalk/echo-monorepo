@@ -7,6 +7,8 @@ const isPublicRoute = createRouteMatcher([
     '/sign-up(.*)',
 ])
 
+const isAdminRoute = createRouteMatcher(['/admin(.*)'])
+
 const isOrgFreeRoute = createRouteMatcher([
     '/sign-in(.*)',
     '/sign-up(.*)',
@@ -19,6 +21,12 @@ export default clerkMiddleware(async (auth, req) => {
 
     if (!isPublicRoute(req)) {
         await auth.protect()
+    }
+
+    // Admin routes require authentication at the edge.
+    // Role verification happens in the server-side layout (admin/layout.tsx).
+    if (isAdminRoute(req) && !userId) {
+        return NextResponse.redirect(new URL('/sign-in', req.url))
     }
 
     // Redirect authenticated users with an org away from the landing page
