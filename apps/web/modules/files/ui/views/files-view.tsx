@@ -22,6 +22,7 @@ import { api } from "@workspace/backend/_generated/api";
 import type { PublicFile } from "@workspace/backend/private/files";
 import { Button } from "@workspace/ui/components/button";
 import {
+    ExternalLinkIcon,
     FileIcon,
     FilePenLineIcon,
     MoreHorizontalIcon,
@@ -168,6 +169,20 @@ export const FilesView = () => {
                                                         </Button>
                                                     </DropdownMenuTrigger>
                                                     <DropdownMenuContent align="end">
+                                                        {file.url ? (
+                                                            <DropdownMenuItem
+                                                                onSelect={() => {
+                                                                    window.open(
+                                                                        file.url!,
+                                                                        "_blank",
+                                                                        "noopener,noreferrer",
+                                                                    );
+                                                                }}
+                                                            >
+                                                                <ExternalLinkIcon className="size-4 mr-2" />
+                                                                Open file
+                                                            </DropdownMenuItem>
+                                                        ) : null}
                                                         <DropdownMenuItem
                                                             onClick={() => {
                                                                 setEditorFile(file);
