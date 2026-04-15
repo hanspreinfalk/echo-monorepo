@@ -74,8 +74,8 @@ export default function HeroSection() {
                                 speedSegment={0.3}
                                 delay={0.5}
                                 as="p"
-                                className="text-muted-foreground mx-auto mt-6 max-w-2xl text-balance text-lg">
-                                Resolve users in chat. Turn real problems into product issues your team can prioritize.
+                                className="text-muted-foreground mx-auto mt-6 max-w-lg text-balance text-lg">
+                                Resolve users. Capture issues. Ship what matters.
                             </TextEffect>
 
                             <AnimatedGroup
@@ -126,7 +126,7 @@ export default function HeroSection() {
                             },
                             ...transitionVariants,
                         }}>
-                        <div className="relative mt-8 w-full min-w-0 overflow-x-clip px-6 sm:mt-12 md:mt-20">
+                        <div className="relative mt-12 w-full min-w-0 overflow-x-clip px-6 sm:mt-20 md:mt-28">
                             <div className="bg-background relative mx-auto w-full max-w-6xl min-w-0 overflow-hidden rounded-2xl border p-2 shadow-lg shadow-zinc-950/10 sm:p-4">
                                 <div className="relative aspect-video w-full min-w-0 overflow-hidden rounded-xl sm:rounded-2xl">
                                     <iframe
@@ -143,20 +143,26 @@ export default function HeroSection() {
                 </div>
             </section>
 
-            <section className="border-y border-border bg-background py-12">
+            <section className="border-y border-border bg-background py-10 mt-16 md:mt-24">
                 <div className="mx-auto max-w-5xl px-6">
-                    <div className="grid gap-8 sm:grid-cols-3 sm:divide-x sm:divide-border">
-                        <div className="text-center sm:text-left sm:pr-8">
-                            <p className="text-foreground text-sm font-semibold">Faster answers</p>
-                            <p className="text-muted-foreground mt-1.5 text-sm text-pretty">Help users in natural language, in the thread.</p>
+                    <div className="grid gap-6 sm:grid-cols-3 sm:divide-x sm:divide-border">
+                        <div className="flex items-center gap-3 sm:pr-8">
+                            <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border bg-muted">
+                                <span className="text-xs font-bold text-foreground">1</span>
+                            </div>
+                            <p className="text-sm font-medium text-foreground">Instant answers in-app</p>
                         </div>
-                        <div className="text-center sm:text-left sm:px-8">
-                            <p className="text-foreground text-sm font-semibold">Issues with context</p>
-                            <p className="text-muted-foreground mt-1.5 text-sm text-pretty">Nothing important lost in chat.</p>
+                        <div className="flex items-center gap-3 sm:px-8">
+                            <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border bg-muted">
+                                <span className="text-xs font-bold text-foreground">2</span>
+                            </div>
+                            <p className="text-sm font-medium text-foreground">Issues with full context</p>
                         </div>
-                        <div className="text-center sm:text-left sm:pl-8">
-                            <p className="text-foreground text-sm font-semibold">Clear priority</p>
-                            <p className="text-muted-foreground mt-1.5 text-sm text-pretty">Engineering sees what to ship first.</p>
+                        <div className="flex items-center gap-3 sm:pl-8">
+                            <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border bg-muted">
+                                <span className="text-xs font-bold text-foreground">3</span>
+                            </div>
+                            <p className="text-sm font-medium text-foreground">Clear engineering priority</p>
                         </div>
                     </div>
                 </div>

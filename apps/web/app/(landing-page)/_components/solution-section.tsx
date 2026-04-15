@@ -1,71 +1,92 @@
-import { ArrowRight, ListOrdered, MessageSquareText, Ticket } from 'lucide-react'
+import { Check, Image as ImageIcon } from 'lucide-react'
 
-const steps = [
+const sections = [
     {
-        icon: MessageSquareText,
-        title: 'Embed the widget where your product lives',
+        category: 'AI-Powered Support',
+        title: 'Resolve users in the moment',
         description:
-            'Users chat with your AI support agent inside the Echo widget on your app or site, so issues are captured in the product context, not lost in email or side threads.',
+            'Your AI support agent handles questions inside your product, in real time. Users get accurate answers without leaving your app.',
+        benefits: ['Proactive', 'Personalized', 'Always available'],
+        reverse: false,
     },
     {
-        icon: ArrowRight,
-        title: 'Resolve problems in the conversation',
+        category: 'Issue Capture',
+        title: 'Turn conversations into structured work',
         description:
-            'Answer questions, troubleshoot, and clarify expectations in real time. When something is truly wrong with the product, the thread already has the context engineers need.',
+            'When something is truly broken, Echo drafts clear product issues from the thread — with all the context your team needs to act.',
+        benefits: ['Rich context preserved', 'No retyping required', 'Team-ready instantly'],
+        reverse: true,
     },
     {
-        icon: Ticket,
-        title: 'Open structured product issues',
+        category: 'Prioritization',
+        title: 'Ship what matters most',
         description:
-            'Turn messy reports into clear product issues: titles, descriptions, and labels your team can triage, without retyping or losing nuance from the original conversation.',
+            'Severity, impact, and recurrence roll up into a ranked backlog so engineering always knows what to fix first.',
+        benefits: ['Data-driven ranking', 'Transparent scoring', 'No more guessing'],
+        reverse: false,
     },
-    {
-        icon: ListOrdered,
-        title: 'Prioritize what engineering ships next',
-        description:
-            'Signals from the conversation, including severity, customer impact, and how often themes show up, roll up into a ranked view so your backlog reflects what matters most to users.',
-    },
-] as const
+]
+
+function ImagePlaceholder({ alt }: { alt: string }) {
+    return (
+        <div
+            aria-label={alt}
+            className="relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-2xl border border-border bg-muted/30 dark:bg-muted/10">
+            <div
+                aria-hidden
+                className="pointer-events-none absolute inset-0"
+                style={{
+                    backgroundImage: 'radial-gradient(var(--color-border) 1px, transparent 1px)',
+                    backgroundSize: '24px 24px',
+                }}
+            />
+            <div className="relative flex flex-col items-center gap-2 text-muted-foreground/25">
+                <ImageIcon className="size-12 stroke-[1]" />
+            </div>
+        </div>
+    )
+}
 
 export default function SolutionSection() {
     return (
-        <section
-            id="solution"
-            className="border-b border-border bg-background py-16 md:py-24">
-            <div className="mx-auto max-w-5xl px-6">
-                <div className="max-w-2xl">
-                    <p className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">How it works</p>
-                    <h2 className="text-foreground mt-3 text-balance text-4xl font-semibold tracking-tight md:text-5xl">
-                        Support, product issues, and engineering priorities in one flow
-                    </h2>
-                    <p className="text-muted-foreground mt-4 text-pretty text-lg">
-                        Echo closes the gap between what users say in support and what your team actually builds, so every serious problem becomes traceable, prioritized work.
-                    </p>
-                </div>
+        <section id="solution" className="border-b border-border bg-background py-20 md:py-32">
+            <div className="mx-auto max-w-6xl space-y-28 px-6 md:space-y-36">
+                {sections.map((section) => (
+                    <div
+                        key={section.category}
+                        className={`flex flex-col gap-10 md:flex-row md:items-center md:gap-20 ${section.reverse ? 'md:flex-row-reverse' : ''}`}>
+                        {/* Image frame — takes 55% on desktop */}
+                        <div className="w-full md:w-[55%]">
+                            <ImagePlaceholder alt={section.title} />
+                        </div>
 
-                <ol className="mt-14 grid gap-10 md:grid-cols-2 md:gap-x-12 md:gap-y-12">
-                    {steps.map((step, index) => {
-                        const Icon = step.icon
-                        return (
-                            <li
-                                key={step.title}
-                                className="flex gap-5">
-                                <span className="text-muted-foreground border border-border bg-muted flex size-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold tabular-nums">
-                                    {index + 1}
-                                </span>
-                                <div>
-                                    <div className="flex flex-wrap items-center gap-3">
-                                        <span className="border border-border bg-muted text-foreground flex size-9 items-center justify-center rounded-lg">
-                                            <Icon className="size-4" strokeWidth={1.5} aria-hidden />
+                        {/* Text — takes 45% on desktop */}
+                        <div className="w-full md:w-[45%]">
+                            <p className="text-xs font-semibold uppercase tracking-widest text-primary">
+                                {section.category}
+                            </p>
+                            <h2 className="mt-4 text-balance text-3xl font-semibold tracking-tight text-foreground md:text-[2.5rem] md:leading-tight">
+                                {section.title}
+                            </h2>
+                            <p className="mt-5 text-pretty text-base leading-relaxed text-muted-foreground">
+                                {section.description}
+                            </p>
+
+                            <ul className="mt-8 space-y-3">
+                                {section.benefits.map((benefit) => (
+                                    <li
+                                        key={benefit}
+                                        className="flex items-center gap-3 text-sm font-medium text-foreground">
+                                        <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                                            <Check className="size-3 text-primary" strokeWidth={3} />
                                         </span>
-                                        <h3 className="text-foreground text-base font-semibold">{step.title}</h3>
-                                    </div>
-                                    <p className="text-muted-foreground mt-3 text-pretty text-sm leading-relaxed">{step.description}</p>
-                                </div>
-                            </li>
-                        )
-                    })}
-                </ol>
+                                        {benefit}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    </div>
+                ))}
             </div>
         </section>
     )
