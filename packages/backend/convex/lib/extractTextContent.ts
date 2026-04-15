@@ -17,6 +17,27 @@ const SUPPORTED_IMAGE_TYPES = [
     "image/gif"
 ] as const;
 
+function isTextLikeMimeType(mimeType: string): boolean {
+    const m = mimeType.toLowerCase();
+    if (m.includes("text")) return true;
+    if (m === "image/svg+xml") return true;
+    if (
+        m === "application/json" ||
+        m === "application/xml" ||
+        m === "application/javascript" ||
+        m === "application/x-javascript" ||
+        m === "application/typescript" ||
+        m === "application/x-typescript" ||
+        m === "application/x-yaml" ||
+        m === "text/yaml" ||
+        m === "text/x-yaml"
+    ) {
+        return true;
+    }
+    if (m.endsWith("+json") || m.endsWith("+xml")) return true;
+    return false;
+}
+
 const SYSTEM_PROMPTS = {
     image: "You turn images into text. If it is a photo of a document, transcribe it. If it is not a document describe it.",
     pdf: "You transform PDF files into text.",
@@ -47,7 +68,7 @@ export async function extractTextContent(
         return extractPdfText(url, mimeType, filename);
     }
 
-    if (mimeType.toLowerCase().includes("text")) {
+    if (isTextLikeMimeType(mimeType)) {
         return extractTextFileContent(ctx, storageId, bytes, mimeType);
     }
 

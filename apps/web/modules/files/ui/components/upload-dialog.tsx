@@ -27,6 +27,40 @@ import { Textarea } from "@workspace/ui/components/textarea";
 import { api } from "@workspace/backend/_generated/api";
 import { toast } from "sonner";
 
+/** Matches backend `extractTextContent`: raster images, PDF, and text-like formats. */
+const KNOWLEDGE_BASE_ACCEPT = {
+    "image/jpeg": [".jpg", ".jpeg"],
+    "image/png": [".png"],
+    "image/gif": [".gif"],
+    "image/webp": [".webp"],
+    "image/svg+xml": [".svg"],
+    "application/pdf": [".pdf"],
+    "text/*": [
+        ".txt",
+        ".html",
+        ".htm",
+        ".csv",
+        ".md",
+        ".markdown",
+        ".xml",
+        ".css",
+        ".log",
+        ".ts",
+        ".tsx",
+        ".js",
+        ".jsx",
+        ".mjs",
+        ".cjs",
+        ".yaml",
+        ".yml",
+    ],
+    "application/json": [".json"],
+    "application/xml": [".xml", ".xhtml"],
+    "application/javascript": [".js", ".mjs"],
+    "application/typescript": [".ts", ".tsx"],
+    "application/x-yaml": [".yaml", ".yml"],
+} as const;
+
 interface UploadDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -227,11 +261,7 @@ export const UploadDialog = ({
                                 </div>
 
                                 <Dropzone
-                                    accept={{
-                                        "application/pdf": [".pdf"],
-                                        "text/csv": [".csv"],
-                                        "text/plain": [".txt"],
-                                    }}
+                                    accept={KNOWLEDGE_BASE_ACCEPT}
                                     disabled={isUploading}
                                     maxFiles={1}
                                     onDrop={handleFileDrop}
