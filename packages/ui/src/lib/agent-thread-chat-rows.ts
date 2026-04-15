@@ -3,6 +3,12 @@
  * per assistant text chunk, and per tool call (instead of merging into one bubble).
  */
 
+/** Who sent the row — used for Human vs Bot badges (assistant rows use `agentName` on the thread message). */
+export type ChatMessageAttribution =
+  | { kind: "system" }
+  | { kind: "human"; name: string }
+  | { kind: "bot" };
+
 export type RawAgentThreadMessage = {
   _id: string;
   _creationTime: number;
@@ -14,7 +20,53 @@ export type RawAgentThreadMessage = {
   message?: { role: string; content: unknown } | null;
   text?: string | null;
   tool?: boolean;
+  /** Set when a dashboard operator sends the message via `saveMessage` — distinguishes human from model. */
+  agentName?: string | null;
+  /** Present on model-generated assistant messages (operator handoffs typically omit these). */
+  model?: string | null;
+  usage?: unknown;
+  finishReason?: string | null;
+  reasoning?: string | null;
 };
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null;
+}
+
+/** True when this assistant row clearly came from the LLM (vs a human operator message). */
+function looksLikeGeneratedAssistantMessage(
+  m: Pick<RawAgentThreadMessage, "model" | "usage" | "finishReason" | "reasoning" | "message">,
+): boolean {
+  if (typeof m.model === "string" && m.model.trim()) return true;
+  if (m.usage != null) return true;
+  if (m.finishReason != null) return true;
+  if (typeof m.reasoning === "string" && m.reasoning.trim()) return true;
+  const content = m.message?.content;
+  if (Array.isArray(content)) {
+    for (const part of content) {
+      if (!isRecord(part)) continue;
+      const t = part.type;
+      if (t === "tool-call" || t === "reasoning" || t === "redacted-reasoning") return true;
+    }
+  }
+  return false;
+}
+
+function assistantAttribution(
+  m: RawAgentThreadMessage,
+  /** True when this is the earliest stored message with a valid role (often the bot greeting). */
+  isFirstProcessableInThread: boolean,
+): Extract<ChatMessageAttribution, { kind: "human" } | { kind: "bot" }> {
+  const n = typeof m.agentName === "string" ? m.agentName.trim() : "";
+  if (n) return { kind: "human", name: n };
+  // Opening assistant message is always the model unless explicitly attributed to a person.
+  if (isFirstProcessableInThread) return { kind: "bot" };
+  // Operator messages use role "assistant" with `agentName` (often `familyName`); if that is empty we
+  // still treat plain assistant text as human unless the doc looks like model output.
+  if (m.streaming) return { kind: "bot" };
+  if (looksLikeGeneratedAssistantMessage(m)) return { kind: "bot" };
+  return { kind: "human", name: "" };
+}
 
 export type AgentChatRow =
   | {
@@ -34,6 +86,7 @@ export type AgentChatRow =
       content: string;
       order: number;
       stepOrder: number;
+      attribution: Extract<ChatMessageAttribution, { kind: "system" }>;
     }
   | {
       kind: "assistant-text";
@@ -44,6 +97,7 @@ export type AgentChatRow =
       order: number;
       stepOrder: number;
       streaming?: boolean;
+      attribution: Extract<ChatMessageAttribution, { kind: "human" } | { kind: "bot" }>;
     }
   | {
       kind: "tool";
@@ -57,6 +111,7 @@ export type AgentChatRow =
       order: number;
       stepOrder: number;
       streaming?: boolean;
+      attribution: Extract<ChatMessageAttribution, { kind: "human" } | { kind: "bot" }>;
     }
   | {
       kind: "page-control";
@@ -70,6 +125,7 @@ export type AgentChatRow =
       order: number;
       stepOrder: number;
       streaming?: boolean;
+      attribution: Extract<ChatMessageAttribution, { kind: "human" } | { kind: "bot" }>;
     }
   | {
       kind: "page-control-steps";
@@ -79,6 +135,7 @@ export type AgentChatRow =
       requestId: string;
       order: number;
       stepOrder: number;
+      attribution: Extract<ChatMessageAttribution, { kind: "bot" }>;
     };
 
 const AGENT_TOOL_LABELS: Record<string, string> = {
@@ -104,10 +161,6 @@ function humanizeToolName(toolName: string): string {
 
 export function labelForAgentTool(toolName: string): string {
   return AGENT_TOOL_LABELS[toolName] ?? humanizeToolName(toolName);
-}
-
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return typeof v === "object" && v !== null;
 }
 
 function sortThreadMessages<T extends { order: number; stepOrder: number }>(messages: T[]): T[] {
@@ -177,15 +230,20 @@ export function threadMessagesToSeparateChatRows(
   messages: RawAgentThreadMessage[],
 ): AgentChatRow[] {
   const sorted = sortThreadMessages(messages);
+  const firstProcessableIdx = sorted.findIndex(
+    (msg) => msg.message != null && typeof msg.message.role === "string",
+  );
   const resultByCallId = buildToolResultByCallId(sorted);
   const rows: AgentChatRow[] = [];
 
-  for (const m of sorted) {
+  for (let mi = 0; mi < sorted.length; mi++) {
+    const m = sorted[mi]!;
     const core = m.message;
     if (!core || typeof core.role !== "string") continue;
 
     const createdAt = new Date(m._creationTime);
     const baseKey = `${m.threadId}-${m.order}-${m.stepOrder}`;
+    const isFirstProcessableInThread = mi === firstProcessableIdx;
 
     if (core.role === "user") {
       const content = typeof m.text === "string" ? m.text : "";
@@ -216,6 +274,7 @@ export function threadMessagesToSeparateChatRows(
         content,
         order: m.order,
         stepOrder: m.stepOrder,
+        attribution: { kind: "system" },
       });
       continue;
     }
@@ -225,6 +284,7 @@ export function threadMessagesToSeparateChatRows(
     }
 
     if (core.role === "assistant") {
+      const attr = assistantAttribution(m, isFirstProcessableInThread);
       const content = core.content;
       const streaming = Boolean(m.streaming);
       /** Text already emitted from `content` (the agent also duplicates it on `m.text`). */
@@ -254,6 +314,7 @@ export function threadMessagesToSeparateChatRows(
                   order: m.order,
                   stepOrder: m.stepOrder,
                   streaming,
+                  attribution: attr,
                 });
               } else {
                 rows.push({
@@ -268,6 +329,7 @@ export function threadMessagesToSeparateChatRows(
                   order: m.order,
                   stepOrder: m.stepOrder,
                   streaming,
+                  attribution: attr,
                 });
               }
             } else {
@@ -283,6 +345,7 @@ export function threadMessagesToSeparateChatRows(
                 order: m.order,
                 stepOrder: m.stepOrder,
                 streaming,
+                attribution: attr,
               });
             }
           } else if (part.type === "text" && typeof part.text === "string" && part.text.trim()) {
@@ -300,6 +363,7 @@ export function threadMessagesToSeparateChatRows(
                 order: m.order,
                 stepOrder: m.stepOrder,
                 streaming,
+                attribution: attr,
               });
             } else {
               emittedAssistantTextChunks.push(chunk);
@@ -312,6 +376,7 @@ export function threadMessagesToSeparateChatRows(
                 order: m.order,
                 stepOrder: m.stepOrder,
                 streaming,
+                attribution: attr,
               });
             }
           }
@@ -329,6 +394,7 @@ export function threadMessagesToSeparateChatRows(
             order: m.order,
             stepOrder: m.stepOrder,
             streaming,
+            attribution: attr,
           });
         } else {
           emittedAssistantTextChunks.push(content.trim());
@@ -341,6 +407,7 @@ export function threadMessagesToSeparateChatRows(
             order: m.order,
             stepOrder: m.stepOrder,
             streaming,
+            attribution: attr,
           });
         }
       }
@@ -369,6 +436,7 @@ export function threadMessagesToSeparateChatRows(
               order: m.order,
               stepOrder: m.stepOrder,
               streaming,
+              attribution: attr,
             });
           } else {
             rows.push({
@@ -380,6 +448,7 @@ export function threadMessagesToSeparateChatRows(
               order: m.order,
               stepOrder: m.stepOrder,
               streaming,
+              attribution: attr,
             });
           }
         }
@@ -445,6 +514,7 @@ export function injectPageControlStepRows(
       requestId: row.requestId,
       order: row.order,
       stepOrder: row.stepOrder,
+      attribution: { kind: "bot" },
     };
 
     const target = findPageControlStepsInsertTarget(rows, pcIdx, row.order);

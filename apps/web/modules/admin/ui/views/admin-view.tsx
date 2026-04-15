@@ -41,7 +41,13 @@ import {
   TabsTrigger,
 } from "@workspace/ui/components/tabs";
 import { useInfiniteScroll } from "@workspace/ui/hooks/use-infinite-scroll";
-import { useAction, useMutation, usePaginatedQuery, useQuery } from "convex/react";
+import {
+  useConvexAuth,
+  useAction,
+  useMutation,
+  usePaginatedQuery,
+  useQuery,
+} from "convex/react";
 import { format } from "date-fns";
 import { Loader2Icon, MoreHorizontalIcon, SearchIcon, XIcon } from "lucide-react";
 import React, { useCallback, useEffect, useState } from "react";
@@ -61,24 +67,9 @@ type SubscriptionStatusFilter =
   | "past_due"
   | "unpaid";
 
-type TransactionStatusFilter = "all" | "pending" | "succeeded" | "failed";
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function formatMoney(amount: number, currency: string) {
-  const code = currency.toUpperCase();
-  try {
-    return new Intl.NumberFormat(undefined, { style: "currency", currency: code }).format(amount);
-  } catch {
-    return `${amount} ${code}`;
-  }
-}
-
-function formatStripeMoney(amountSmallestUnit: number, currency: string) {
-  return formatMoney(amountSmallestUnit / 100, currency);
-}
 
 function formatTs(ms: number | undefined) {
   if (ms === undefined) return "—";
@@ -86,7 +77,6 @@ function formatTs(ms: number | undefined) {
 }
 
 type SubStatus = Doc<"subscriptions">["status"];
-type TxStatus = Doc<"transactions">["status"];
 type PlanValue = NonNullable<Doc<"subscriptions">["plan"]>;
 
 function planLabel(plan: PlanValue | null | undefined): string {
@@ -139,29 +129,6 @@ function SubStatusBadge({ status }: { status: SubStatus }) {
     unpaid: {
       label: "Unpaid",
       className: "bg-orange-500/15 text-orange-600 dark:text-orange-400",
-    },
-  };
-  const cfg = map[status];
-  return (
-    <Badge variant="outline" className={cfg.className}>
-      {cfg.label}
-    </Badge>
-  );
-}
-
-function TxStatusBadge({ status }: { status: TxStatus }) {
-  const map: Record<TxStatus, { label: string; className: string }> = {
-    succeeded: {
-      label: "Succeeded",
-      className: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
-    },
-    pending: {
-      label: "Pending",
-      className: "bg-blue-500/15 text-blue-600 dark:text-blue-400",
-    },
-    failed: {
-      label: "Failed",
-      className: "bg-red-500/15 text-red-600 dark:text-red-400",
     },
   };
   const cfg = map[status];
@@ -1051,178 +1018,6 @@ function SubscriptionsTab({ isAdmin }: { isAdmin: boolean }) {
 }
 
 // ---------------------------------------------------------------------------
-// Tab: Transactions
-// ---------------------------------------------------------------------------
-function TxRows({ rows }: { rows: Doc<"transactions">[] }) {
-  return (
-    <>
-      {rows.map((t) => (
-        <TableRow key={t._id}>
-          <TableCell className="font-mono text-xs">{t.organizationId}</TableCell>
-          <TableCell>{formatStripeMoney(t.amount, t.currency)}</TableCell>
-          <TableCell><TxStatusBadge status={t.status} /></TableCell>
-          <TableCell className="font-mono text-xs">{t.subscriptionId}</TableCell>
-          <TableCell className="text-right">
-            <ThreeDotMenu>
-              <DropdownMenuItem disabled className="text-muted-foreground text-xs">
-                No actions available
-              </DropdownMenuItem>
-            </ThreeDotMenu>
-          </TableCell>
-        </TableRow>
-      ))}
-    </>
-  );
-}
-
-function TransactionsTab({ isAdmin }: { isAdmin: boolean }) {
-  const [rawQuery, setRawQuery] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<TransactionStatusFilter>("all");
-
-  useEffect(() => {
-    const t = setTimeout(() => setSearchQuery(rawQuery.trim()), 350);
-    return () => clearTimeout(t);
-  }, [rawQuery]);
-
-  const isSearching = searchQuery.length > 0;
-
-  const txPage = usePaginatedQuery(
-    api.public.admin.listTransactions,
-    isAdmin && !isSearching
-      ? statusFilter === "all" ? {} : { status: statusFilter }
-      : "skip",
-    { initialNumItems: PAGE_SIZE },
-  );
-
-  const { topElementRef, handleLoadMore, canLoadMore, isLoadingFirstPage, isLoadingMore } =
-    useInfiniteScroll({
-      status: txPage.status,
-      loadMore: txPage.loadMore,
-      loadSize: PAGE_SIZE,
-    });
-
-  const searchTxs = useAction(api.public.admin.searchTransactions);
-  const [searchResults, setSearchResults] = useState<Doc<"transactions">[] | null>(null);
-  const [searchLoading, setSearchLoading] = useState(false);
-
-  useEffect(() => {
-    if (!isSearching || !isAdmin) { setSearchResults(null); return; }
-    setSearchLoading(true);
-    let cancelled = false;
-    void searchTxs({ query: searchQuery })
-      .then((r) => { if (!cancelled) setSearchResults(r as Doc<"transactions">[]); })
-      .catch(() => { if (!cancelled) toast.error("Search failed."); if (!cancelled) setSearchResults([]); })
-      .finally(() => { if (!cancelled) setSearchLoading(false); });
-    return () => { cancelled = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, isAdmin]);
-
-  const tableHeader = (
-    <TableHeader>
-      <TableRow>
-        <TableHead>Org id</TableHead>
-        <TableHead>Amount</TableHead>
-        <TableHead>Status</TableHead>
-        <TableHead>Subscription id</TableHead>
-        <TableHead className="w-[52px] text-right">Actions</TableHead>
-      </TableRow>
-    </TableHeader>
-  );
-
-  return (
-    <div>
-      {/* Search + status bar */}
-      <div className={ADMIN_TABLE_SEARCH_ROW}>
-        <div className="relative min-w-0 flex-1">
-          <SearchIcon className="text-muted-foreground absolute left-3 top-1/2 size-3.5 -translate-y-1/2" />
-          <Input
-            placeholder="Search by email, name, or org id / name…"
-            value={rawQuery}
-            onChange={(e) => setRawQuery(e.target.value)}
-            className="h-8 pl-8 pr-8 text-sm"
-          />
-          {rawQuery && (
-            <button
-              type="button"
-              onClick={() => { setRawQuery(""); setSearchQuery(""); setSearchResults(null); }}
-              className="text-muted-foreground hover:text-foreground absolute right-2.5 top-1/2 -translate-y-1/2"
-              aria-label="Clear"
-            >
-              <XIcon className="size-3.5" />
-            </button>
-          )}
-        </div>
-        {!isSearching && (
-          <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as TransactionStatusFilter)}>
-            <SelectTrigger size="sm" className="w-[160px] shrink-0">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All statuses</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="succeeded">Succeeded</SelectItem>
-              <SelectItem value="failed">Failed</SelectItem>
-            </SelectContent>
-          </Select>
-        )}
-      </div>
-
-      {isSearching ? (
-        <Table>
-          {tableHeader}
-          <TableBody>
-            {searchLoading ? (
-              <TableRow>
-                <TableCell colSpan={5} className="py-8 text-center">
-                  <Loader2Icon className="text-muted-foreground mx-auto size-5 animate-spin" />
-                </TableCell>
-              </TableRow>
-            ) : !searchResults || searchResults.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={5} className="text-muted-foreground">
-                  {searchResults === null ? null : `No transactions found for "${searchQuery}".`}
-                </TableCell>
-              </TableRow>
-            ) : (
-              <TxRows rows={searchResults} />
-            )}
-          </TableBody>
-        </Table>
-      ) : isLoadingFirstPage ? (
-        <div className="flex items-center justify-center gap-2 py-16">
-          <Loader2Icon className="text-muted-foreground size-6 animate-spin" />
-          <span className="text-muted-foreground text-sm">Loading transactions…</span>
-        </div>
-      ) : (
-        <>
-          <Table>
-            {tableHeader}
-            <TableBody>
-              {txPage.results.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-muted-foreground">
-                    No transactions for this filter.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                <TxRows rows={txPage.results} />
-              )}
-            </TableBody>
-          </Table>
-          <InfiniteScrollTrigger
-            canLoadMore={canLoadMore}
-            isLoadingMore={isLoadingMore}
-            onLoadMore={handleLoadMore}
-            ref={topElementRef}
-          />
-        </>
-      )}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Stats cards
 // ---------------------------------------------------------------------------
 
@@ -1268,7 +1063,7 @@ function StatsSection({ isAdmin }: { isAdmin: boolean }) {
   if (!stats) {
     return (
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-        {Array.from({ length: 10 }).map((_, i) => (
+        {Array.from({ length: 3 }).map((_, i) => (
           <div
             key={i}
             className="h-[84px] animate-pulse rounded-lg border border-border bg-background"
@@ -1278,31 +1073,15 @@ function StatsSection({ isAdmin }: { isAdmin: boolean }) {
     );
   }
 
-  const revenue = stats.totalRevenueSmallestUnit / 100;
-  const revenueFormatted = new Intl.NumberFormat(undefined, {
-    style: "currency",
-    currency: "USD",
-  }).format(revenue);
-
   return (
     <div className="space-y-2">
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
       <StatCard label="Users" value={stats.totalUsers} />
       <StatCard label="Organizations" value={stats.totalOrganizations} />
       <StatCard
         label="Subscriptions"
         value={stats.totalSubscriptions}
         sub={`${stats.subscriptionsByStatus.active} active · ${stats.subscriptionsByStatus.cancelled} cancelled`}
-      />
-      <StatCard
-        label="Transactions"
-        value={stats.totalTransactions}
-        sub={`${stats.transactionsByStatus.succeeded} succeeded · ${stats.transactionsByStatus.failed} failed`}
-      />
-      <StatCard
-        label="Total Revenue"
-        value={revenueFormatted}
-        sub="Succeeded transactions"
       />
     </div>
     <div className="flex justify-end">
@@ -1329,10 +1108,11 @@ function StatsSection({ isAdmin }: { isAdmin: boolean }) {
 // Main view
 // ---------------------------------------------------------------------------
 export function AdminView() {
-  const me = useQuery(api.users.getMe);
+  const { isLoading: authLoading } = useConvexAuth();
+  const me = useQuery(api.users.getMe, authLoading ? "skip" : {});
   const isAdmin = me?.role === "admin";
 
-  if (me === undefined) {
+  if (authLoading || me === undefined) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-2 bg-muted p-8">
         <Loader2Icon className="text-muted-foreground size-8 animate-spin" />
@@ -1366,7 +1146,7 @@ export function AdminView() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Admin</h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            Users, organizations, subscriptions, and transactions.
+            Users, organizations, and subscriptions.
           </p>
         </div>
 
@@ -1377,7 +1157,6 @@ export function AdminView() {
             <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="organizations">Organizations</TabsTrigger>
             <TabsTrigger value="subscriptions">Subscriptions</TabsTrigger>
-            <TabsTrigger value="transactions">Transactions</TabsTrigger>
           </TabsList>
 
           <TabsContent value="users" className="mt-0">
@@ -1398,11 +1177,6 @@ export function AdminView() {
             </div>
           </TabsContent>
 
-          <TabsContent value="transactions" className="mt-0">
-            <div className="rounded-lg border border-border bg-background">
-              <TransactionsTab isAdmin={isAdmin} />
-            </div>
-          </TabsContent>
         </Tabs>
       </div>
     </div>

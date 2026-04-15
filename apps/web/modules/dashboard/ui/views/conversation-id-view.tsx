@@ -50,6 +50,7 @@ import {
     AIMessageContent, 
 } from "@workspace/ui/components/ai/message";
 import { AIResponse } from "@workspace/ui/components/ai/response";
+import { MessageSenderBadge } from "@workspace/ui/components/ai/message-sender-badge";
 import { Form, FormField } from "@workspace/ui/components/form";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -433,6 +434,10 @@ export function ConversationIdView({ conversationId }: { conversationId: Id<"con
                             return (
                                 <AIMessage from="user" key={row.id}>
                                     <div className="flex min-w-0 w-fit max-w-[80%] flex-col items-start gap-1">
+                                        <MessageSenderBadge
+                                            attribution={row.attribution}
+                                            className="self-start"
+                                        />
                                         <PageAgentStepsToolCard
                                             phase={agentPhase}
                                             steps={req.steps ?? []}
@@ -466,6 +471,12 @@ export function ConversationIdView({ conversationId }: { conversationId: Id<"con
                                     key={row.id}
                                     from="user"
                                     action={actionLabel}
+                                    leadContent={
+                                        <MessageSenderBadge
+                                            attribution={row.attribution}
+                                            className="self-start"
+                                        />
+                                    }
                                     requestStatus={req.status}
                                     requestTrailing={pageControlTime}
                                 />
@@ -476,6 +487,10 @@ export function ConversationIdView({ conversationId }: { conversationId: Id<"con
                             return (
                                 <AIMessage from="user" key={row.id}>
                                     <div className="flex flex-col gap-2">
+                                        <MessageSenderBadge
+                                            attribution={row.attribution}
+                                            className="self-start"
+                                        />
                                         <AIMessageContent>
                                             <AIResponse className="text-muted-foreground text-sm italic">
                                                 {row.content}
@@ -496,6 +511,10 @@ export function ConversationIdView({ conversationId }: { conversationId: Id<"con
                             return (
                                 <AIMessage from="user" key={row.id}>
                                     <div className="flex flex-col gap-1">
+                                        <MessageSenderBadge
+                                            attribution={row.attribution}
+                                            className="self-start"
+                                        />
                                         <div
                                             className="flex flex-col gap-1.5 rounded-lg border border-border/70 bg-muted/50 px-2.5 py-2"
                                             aria-label="Assistant tool"
@@ -535,6 +554,10 @@ export function ConversationIdView({ conversationId }: { conversationId: Id<"con
                         return (
                             <AIMessage from="user" key={row.id}>
                                 <div className="flex flex-col gap-2">
+                                    <MessageSenderBadge
+                                        attribution={row.attribution}
+                                        className="self-start"
+                                    />
                                     {parsedMessage.attachments.map((attachment, index) => (
                                         attachment.isImage ? (
                                             <a

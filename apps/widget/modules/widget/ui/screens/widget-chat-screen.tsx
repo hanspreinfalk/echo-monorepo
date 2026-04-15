@@ -59,7 +59,9 @@ import {
     AIMessageContent,
 } from "@workspace/ui/components/ai/message";
 import { AIResponse } from "@workspace/ui/components/ai/response";
+import { MessageSenderBadge } from "@workspace/ui/components/ai/message-sender-badge";
 import {
+    type ChatMessageAttribution,
     injectPageControlStepRows,
     labelForAgentTool,
     threadMessagesToSeparateChatRows,
@@ -126,7 +128,7 @@ function WidgetPageControlRow({
     contactSessionId,
     resolvePageControlRequest,
 }: {
-    row: { id: string; createdAt: Date; action: string };
+    row: { id: string; createdAt: Date; action: string; attribution: ChatMessageAttribution };
     request: Doc<"pageControlRequests">;
     contactSessionId: Id<"contactSessions">;
     resolvePageControlRequest: (args: {
@@ -199,6 +201,12 @@ function WidgetPageControlRow({
                 action={actionLabel}
                 avatar={avatar}
                 from="assistant"
+                leadContent={
+                    <MessageSenderBadge
+                        attribution={row.attribution}
+                        className="self-start"
+                    />
+                }
                 onAllow={onAllow}
                 onDeny={onDeny}
                 requestStatus={request.status}
@@ -593,6 +601,10 @@ export const WidgetChatScreen = () => {
                                 >
                                     <AIMessage from="assistant">
                                         <div className="flex min-w-0 w-fit max-w-[80%] flex-col items-start gap-1">
+                                            <MessageSenderBadge
+                                                attribution={row.attribution}
+                                                className="self-start"
+                                            />
                                             <PageAgentStepsToolCard
                                                 expandWhileRunning
                                                 onStop={onAgentStop}
@@ -634,6 +646,10 @@ export const WidgetChatScreen = () => {
                             return (
                                 <AIMessage from="assistant" key={row.id}>
                                     <div className="flex flex-col gap-2">
+                                        <MessageSenderBadge
+                                            attribution={row.attribution}
+                                            className="self-start"
+                                        />
                                         <AIMessageContent>
                                             <AIResponse className="text-muted-foreground text-sm italic">
                                                 {row.content}
@@ -655,6 +671,10 @@ export const WidgetChatScreen = () => {
                             return (
                                 <AIMessage from="assistant" key={row.id}>
                                     <div className="flex flex-col gap-1">
+                                        <MessageSenderBadge
+                                            attribution={row.attribution}
+                                            className="self-start"
+                                        />
                                         <div
                                             className="flex flex-col gap-1.5 rounded-lg border border-border/70 bg-muted/50 px-2.5 py-2"
                                             aria-label="Assistant tool"
@@ -695,6 +715,10 @@ export const WidgetChatScreen = () => {
                         return (
                             <AIMessage from="assistant" key={row.id}>
                                 <div className="flex flex-col gap-2">
+                                    <MessageSenderBadge
+                                        attribution={row.attribution}
+                                        className="self-start"
+                                    />
                                     {parsed.attachments.map((attachment, i) => (
                                         attachment.isImage ? (
                                             <a
@@ -745,6 +769,11 @@ export const WidgetChatScreen = () => {
                     })}
                     {isAiTyping && (
                         <AIMessage from="assistant">
+                            <div className="flex min-w-0 max-w-[80%] flex-col gap-1 self-start">
+                                <MessageSenderBadge
+                                    attribution={{ kind: "bot" }}
+                                    className="self-start"
+                                />
                             <AIMessageContent>
                                 <div className="flex items-center gap-1 py-0.5">
                                     <span className="size-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.3s]" />
@@ -752,6 +781,7 @@ export const WidgetChatScreen = () => {
                                     <span className="size-1.5 animate-bounce rounded-full bg-current" />
                                 </div>
                             </AIMessageContent>
+                            </div>
                             <WidgetAssistantAvatar />
                         </AIMessage>
                     )}

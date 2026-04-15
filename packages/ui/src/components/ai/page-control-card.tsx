@@ -419,6 +419,8 @@ export interface PageControlCardStandaloneProps extends PageControlCardProps {
     from?: "user" | "assistant";
     /** E.g. message timestamp below the request card. */
     requestTrailing?: ReactNode;
+    /** Rendered above the request card (e.g. sender badge). */
+    leadContent?: ReactNode;
 }
 
 /**
@@ -429,6 +431,7 @@ export function PageControlCard({
     avatar,
     from = "assistant",
     requestTrailing,
+    leadContent,
     ...contentProps
 }: PageControlCardStandaloneProps) {
     const { action, requestStatus, colors, acceptSubmitted, onAllow, onDeny } = contentProps;
@@ -437,6 +440,7 @@ export function PageControlCard({
     return (
         <AIMessage from={from}>
             <div className="flex min-w-0 w-fit max-w-[80%] flex-col gap-1">
+                {leadContent}
                 <AIMessageContent>
                     <PageControlRequestCardContent
                         acceptSubmitted={acceptSubmitted}
