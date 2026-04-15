@@ -21,10 +21,17 @@ import { usePaginatedQuery } from "convex/react";
 import { api } from "@workspace/backend/_generated/api";
 import type { PublicFile } from "@workspace/backend/private/files";
 import { Button } from "@workspace/ui/components/button";
-import { FileIcon, MoreHorizontalIcon, PlusIcon, TrashIcon } from "lucide-react";
+import {
+    FileIcon,
+    FilePenLineIcon,
+    MoreHorizontalIcon,
+    PlusIcon,
+    TrashIcon,
+} from "lucide-react";
 import { UploadDialog } from "../components/upload-dialog";
 import { useState } from "react";
 import { DeleteFileDialog } from "../components/delete-file-dialog";
+import { KnowledgeBaseEditorDialog } from "../components/knowledge-base-editor-dialog";
 
 export const FilesView = () => {
     const files = usePaginatedQuery(
@@ -51,6 +58,7 @@ export const FilesView = () => {
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
     const [selectedFile, setSelectedFile] = useState<PublicFile | null>(null);
+    const [editorFile, setEditorFile] = useState<PublicFile | null>(null);
     const handleDeleteClick = (file: PublicFile) => {
         setSelectedFile(file);
         setDeleteDialogOpen(true);
@@ -67,6 +75,15 @@ export const FilesView = () => {
                 open={deleteDialogOpen}
                 file={selectedFile}
                 onDeleted={handleFileDeleted}
+            />
+            <KnowledgeBaseEditorDialog
+                file={editorFile}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setEditorFile(null);
+                    }
+                }}
+                open={editorFile !== null}
             />
             <UploadDialog
                 onOpenChange={setUploadDialogOpen}
@@ -151,6 +168,14 @@ export const FilesView = () => {
                                                         </Button>
                                                     </DropdownMenuTrigger>
                                                     <DropdownMenuContent align="end">
+                                                        <DropdownMenuItem
+                                                            onClick={() => {
+                                                                setEditorFile(file);
+                                                            }}
+                                                        >
+                                                            <FilePenLineIcon className="size-4 mr-2" />
+                                                            Edit text
+                                                        </DropdownMenuItem>
                                                         <DropdownMenuItem
                                                             variant="destructive"
                                                             onClick={() => handleDeleteClick(file)}
