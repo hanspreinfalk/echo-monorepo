@@ -1,6 +1,6 @@
 'use client'
 
-import { PricingTable } from '@/modules/billing/ui/components/pricing-table'
+import { PricingCards } from '@/modules/billing/ui/components/pricing-cards'
 
 export default function PricingSection() {
     return (
@@ -17,7 +17,7 @@ export default function PricingSection() {
                 </div>
 
                 <div className="mx-auto mt-8 w-full max-w-screen-md">
-                    <PricingTable />
+                    <PricingCards hideFooterActions />
                 </div>
             </div>
         </section>

@@ -15,6 +15,7 @@ import type * as embedWidgetAppearance from "../embedWidgetAppearance.js";
 import type * as http from "../http.js";
 import type * as lib_attachmentMarkdown from "../lib/attachmentMarkdown.js";
 import type * as lib_extractTextContent from "../lib/extractTextContent.js";
+import type * as pricing from "../pricing.js";
 import type * as private_agentCustomTools from "../private/agentCustomTools.js";
 import type * as private_contactSessions from "../private/contactSessions.js";
 import type * as private_conversations from "../private/conversations.js";
@@ -24,11 +25,13 @@ import type * as private_issueFixPrompt from "../private/issueFixPrompt.js";
 import type * as private_issues from "../private/issues.js";
 import type * as private_messages from "../private/messages.js";
 import type * as private_widgetSettings from "../private/widgetSettings.js";
+import type * as public_billing from "../public/billing.js";
 import type * as public_contactSessions from "../public/contactSessions.js";
 import type * as public_conversations from "../public/conversations.js";
 import type * as public_messages from "../public/messages.js";
 import type * as public_organizations from "../public/organizations.js";
 import type * as public_widgetSettings from "../public/widgetSettings.js";
+import type * as stripe from "../stripe.js";
 import type * as system_agentCustomTools from "../system/agentCustomTools.js";
 import type * as system_ai_agents_supportAgent from "../system/ai/agents/supportAgent.js";
 import type * as system_ai_constants from "../system/ai/constants.js";
@@ -49,6 +52,7 @@ import type * as system_contactSessions from "../system/contactSessions.js";
 import type * as system_conversations from "../system/conversations.js";
 import type * as system_issues from "../system/issues.js";
 import type * as system_subscriptions from "../system/subscriptions.js";
+import type * as system_transactions from "../system/transactions.js";
 import type * as users from "../users.js";
 
 import type {
@@ -65,6 +69,7 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   "lib/attachmentMarkdown": typeof lib_attachmentMarkdown;
   "lib/extractTextContent": typeof lib_extractTextContent;
+  pricing: typeof pricing;
   "private/agentCustomTools": typeof private_agentCustomTools;
   "private/contactSessions": typeof private_contactSessions;
   "private/conversations": typeof private_conversations;
@@ -74,11 +79,13 @@ declare const fullApi: ApiFromModules<{
   "private/issues": typeof private_issues;
   "private/messages": typeof private_messages;
   "private/widgetSettings": typeof private_widgetSettings;
+  "public/billing": typeof public_billing;
   "public/contactSessions": typeof public_contactSessions;
   "public/conversations": typeof public_conversations;
   "public/messages": typeof public_messages;
   "public/organizations": typeof public_organizations;
   "public/widgetSettings": typeof public_widgetSettings;
+  stripe: typeof stripe;
   "system/agentCustomTools": typeof system_agentCustomTools;
   "system/ai/agents/supportAgent": typeof system_ai_agents_supportAgent;
   "system/ai/constants": typeof system_ai_constants;
@@ -99,6 +106,7 @@ declare const fullApi: ApiFromModules<{
   "system/conversations": typeof system_conversations;
   "system/issues": typeof system_issues;
   "system/subscriptions": typeof system_subscriptions;
+  "system/transactions": typeof system_transactions;
   users: typeof users;
 }>;
 

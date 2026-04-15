@@ -53,9 +53,43 @@ export default defineSchema({
     ,
     subscriptions: defineTable({
         organizationId: v.string(),
-        status: v.string(),
+        stripeCustomerId: v.optional(v.string()),
+        stripeSubscriptionId: v.optional(v.string()),
+        startDate: v.optional(v.number()),
+        endDate: v.optional(v.number()),
+        cancelledAt: v.optional(v.number()),
+        /** Unix ms timestamp at which a scheduled cancellation will take effect (cancel_at_period_end). */
+        cancelAt: v.optional(v.number()),
+        plan: v.optional(v.union(
+            v.literal('free'),
+            v.literal('pro'),
+        )),
+        status: v.optional(v.union(
+            v.literal('active'),
+            v.literal('cancelled'),
+            v.literal('expired'),
+            v.literal('past_due'),
+            v.literal('unpaid')
+        )),
     })
         .index("by_organization_id", ["organizationId"])
+        .index("by_stripe_subscription_id", ["stripeSubscriptionId"])
+        .index("by_status", ["status"])
+        .index("by_plan", ["plan"])
+    ,
+    transactions: defineTable({
+        subscriptionId: v.id("subscriptions"),
+        organizationId: v.string(),
+        amount: v.number(),
+        currency: v.string(),
+        status: v.union(
+            v.literal('pending'),
+            v.literal('succeeded'),
+            v.literal('failed')
+        ),
+    })
+        .index("by_organization_id", ["organizationId"])
+        .index("by_status", ["status"])
     ,
     widgetSettings: defineTable({
         organizationId: v.string(),
@@ -126,6 +160,12 @@ export default defineSchema({
     .index("by_expires_at", ["expiresAt"]),
     users: defineTable({
         name: v.string(),
+        role: v.optional(
+            v.union(
+                v.literal('admin'),
+                v.literal('user'),
+            )
+        )
     }),
     pageControlRequests: defineTable({
         conversationId: v.id("conversations"),
