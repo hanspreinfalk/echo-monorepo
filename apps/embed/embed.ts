@@ -265,6 +265,7 @@ const WIDGET_Z_BUTTON = 2147483647;
       width: 100%;
       height: 100%;
       border: none;
+      display: block;
     `;
     // Add permissions for microphone and clipboard
     iframe.allow = 'microphone; clipboard-read; clipboard-write';

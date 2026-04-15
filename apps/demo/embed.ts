@@ -7,7 +7,7 @@ import {
 import type { EmbedWidgetAppearance } from './launcher-appearance';
 import { PageAgent } from 'page-agent';
 
-// cd apps/embed && VITE_WIDGET_URL=https://echo-monorepo-widget.vercel.app pnpm build
+// cd apps/demo && VITE_CONVEX_SITE_URL=https://wandering-beagle-503.convex.site VITE_WIDGET_URL=https://echo-monorepo-widget.vercel.app pnpm build
 
 /** Above page-agent SimulatorMask (z-index 2147483641) so the chat iframe and Stop stay clickable. */
 const WIDGET_Z_PANEL = 2147483646;
@@ -265,6 +265,7 @@ const WIDGET_Z_BUTTON = 2147483647;
       width: 100%;
       height: 100%;
       border: none;
+      display: block;
     `;
     // Add permissions for microphone and clipboard
     iframe.allow = 'microphone; clipboard-read; clipboard-write';
