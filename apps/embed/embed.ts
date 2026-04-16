@@ -145,7 +145,7 @@ const WIDGET_Z_BUTTON = 2147483647;
   let iframe: HTMLIFrameElement | null = null;
   let container: HTMLDivElement | null = null;
   let button: HTMLButtonElement | null = null;
-  let cachedEmbedAppearance: EmbedWidgetAppearance;
+  let cachedEmbedAppearance: EmbedWidgetAppearance = undefined;
   let isOpen = false;
   let agent: InstanceType<typeof PageAgent> | null = null;
   /** Current `page-agent-execute` / `execute()` correlation id (Convex pageControlRequests id). */
@@ -194,13 +194,17 @@ const WIDGET_Z_BUTTON = 2147483647;
     appearance: EmbedWidgetAppearance,
   ) {
     const t = resolveLauncherButtonColors(appearance);
+    if (!t) return;
     btn.style.background = t.background;
     btn.style.color = t.color;
     btn.style.boxShadow = t.boxShadow;
+    // Light launcher fills (e.g. default white) stay visible on light host pages.
+    btn.style.border = '1px solid rgba(15, 23, 42, 0.12)';
   }
 
-  function render() {
-    // Create floating action button
+  function mountLauncherButton(appearance: EmbedWidgetAppearance) {
+    if (button || !resolveLauncherButtonColors(appearance)) return;
+
     button = document.createElement('button');
     button.id = 'echo-widget-button';
     button.innerHTML = chatBubbleIcon;
@@ -219,7 +223,7 @@ const WIDGET_Z_BUTTON = 2147483647;
       justify-content: center;
       transition: all 0.2s ease;
     `;
-    applyLauncherButtonStyles(button, undefined);
+    applyLauncherButtonStyles(button, appearance);
 
     button.addEventListener('click', toggleWidget);
     button.addEventListener('mouseenter', () => {
@@ -230,18 +234,11 @@ const WIDGET_Z_BUTTON = 2147483647;
     });
 
     document.body.appendChild(button);
+  }
 
-    void fetchWidgetAppearanceForLauncher(
-      EMBED_CONFIG.CONVEX_SITE_URL,
-      organizationId!,
-    ).then((appearance) => {
-      cachedEmbedAppearance = appearance;
-      if (button) {
-        applyLauncherButtonStyles(button, appearance);
-      }
-    });
+  function setupEmbedShell() {
+    if (container) return;
 
-    // Create container (hidden by default)
     container = document.createElement('div');
     container.id = 'echo-widget-container';
     container.style.cssText = `
@@ -262,7 +259,6 @@ const WIDGET_Z_BUTTON = 2147483647;
       transition: all 0.3s ease;
     `;
 
-    // Create iframe
     iframe = document.createElement('iframe');
     iframe.src = buildWidgetUrl();
     iframe.style.cssText = `
@@ -271,7 +267,6 @@ const WIDGET_Z_BUTTON = 2147483647;
       border: none;
       display: block;
     `;
-    // Add permissions for microphone and clipboard
     iframe.allow = 'microphone; clipboard-read; clipboard-write';
 
     container.appendChild(iframe);
@@ -308,8 +303,19 @@ const WIDGET_Z_BUTTON = 2147483647;
       flushHostContextToWidget();
     });
 
-    // Handle messages from widget
     window.addEventListener('message', handleMessage);
+  }
+
+  function render() {
+    void fetchWidgetAppearanceForLauncher(
+      EMBED_CONFIG.CONVEX_SITE_URL,
+      organizationId!,
+    ).then((raw) => {
+      const appearance = raw ?? undefined;
+      cachedEmbedAppearance = appearance;
+      setupEmbedShell();
+      mountLauncherButton(appearance);
+    });
   }
 
   function buildWidgetUrl(): string {
@@ -318,12 +324,73 @@ const WIDGET_Z_BUTTON = 2147483647;
     return `${EMBED_CONFIG.WIDGET_URL}?${params.toString()}`;
   }
 
+  const MAX_SCREENSHOT_BYTES = 10 * 1024 * 1024;
+
+  function postScreenshotError(requestId: string, message: string) {
+    iframe?.contentWindow?.postMessage(
+      { type: 'echo-host-screenshot-error', payload: { requestId, message } },
+      widgetMessageTarget,
+    );
+  }
+
+  async function captureHostPageAndPostToWidget(requestId: string) {
+    const win = iframe?.contentWindow;
+    if (!win) {
+      postScreenshotError(requestId, 'Widget is not ready.');
+      return;
+    }
+    try {
+      const { default: html2canvas } = await import('html2canvas');
+      const canvas = await html2canvas(document.body, {
+        useCORS: true,
+        allowTaint: true,
+        logging: false,
+        scale: Math.min(2, Math.max(1, typeof devicePixelRatio === 'number' ? devicePixelRatio : 1)),
+      });
+      const blob = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob(resolve, 'image/png', 0.9),
+      );
+      if (!blob) {
+        postScreenshotError(requestId, 'Could not create screenshot image.');
+        return;
+      }
+      if (blob.size > MAX_SCREENSHOT_BYTES) {
+        postScreenshotError(
+          requestId,
+          'Screenshot is larger than 10 MB. Try capturing a shorter page.',
+        );
+        return;
+      }
+      const buf = await blob.arrayBuffer();
+      win.postMessage(
+        {
+          type: 'echo-host-screenshot-result',
+          payload: { requestId, mimeType: blob.type || 'image/png', bytes: buf },
+        },
+        widgetMessageTarget,
+        [buf],
+      );
+    } catch (e) {
+      postScreenshotError(
+        requestId,
+        e instanceof Error ? e.message : 'Could not capture this page.',
+      );
+    }
+  }
+
   function handleMessage(event: MessageEvent) {
     if (event.origin !== new URL(EMBED_CONFIG.WIDGET_URL).origin) return;
 
     const { type, payload } = event.data;
 
     switch (type) {
+      case 'echo-request-host-screenshot': {
+        const requestId = payload?.requestId as string | undefined;
+        if (requestId) {
+          void captureHostPageAndPostToWidget(requestId);
+        }
+        break;
+      }
       case 'close':
         hide();
         break;
@@ -440,6 +507,7 @@ Final message examples:
   }
 
   function toggleWidget() {
+    if (!button) return;
     if (isOpen) {
       hide();
     } else {
@@ -448,31 +516,29 @@ Final message examples:
   }
 
   function show() {
-    if (container && button) {
-      isOpen = true;
-      container.style.display = 'block';
-      // Trigger animation
-      setTimeout(() => {
-        if (container) {
-          container.style.opacity = '1';
-          container.style.transform = 'translateY(0)';
-        }
-      }, 10);
-      // Change button icon to close
+    if (!container) return;
+    isOpen = true;
+    container.style.display = 'block';
+    setTimeout(() => {
+      if (container) {
+        container.style.opacity = '1';
+        container.style.transform = 'translateY(0)';
+      }
+    }, 10);
+    if (button) {
       button.innerHTML = closeIcon;
     }
   }
 
   function hide() {
-    if (container && button) {
-      isOpen = false;
-      container.style.opacity = '0';
-      container.style.transform = 'translateY(10px)';
-      // Hide after animation
-      setTimeout(() => {
-        if (container) container.style.display = 'none';
-      }, 300);
-      // Change button icon back to chat
+    if (!container) return;
+    isOpen = false;
+    container.style.opacity = '0';
+    container.style.transform = 'translateY(10px)';
+    setTimeout(() => {
+      if (container) container.style.display = 'none';
+    }, 300);
+    if (button) {
       button.innerHTML = chatBubbleIcon;
       applyLauncherButtonStyles(button, cachedEmbedAppearance);
     }

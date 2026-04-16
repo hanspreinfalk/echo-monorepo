@@ -18,6 +18,7 @@ const widgetAppearanceSchema = z.object({
   mutedColor: optionalHex,
   mutedForegroundColor: optionalHex,
   borderColor: optionalHex,
+  launcherButtonColor: optionalHex,
 });
 
 export const widgetSettingsSchema = z.object({
@@ -32,6 +33,8 @@ export const widgetSettingsSchema = z.object({
 });
 
 export type WidgetAppearanceForm = z.infer<typeof widgetAppearanceSchema>;
+
+const HEX_VALID = /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/;
 
 const APPEARANCE_KEYS = [
   "primaryColor",
@@ -49,23 +52,31 @@ function hexMatchesDefault(key: (typeof APPEARANCE_KEYS)[number], v: string) {
   return v.toLowerCase() === def.toLowerCase();
 }
 
+export type ConvexAppearanceFields = Partial<
+  Record<(typeof APPEARANCE_KEYS)[number] | "launcherButtonColor", string>
+>;
+
 /** Strips empty strings and theme-default hex values (Convex stores only overrides). */
 export function appearanceForConvex(
   appearance: WidgetAppearanceForm | undefined,
-): Partial<Record<(typeof APPEARANCE_KEYS)[number], string>> {
+): ConvexAppearanceFields {
   if (!appearance) {
     return {};
   }
-  const out: Partial<Record<(typeof APPEARANCE_KEYS)[number], string>> = {};
+  const out: ConvexAppearanceFields = {};
   for (const key of APPEARANCE_KEYS) {
     const v = appearance[key];
-    if (!v || !/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(v)) {
+    if (!v || !HEX_VALID.test(v)) {
       continue;
     }
     if (hexMatchesDefault(key, v)) {
       continue;
     }
     out[key] = v;
+  }
+  const launcher = appearance.launcherButtonColor?.trim();
+  if (launcher && HEX_VALID.test(launcher)) {
+    out.launcherButtonColor = launcher;
   }
   return out;
 }
@@ -80,9 +91,13 @@ export function mergeAppearanceForForm(
   }
   for (const key of APPEARANCE_KEYS) {
     const v = saved[key];
-    if (typeof v === "string" && /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(v)) {
+    if (typeof v === "string" && HEX_VALID.test(v)) {
       out[key] = v;
     }
+  }
+  const lv = saved.launcherButtonColor;
+  if (typeof lv === "string" && HEX_VALID.test(lv)) {
+    out.launcherButtonColor = lv;
   }
   return out;
 }

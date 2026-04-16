@@ -379,7 +379,7 @@ export function ConversationIdView({ conversationId }: { conversationId: Id<"con
                                                 href={attachment.url}
                                                 rel="noreferrer"
                                                 target="_blank"
-                                                className="block overflow-hidden rounded-lg border bg-background transition hover:opacity-90"
+                                                className="block max-w-[280px] overflow-hidden rounded-lg border bg-background transition hover:opacity-90"
                                             >
                                                 {/* eslint-disable-next-line @next/next/no-img-element -- dynamic Convex storage URLs */}
                                                 <img
@@ -565,7 +565,7 @@ export function ConversationIdView({ conversationId }: { conversationId: Id<"con
                                                 href={attachment.url}
                                                 rel="noreferrer"
                                                 target="_blank"
-                                                className="block overflow-hidden rounded-lg border bg-background transition hover:opacity-90"
+                                                className="block max-w-[280px] overflow-hidden rounded-lg border bg-background transition hover:opacity-90"
                                             >
                                                 {/* eslint-disable-next-line @next/next/no-img-element -- dynamic Convex storage URLs */}
                                                 <img

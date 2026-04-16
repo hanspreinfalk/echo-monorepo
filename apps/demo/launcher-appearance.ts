@@ -3,6 +3,7 @@ export type EmbedWidgetAppearance = {
   primaryColor?: string;
   headerForegroundColor?: string;
   backgroundColor?: string;
+  launcherButtonColor?: string;
 } | undefined;
 
 const HEX_RE = /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/;
@@ -26,7 +27,7 @@ export function parseHexRgb(hex: string): [number, number, number] | null {
 
 export function hexToRgba(hex: string, alpha: number): string {
   const rgb = parseHexRgb(hex);
-  if (!rgb) return `rgba(59, 130, 246, ${alpha})`;
+  if (!rgb) return `rgba(0, 0, 0, ${alpha})`;
   return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${alpha})`;
 }
 
@@ -53,33 +54,21 @@ function pickIconColor(bgHex: string, appearance: EmbedWidgetAppearance): string
   return contrastingIconColor(bgHex);
 }
 
-/** Launcher fill uses saved `foregroundColor`, else `primaryColor`, else default blue. */
-export function resolveLauncherButtonColors(appearance: EmbedWidgetAppearance): {
-  background: string;
-  color: string;
-  boxShadow: string;
-} {
-  const fg = appearance?.foregroundColor;
-  if (fg && HEX_RE.test(fg)) {
-    return {
-      background: fg,
-      color: pickIconColor(fg, appearance),
-      boxShadow: `0 4px 24px ${hexToRgba(fg, 0.35)}`,
-    };
+/**
+ * Host-page launcher uses only `launcherButtonColor` from widget customization.
+ * No default fill — embed waits for settings and omits the button when unset.
+ */
+export function resolveLauncherButtonColors(
+  appearance: EmbedWidgetAppearance,
+): { background: string; color: string; boxShadow: string } | null {
+  const raw = appearance?.launcherButtonColor?.trim();
+  if (!raw || !HEX_RE.test(raw)) {
+    return null;
   }
-  const primary = appearance?.primaryColor;
-  if (primary && HEX_RE.test(primary)) {
-    return {
-      background: primary,
-      color: pickIconColor(primary, appearance),
-      boxShadow: `0 4px 24px ${hexToRgba(primary, 0.35)}`,
-    };
-  }
-  const fallback = "#3b82f6";
   return {
-    background: fallback,
-    color: "#ffffff",
-    boxShadow: `0 4px 24px ${hexToRgba(fallback, 0.35)}`,
+    background: raw,
+    color: pickIconColor(raw, appearance),
+    boxShadow: `0 4px 24px ${hexToRgba(raw, 0.35)}`,
   };
 }
 

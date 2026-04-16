@@ -94,8 +94,9 @@ export default defineSchema({
     widgetSettings: defineTable({
         organizationId: v.string(),
         greetMessage: v.string(),
-        /** When false, assistant rows hide the logo/avatar. Default true when omitted (legacy docs). */
         showLogo: v.optional(v.boolean()),
+        logoUrl: v.optional(v.string()),
+        logoStorageId: v.optional(v.id("_storage")),
         defaultSuggestions: v.object({
           suggestion1: v.optional(v.string()),
           suggestion2: v.optional(v.string()),
@@ -111,6 +112,7 @@ export default defineSchema({
             mutedColor: v.optional(v.string()),
             mutedForegroundColor: v.optional(v.string()),
             borderColor: v.optional(v.string()),
+            launcherButtonColor: v.optional(v.string()),
           }),
         ),
       })

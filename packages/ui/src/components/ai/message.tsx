@@ -30,7 +30,7 @@ export const AIMessageContent = ({
             "wrap-break-word",
             "flex flex-col gap-2 rounded-md border px-3 py-2 text-sm",
             "border-[var(--chat-bubble-inbound-border)] bg-[var(--chat-bubble-inbound-bg)] text-foreground",
-            "group-[.is-user]:border-transparent group-[.is-user]:bg-linear-to-b group-[.is-user]:from-[var(--chat-bubble-outbound-from)] group-[.is-user]:to-[var(--chat-bubble-outbound-to)] group-[.is-user]:text-foreground",
+            "group-[.is-user]:border-transparent group-[.is-user]:bg-linear-to-b group-[.is-user]:from-[var(--chat-bubble-outbound-from)] group-[.is-user]:to-[var(--chat-bubble-outbound-to)] group-[.is-user]:text-[var(--chat-bubble-outbound-text,var(--foreground))]",
             className
         )}
         {...props}

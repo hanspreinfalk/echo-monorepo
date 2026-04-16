@@ -16,6 +16,7 @@
     "vite": "^5.0.8"
   },
   "dependencies": {
+    "html2canvas": "^1.4.1",
     "page-agent": "^1.7.1"
   }
 }

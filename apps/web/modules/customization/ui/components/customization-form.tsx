@@ -1,7 +1,10 @@
+"use client";
+
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { Control, FieldPath } from "react-hook-form";
 import { useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
+import { useRef, useState } from "react";
 import { Button } from "@workspace/ui/components/button";
 import {
   Card,
@@ -24,7 +27,7 @@ import { Separator } from "@workspace/ui/components/separator";
 import { Switch } from "@workspace/ui/components/switch";
 import { Textarea } from "@workspace/ui/components/textarea";
 import { Doc } from "@workspace/backend/_generated/dataModel";
-import { useMutation } from "convex/react";
+import { useAction, useMutation } from "convex/react";
 import { api } from "@workspace/backend/_generated/api";
 import { FormSchema } from "../../types";
 import { WIDGET_THEME_DEFAULT_HEX } from "@workspace/ui/lib/widget-default-appearance-hex";
@@ -34,6 +37,8 @@ import {
   widgetSettingsSchema,
 } from "../../schemas";
 import { WidgetAppearancePreview } from "./widget-appearance-preview";
+import { ImageIcon, Loader2Icon, Trash2Icon, UploadIcon } from "lucide-react";
+import { cn } from "@workspace/ui/lib/utils";
 
 type WidgetSettings = Doc<"widgetSettings">;
 
@@ -90,6 +95,133 @@ function AppearanceColorField({
   );
 }
 
+interface LogoUploadProps {
+  logoUrl: string | undefined;
+  onLogoChange: (url: string | undefined) => void;
+}
+
+function LogoUpload({ logoUrl, onLogoChange }: LogoUploadProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isRemoving, setIsRemoving] = useState(false);
+
+  const uploadLogo = useAction(api.private.widgetSettings.uploadLogo);
+  const removeLogo = useMutation(api.private.widgetSettings.removeLogo);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select an image file");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image must be smaller than 5 MB");
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const bytes = await file.arrayBuffer();
+      const result = await uploadLogo({ bytes, mimeType: file.type });
+      onLogoChange(result.logoUrl ?? undefined);
+      toast.success("Logo uploaded");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to upload logo");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleRemove = async () => {
+    setIsRemoving(true);
+    try {
+      await removeLogo({});
+      onLogoChange(undefined);
+      toast.success("Logo removed");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to remove logo");
+    } finally {
+      setIsRemoving(false);
+    }
+  };
+
+  const isBusy = isUploading || isRemoving;
+
+  return (
+    <div className="space-y-2">
+      <p className="text-sm font-medium leading-none">Assistant logo</p>
+      <div className="flex items-center gap-4">
+        <div
+          className={cn(
+            "flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted",
+            logoUrl && "bg-transparent",
+          )}
+        >
+          {logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={logoUrl}
+              alt="Logo"
+              className="size-full object-contain p-1"
+            />
+          ) : (
+            <ImageIcon className="size-6 text-muted-foreground" />
+          )}
+        </div>
+        <div className="flex flex-col gap-2">
+          <input
+            ref={fileInputRef}
+            accept="image/*"
+            className="hidden"
+            type="file"
+            onChange={handleFileChange}
+          />
+          <Button
+            disabled={isBusy}
+            onClick={() => fileInputRef.current?.click()}
+            size="sm"
+            type="button"
+            variant="outline"
+          >
+            {isUploading ? (
+              <Loader2Icon className="size-3.5 animate-spin" />
+            ) : (
+              <UploadIcon className="size-3.5" />
+            )}
+            {logoUrl ? "Replace" : "Upload image"}
+          </Button>
+          {logoUrl && (
+            <Button
+              disabled={isBusy}
+              onClick={handleRemove}
+              size="sm"
+              type="button"
+              variant="ghost"
+              className="text-destructive hover:text-destructive"
+            >
+              {isRemoving ? (
+                <Loader2Icon className="size-3.5 animate-spin" />
+              ) : (
+                <Trash2Icon className="size-3.5" />
+              )}
+              Remove
+            </Button>
+          )}
+        </div>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        PNG, JPG or SVG · max 5 MB · shown next to assistant messages in the widget.
+      </p>
+    </div>
+  );
+}
+
 interface CustomizationFormProps {
   initialData?: WidgetSettings | null;
 }
@@ -98,6 +230,10 @@ export const CustomizationForm = ({
   initialData,
 }: CustomizationFormProps) => {
   const upsertWidgetSettings = useMutation(api.private.widgetSettings.upsert);
+
+  const [logoUrl, setLogoUrl] = useState<string | undefined>(
+    initialData?.logoUrl ?? undefined,
+  );
 
   const form = useForm<FormSchema>({
     resolver: zodResolver(widgetSettingsSchema),
@@ -126,16 +262,6 @@ export const CustomizationForm = ({
     control: form.control,
     name: "defaultSuggestions",
   });
-  const watchedShowLogo = useWatch({
-    control: form.control,
-    name: "showLogo",
-  });
-  const previewSuggestion =
-    watchedSuggestions?.suggestion1?.trim() ||
-    watchedSuggestions?.suggestion2?.trim() ||
-    watchedSuggestions?.suggestion3?.trim() ||
-    undefined;
-
   const onSubmit = async (values: FormSchema) => {
     try {
       await upsertWidgetSettings({
@@ -150,7 +276,7 @@ export const CustomizationForm = ({
       console.error(error);
       toast.error("Something went wrong");
     }
-  } 
+  };
 
   return (
     <Form {...form}>
@@ -205,6 +331,8 @@ export const CustomizationForm = ({
                 </FormItem>
               )}
             />
+
+            <LogoUpload logoUrl={logoUrl} onLogoChange={setLogoUrl} />
 
             <Separator />
 
@@ -277,87 +405,103 @@ export const CustomizationForm = ({
           <CardHeader>
             <CardTitle>Widget appearance</CardTitle>
             <CardDescription>
-              Hex colors (#RGB or #RRGGBB). Fields start with the standard light-theme
-              defaults; only values that differ from those defaults are saved.
+              Hex colors (#RGB or #RRGGBB). Theme fields use standard light defaults;
+              only values that differ from those defaults are stored. The host-page
+              launcher color is saved whenever set—leave it empty to hide the floating
+              button until you choose a color.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <WidgetAppearancePreview
               appearance={watchedAppearance ?? WIDGET_THEME_DEFAULT_HEX}
+              defaultSuggestions={
+                watchedSuggestions ?? {
+                  suggestion1: "",
+                  suggestion2: "",
+                  suggestion3: "",
+                }
+              }
               greetMessage={
                 typeof watchedGreet === "string"
                   ? watchedGreet
                   : form.getValues("greetMessage")
               }
-              showLogo={watchedShowLogo !== false}
-              suggestionSample={previewSuggestion}
             />
             <Separator />
-            <AppearanceColorField
-              control={form.control}
-              description="Header gradient start, primary buttons, user message bubble, and focus rings."
-              fallbackHex={WIDGET_THEME_DEFAULT_HEX.primaryColor}
-              label="Primary"
-              name="appearance.primaryColor"
-              placeholderHex={WIDGET_THEME_DEFAULT_HEX.primaryColor}
-            />
-            <AppearanceColorField
-              control={form.control}
-              description="Bottom of the header gradient and user message bubble."
-              fallbackHex={WIDGET_THEME_DEFAULT_HEX.primaryGradientEndColor}
-              label="Primary gradient end"
-              name="appearance.primaryGradientEndColor"
-              placeholderHex={WIDGET_THEME_DEFAULT_HEX.primaryGradientEndColor}
-            />
-            <AppearanceColorField
-              control={form.control}
-              description="Text and icons on the header and in user-sent bubbles."
-              fallbackHex={WIDGET_THEME_DEFAULT_HEX.headerForegroundColor}
-              label="On-primary text"
-              name="appearance.headerForegroundColor"
-              placeholderHex={WIDGET_THEME_DEFAULT_HEX.headerForegroundColor}
-            />
-            <Separator />
-            <AppearanceColorField
-              control={form.control}
-              description="Main widget panel and cards."
-              fallbackHex={WIDGET_THEME_DEFAULT_HEX.backgroundColor}
-              label="Background"
-              name="appearance.backgroundColor"
-              placeholderHex={WIDGET_THEME_DEFAULT_HEX.backgroundColor}
-            />
-            <AppearanceColorField
-              control={form.control}
-              description="Primary text color."
-              fallbackHex={WIDGET_THEME_DEFAULT_HEX.foregroundColor}
-              label="Foreground"
-              name="appearance.foregroundColor"
-              placeholderHex={WIDGET_THEME_DEFAULT_HEX.foregroundColor}
-            />
-            <AppearanceColorField
-              control={form.control}
-              description="Secondary surfaces (e.g. soft panels)."
-              fallbackHex={WIDGET_THEME_DEFAULT_HEX.mutedColor}
-              label="Muted surface"
-              name="appearance.mutedColor"
-              placeholderHex={WIDGET_THEME_DEFAULT_HEX.mutedColor}
-            />
-            <AppearanceColorField
-              control={form.control}
-              description="Secondary text and timestamps."
-              fallbackHex={WIDGET_THEME_DEFAULT_HEX.mutedForegroundColor}
-              label="Muted text"
-              name="appearance.mutedForegroundColor"
-              placeholderHex={WIDGET_THEME_DEFAULT_HEX.mutedForegroundColor}
-            />
-            <AppearanceColorField
-              control={form.control}
-              description="Borders and input outlines."
-              fallbackHex={WIDGET_THEME_DEFAULT_HEX.borderColor}
-              label="Border"
-              name="appearance.borderColor"
-              placeholderHex={WIDGET_THEME_DEFAULT_HEX.borderColor}
-            />
+            <div className="grid gap-6 sm:grid-cols-2">
+              <AppearanceColorField
+                control={form.control}
+                description="Background fill for the round chat button on your website (embed script). The button appears only after this is saved and loaded—leave empty to hide it."
+                fallbackHex={WIDGET_THEME_DEFAULT_HEX.launcherButtonColor}
+                label="Host-page launcher button"
+                name="appearance.launcherButtonColor"
+                placeholderHex={WIDGET_THEME_DEFAULT_HEX.launcherButtonColor}
+              />
+              <AppearanceColorField
+                control={form.control}
+                description="Header gradient start, primary buttons, user message bubble, and focus rings."
+                fallbackHex={WIDGET_THEME_DEFAULT_HEX.primaryColor}
+                label="Primary"
+                name="appearance.primaryColor"
+                placeholderHex={WIDGET_THEME_DEFAULT_HEX.primaryColor}
+              />
+              <AppearanceColorField
+                control={form.control}
+                description="Bottom of the header gradient and user message bubble."
+                fallbackHex={WIDGET_THEME_DEFAULT_HEX.primaryGradientEndColor}
+                label="Primary gradient end"
+                name="appearance.primaryGradientEndColor"
+                placeholderHex={WIDGET_THEME_DEFAULT_HEX.primaryGradientEndColor}
+              />
+              <AppearanceColorField
+                control={form.control}
+                description="Text and icons on the header and in user-sent bubbles."
+                fallbackHex={WIDGET_THEME_DEFAULT_HEX.headerForegroundColor}
+                label="On-primary text"
+                name="appearance.headerForegroundColor"
+                placeholderHex={WIDGET_THEME_DEFAULT_HEX.headerForegroundColor}
+              />
+              <AppearanceColorField
+                control={form.control}
+                description="Main widget panel and cards."
+                fallbackHex={WIDGET_THEME_DEFAULT_HEX.backgroundColor}
+                label="Background"
+                name="appearance.backgroundColor"
+                placeholderHex={WIDGET_THEME_DEFAULT_HEX.backgroundColor}
+              />
+              <AppearanceColorField
+                control={form.control}
+                description="Primary text color."
+                fallbackHex={WIDGET_THEME_DEFAULT_HEX.foregroundColor}
+                label="Foreground"
+                name="appearance.foregroundColor"
+                placeholderHex={WIDGET_THEME_DEFAULT_HEX.foregroundColor}
+              />
+              <AppearanceColorField
+                control={form.control}
+                description="Secondary surfaces (e.g. soft panels)."
+                fallbackHex={WIDGET_THEME_DEFAULT_HEX.mutedColor}
+                label="Muted surface"
+                name="appearance.mutedColor"
+                placeholderHex={WIDGET_THEME_DEFAULT_HEX.mutedColor}
+              />
+              <AppearanceColorField
+                control={form.control}
+                description="Secondary text and timestamps."
+                fallbackHex={WIDGET_THEME_DEFAULT_HEX.mutedForegroundColor}
+                label="Muted text"
+                name="appearance.mutedForegroundColor"
+                placeholderHex={WIDGET_THEME_DEFAULT_HEX.mutedForegroundColor}
+              />
+              <AppearanceColorField
+                control={form.control}
+                description="Borders and input outlines."
+                fallbackHex={WIDGET_THEME_DEFAULT_HEX.borderColor}
+                label="Border"
+                name="appearance.borderColor"
+                placeholderHex={WIDGET_THEME_DEFAULT_HEX.borderColor}
+              />
+            </div>
           </CardContent>
         </Card>
 

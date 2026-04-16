@@ -10,6 +10,7 @@ import { Button } from "@workspace/ui/components/button";
 import { useAtomValue, useSetAtom } from "jotai";
 import {
     ArrowLeftIcon,
+    Camera,
     CheckIcon,
     FileIcon,
     Loader2Icon,
@@ -19,7 +20,6 @@ import {
     WrenchIcon,
     XIcon,
 } from "lucide-react";
-import { DicebearAvatar } from "@workspace/ui/components/dicebear-avatar";
 import { useInfiniteScroll } from "@workspace/ui/hooks/use-infinite-scroll";
 import { InfiniteScrollTrigger } from "@workspace/ui/components/infinite-scroll-trigger";
 import { contactSessionIdAtomFamily, conversationIdAtom, organizationIdAtom, screenAtom, widgetSettingsAtom } from "../../atoms/widget-atoms";
@@ -73,7 +73,7 @@ import {
 } from "@workspace/ui/lib/attachment-markdown";
 import { cn } from "@workspace/ui/lib/utils";
 import { motion } from "motion/react";
-import { useRef, useState, useMemo, useEffect } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     PageAgentStepsToolCard,
     PageControlCard,
@@ -113,14 +113,6 @@ function formatMessageTime(createdAt: Date) {
 const formSchema = z.object({
     message: z.string(),
 });
-
-function WidgetAssistantAvatar() {
-    const widgetSettings = useAtomValue(widgetSettingsAtom);
-    if (widgetSettings?.showLogo === false) {
-        return null;
-    }
-    return <DicebearAvatar imageUrl="/logo.svg" seed="assistant" size={32} />;
-}
 
 function WidgetPageControlRow({
     row,
@@ -175,7 +167,6 @@ function WidgetPageControlRow({
                   });
               }
             : undefined;
-    const avatar = <WidgetAssistantAvatar />;
     const pageControlTime =
         row.createdAt != null ? (
             <p className="mt-0.5 w-max max-w-full shrink-0 grow-0 basis-auto self-end text-right text-[10px] leading-none text-muted-foreground tabular-nums">
@@ -199,7 +190,6 @@ function WidgetPageControlRow({
             <PageControlCard
                 acceptSubmitted={acceptSubmitted}
                 action={actionLabel}
-                avatar={avatar}
                 from="assistant"
                 leadContent={
                     <MessageSenderBadge
@@ -298,6 +288,9 @@ export const WidgetChatScreen = () => {
 
     const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
     const [attachmentError, setAttachmentError] = useState<string | null>(null);
+    const [screenshotPending, setScreenshotPending] = useState(false);
+    const pendingScreenshotRequestIdRef = useRef<string | null>(null);
+    const screenshotTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const pageControlRequests = useQuery(
         api.public.conversations.getPageControlRequests,
@@ -314,6 +307,102 @@ export const WidgetChatScreen = () => {
     const addStep = useMutation(api.public.conversations.addPageControlStep);
     const setResult = useMutation(api.public.conversations.setPageControlResult);
     const resolvePageControlRequest = useMutation(api.public.conversations.resolvePageControlRequest);
+
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const storeAttachment = useAction(api.public.messages.storeAttachment);
+
+    const uploadFileToAttachments = useCallback(
+        async (file: File) => {
+            if (!contactSessionId) return;
+
+            if (file.size > MAX_ATTACHMENT_SIZE) {
+                setAttachmentError(`"${file.name}" exceeds the 10 MB limit.`);
+                return;
+            }
+
+            const localId = crypto.randomUUID();
+            setAttachedFiles((prev) => [
+                ...prev,
+                {
+                    id: localId,
+                    name: file.name,
+                    mimeType: file.type || "application/octet-stream",
+                    size: file.size,
+                    uploading: true,
+                },
+            ]);
+
+            try {
+                const bytes = await file.arrayBuffer();
+                const result = await storeAttachment({
+                    bytes,
+                    filename: file.name,
+                    mimeType: file.type || "application/octet-stream",
+                    contactSessionId,
+                });
+                setAttachedFiles((prev) =>
+                    prev.map((f) =>
+                        f.id === localId
+                            ? {
+                                  ...f,
+                                  storageId: result.storageId,
+                                  url: result.url,
+                                  uploading: false,
+                              }
+                            : f,
+                    ),
+                );
+            } catch (error) {
+                console.error(error);
+                setAttachedFiles((prev) =>
+                    prev.map((f) =>
+                        f.id === localId
+                            ? { ...f, uploading: false, error: "Upload failed" }
+                            : f,
+                    ),
+                );
+            }
+        },
+        [contactSessionId, storeAttachment],
+    );
+
+    const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(e.target.files ?? []);
+        e.target.value = "";
+        setAttachmentError(null);
+        if (!files.length || !contactSessionId) return;
+
+        for (const file of files) {
+            await uploadFileToAttachments(file);
+        }
+    };
+
+    const handleScreenshotClick = () => {
+        setAttachmentError(null);
+        if (!contactSessionId) return;
+        if (window.parent === window.self) {
+            setAttachmentError(
+                "Screenshots of your site are available when the chat is embedded on your page.",
+            );
+            return;
+        }
+        const requestId = crypto.randomUUID();
+        pendingScreenshotRequestIdRef.current = requestId;
+        setScreenshotPending(true);
+        if (screenshotTimeoutRef.current) {
+            clearTimeout(screenshotTimeoutRef.current);
+        }
+        screenshotTimeoutRef.current = setTimeout(() => {
+            if (pendingScreenshotRequestIdRef.current !== requestId) return;
+            pendingScreenshotRequestIdRef.current = null;
+            setScreenshotPending(false);
+            setAttachmentError("Screenshot timed out. Try again.");
+        }, 60_000);
+        window.parent.postMessage(
+            { type: "echo-request-host-screenshot", payload: { requestId } },
+            "*",
+        );
+    };
 
     useEffect(() => {
         if (!contactSessionId) return;
@@ -335,58 +424,46 @@ export const WidgetChatScreen = () => {
                     contactSessionId,
                     result: { success: payload.success, data: payload.data ?? "" },
                 }).catch(console.error);
+            } else if (type === "echo-host-screenshot-result" && payload?.requestId) {
+                if (pendingScreenshotRequestIdRef.current !== payload.requestId) return;
+                pendingScreenshotRequestIdRef.current = null;
+                if (screenshotTimeoutRef.current) {
+                    clearTimeout(screenshotTimeoutRef.current);
+                    screenshotTimeoutRef.current = null;
+                }
+                setScreenshotPending(false);
+                const bytes = payload.bytes as ArrayBuffer | undefined;
+                if (!bytes) {
+                    setAttachmentError("Screenshot data was missing.");
+                    return;
+                }
+                const mime = (payload.mimeType as string) || "image/png";
+                const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+                const file = new File([new Blob([bytes], { type: mime })], `page-screenshot-${stamp}.png`, {
+                    type: mime,
+                });
+                void uploadFileToAttachments(file);
+            } else if (type === "echo-host-screenshot-error" && payload?.requestId) {
+                if (pendingScreenshotRequestIdRef.current !== payload.requestId) return;
+                pendingScreenshotRequestIdRef.current = null;
+                if (screenshotTimeoutRef.current) {
+                    clearTimeout(screenshotTimeoutRef.current);
+                    screenshotTimeoutRef.current = null;
+                }
+                setScreenshotPending(false);
+                setAttachmentError(
+                    typeof payload.message === "string" ? payload.message : "Screenshot failed.",
+                );
             }
         };
         window.addEventListener("message", handler);
-        return () => window.removeEventListener("message", handler);
-    }, [contactSessionId, addStep, setResult]);
-    const fileInputRef = useRef<HTMLInputElement>(null);
-    const storeAttachment = useAction(api.public.messages.storeAttachment);
-
-    const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const files = Array.from(e.target.files ?? []);
-        e.target.value = '';
-        setAttachmentError(null);
-        if (!files.length || !contactSessionId) return;
-
-        for (const file of files) {
-            if (file.size > MAX_ATTACHMENT_SIZE) {
-                setAttachmentError(`"${file.name}" exceeds the 10 MB limit.`);
-                continue;
+        return () => {
+            window.removeEventListener("message", handler);
+            if (screenshotTimeoutRef.current) {
+                clearTimeout(screenshotTimeoutRef.current);
             }
-
-            const localId = crypto.randomUUID();
-            setAttachedFiles(prev => [...prev, {
-                id: localId,
-                name: file.name,
-                mimeType: file.type || 'application/octet-stream',
-                size: file.size,
-                uploading: true,
-            }]);
-
-            try {
-                const bytes = await file.arrayBuffer();
-                const result = await storeAttachment({
-                    bytes,
-                    filename: file.name,
-                    mimeType: file.type || 'application/octet-stream',
-                    contactSessionId,
-                });
-                setAttachedFiles(prev => prev.map(f =>
-                    f.id === localId
-                        ? { ...f, storageId: result.storageId, url: result.url, uploading: false }
-                        : f
-                ));
-            } catch (error) {
-                console.error(error);
-                setAttachedFiles(prev => prev.map(f =>
-                    f.id === localId
-                        ? { ...f, uploading: false, error: 'Upload failed' }
-                        : f
-                ));
-            }
-        }
-    };
+        };
+    }, [contactSessionId, addStep, setResult, uploadFileToAttachments]);
 
     const handleRemoveAttachment = (id: string) => {
         setAttachedFiles(prev => prev.filter(f => f.id !== id));
@@ -513,7 +590,7 @@ export const WidgetChatScreen = () => {
                                 from="user"
                                 key={row.id}
                             >
-                                <div className="flex flex-col gap-2">
+                                <div className="flex w-fit max-w-[80%] flex-col gap-2">
                                     {parsed.attachments.map((attachment, i) => (
                                         attachment.isImage ? (
                                             <a
@@ -521,14 +598,14 @@ export const WidgetChatScreen = () => {
                                                 href={attachment.url}
                                                 rel="noreferrer"
                                                 target="_blank"
-                                                className="block overflow-hidden rounded-lg border bg-background transition hover:opacity-90"
+                                                className="block w-[220px] overflow-hidden rounded-lg border bg-background transition hover:opacity-90"
                                             >
                                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                                 <img
                                                     src={attachment.url}
                                                     alt={attachment.name}
                                                     loading="lazy"
-                                                    className="h-auto max-h-48 w-full object-cover"
+                                                    className="h-auto max-h-40 w-full object-cover"
                                                 />
                                                 <div className="border-t px-3 py-1.5 text-xs text-muted-foreground">
                                                     {attachment.name}
@@ -617,7 +694,6 @@ export const WidgetChatScreen = () => {
                                                 </p>
                                             )}
                                         </div>
-                                        <WidgetAssistantAvatar />
                                     </AIMessage>
                                 </motion.div>
                             );
@@ -661,7 +737,6 @@ export const WidgetChatScreen = () => {
                                             </p>
                                         )}
                                     </div>
-                                    <WidgetAssistantAvatar />
                                 </AIMessage>
                             );
                         }
@@ -706,7 +781,6 @@ export const WidgetChatScreen = () => {
                                             </p>
                                         )}
                                     </div>
-                                    <WidgetAssistantAvatar />
                                 </AIMessage>
                             );
                         }
@@ -726,7 +800,7 @@ export const WidgetChatScreen = () => {
                                                 href={attachment.url}
                                                 rel="noreferrer"
                                                 target="_blank"
-                                                className="block overflow-hidden rounded-lg border bg-background transition hover:opacity-90"
+                                                className="block max-w-[260px] overflow-hidden rounded-lg border bg-background transition hover:opacity-90"
                                             >
                                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                                 <img
@@ -763,7 +837,6 @@ export const WidgetChatScreen = () => {
                                         </p>
                                     )}
                                 </div>
-                                <WidgetAssistantAvatar />
                             </AIMessage>
                         );
                     })}
@@ -782,7 +855,6 @@ export const WidgetChatScreen = () => {
                                 </div>
                             </AIMessageContent>
                             </div>
-                            <WidgetAssistantAvatar />
                         </AIMessage>
                     )}
                 </AIConversationContent>
@@ -926,6 +998,18 @@ export const WidgetChatScreen = () => {
                                 >
                                     <PaperclipIcon />
                                     Attach
+                                </AIInputButton>
+                                <AIInputButton
+                                    disabled={
+                                        conversation?.status === "resolved" ||
+                                        screenshotPending ||
+                                        isUploadingFiles
+                                    }
+                                    onClick={handleScreenshotClick}
+                                    type="button"
+                                >
+                                    <Camera />
+                                    Screenshot
                                 </AIInputButton>
                             </AIInputTools>
                             <AIInputSubmit
