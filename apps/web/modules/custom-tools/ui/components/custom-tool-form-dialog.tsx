@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "convex/react";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { Button } from "@workspace/ui/components/button";
@@ -34,13 +34,14 @@ import {
 import { Textarea } from "@workspace/ui/components/textarea";
 import { Switch } from "@workspace/ui/components/switch";
 import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-} from "@workspace/ui/components/alert";
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@workspace/ui/components/collapsible";
+import { cn } from "@workspace/ui/lib/utils";
 import { api } from "@workspace/backend/_generated/api";
 import type { Doc } from "@workspace/backend/_generated/dataModel";
-import { InfoIcon, MinusIcon, PlusIcon } from "lucide-react";
+import { ChevronDownIcon, MinusIcon, PlusIcon } from "lucide-react";
 import {
   type CustomToolFormValues,
   createCustomToolFormSchema,
@@ -55,15 +56,6 @@ type CustomToolFormDialogProps = {
   tools: AgentCustomTool[];
 };
 
-const defaultValues: CustomToolFormValues = {
-  name: "",
-  description: "",
-  endpoint: "",
-  method: "POST",
-  argumentFields: [],
-  headers: [],
-};
-
 const defaultArgumentField = {
   name: "",
   type: "string" as const,
@@ -72,14 +64,30 @@ const defaultArgumentField = {
   required: false,
 };
 
+const defaultValues: CustomToolFormValues = {
+  name: "",
+  description: "",
+  endpoint: "",
+  method: "POST",
+  argumentFields: [{ ...defaultArgumentField }],
+  headers: [{ key: "", value: "" }],
+};
+
 export const CustomToolFormDialog = ({
   open,
   onOpenChange,
   editing,
   tools,
 }: CustomToolFormDialogProps) => {
+  const [authHelpOpen, setAuthHelpOpen] = useState(false);
   const createTool = useMutation(api.private.agentCustomTools.create);
   const updateTool = useMutation(api.private.agentCustomTools.update);
+
+  useEffect(() => {
+    if (open) {
+      setAuthHelpOpen(false);
+    }
+  }, [open]);
 
   const takenToolNamesRef = useRef<ReadonlySet<string>>(new Set());
   const takenToolNames = useMemo(() => {
@@ -209,48 +217,17 @@ export const CustomToolFormDialog = ({
 
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
-      <DialogContent className="max-h-[90vh] min-w-0 overflow-y-auto sm:max-w-lg">
+      <DialogContent className="max-h-[90vh] min-w-0 overflow-y-auto sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>
             {editing ? "Edit custom tool" : "New custom tool"}
           </DialogTitle>
           <DialogDescription>
-            You define argument <span className="font-mono text-foreground">names</span>{" "}
-            (and optional hints); the model fills values from the chat. Leave
-            arguments empty to allow any key-value payload. Tools appear as{" "}
-            <span className="font-mono text-foreground">custom_…</span> to the model.
+            Arguments (optional hints) are filled from the chat; leave the list
+            empty for any JSON body. The model sees{" "}
+            <span className="font-mono text-foreground">custom_…</span>.
           </DialogDescription>
         </DialogHeader>
-
-        <Alert className="border-muted-foreground/20 bg-muted/40 py-3">
-          <InfoIcon aria-hidden className="text-muted-foreground" />
-          <AlertTitle className="text-foreground">
-            Authenticated endpoints
-          </AlertTitle>
-          <AlertDescription className="space-y-2 text-muted-foreground">
-            <p>
-              If your API expects a static token or API key, add it below. Common
-              patterns:
-            </p>
-            <ul className="list-none space-y-1.5 border-l-2 border-muted-foreground/25 pl-3 font-mono text-xs text-foreground">
-              <li>
-                <span className="text-muted-foreground">Authorization</span> →{" "}
-                <span className="break-all">Bearer &lt;token&gt;</span>
-              </li>
-              <li>
-                <span className="text-muted-foreground">X-Api-Key</span> →{" "}
-                <span className="break-all">&lt;key&gt;</span>{" "}
-                <span className="font-sans text-muted-foreground">
-                  (or any name your server documents)
-                </span>
-              </li>
-            </ul>
-            <p className="text-xs">
-              Skip headers when the endpoint is public or handles auth another
-              way.
-            </p>
-          </AlertDescription>
-        </Alert>
 
         <Form {...form}>
           <form className="space-y-4" onSubmit={onSubmit}>
@@ -267,9 +244,7 @@ export const CustomToolFormDialog = ({
                       {...field}
                     />
                   </FormControl>
-                  <FormDescription>
-                    Identifier the model uses (letters, numbers, underscores).
-                  </FormDescription>
+                  <FormDescription>Model id: letters, numbers, underscores.</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -293,54 +268,6 @@ export const CustomToolFormDialog = ({
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="endpoint"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Endpoint URL</FormLabel>
-                  <FormControl>
-                    <Input
-                      className="font-mono text-sm"
-                      placeholder="https://api.example.com/v1/recharge"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    Must be https (http allowed only for localhost).
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="method"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>HTTP method</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    value={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Method" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="GET">GET (query parameters)</SelectItem>
-                      <SelectItem value="POST">POST (JSON body)</SelectItem>
-                      <SelectItem value="PUT">PUT (JSON body)</SelectItem>
-                      <SelectItem value="PATCH">PATCH (JSON body)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <FormLabel className="text-foreground">Arguments</FormLabel>
@@ -356,8 +283,7 @@ export const CustomToolFormDialog = ({
                 </Button>
               </div>
               <p className="text-muted-foreground text-sm">
-                Name, type, hint, and whether the argument is required—the model
-                fills values from the chat.
+                Name, type, optional hint, and required flag.
               </p>
               <div className="space-y-3">
                 {argumentFieldRows.map((row, index) => {
@@ -377,7 +303,7 @@ export const CustomToolFormDialog = ({
                               <FormControl>
                                 <Input
                                   className="w-full min-w-0 font-mono text-sm"
-                                  placeholder="userId"
+                                  placeholder="email"
                                   {...field}
                                 />
                               </FormControl>
@@ -449,9 +375,8 @@ export const CustomToolFormDialog = ({
                                 Required argument
                               </FormLabel>
                               <FormDescription className="text-xs">
-                                When on, the tool description tells the model to
-                                call only once this value is known (it may omit
-                                the field while asking the customer).
+                                When on, the model should gather this value before
+                                calling.
                               </FormDescription>
                             </div>
                             <FormControl>
@@ -480,8 +405,7 @@ export const CustomToolFormDialog = ({
                                 />
                               </FormControl>
                               <FormDescription className="text-xs">
-                                Shown to the model so it matches your API. JSON
-                                Schema is optional; plain-English structure works too.
+                                JSON Schema or a short shape note for the model.
                               </FormDescription>
                             </FormItem>
                           )}
@@ -491,6 +415,106 @@ export const CustomToolFormDialog = ({
                   );
                 })}
               </div>
+            </div>
+
+            <div className="space-y-0.5">
+              <p className="text-foreground text-sm font-medium">Custom endpoints</p>
+              <p className="text-muted-foreground text-xs">
+                Your HTTPS URL and optional static auth (see guide).
+              </p>
+            </div>
+
+            <Collapsible
+              className="rounded-lg border border-border/60 bg-muted/30"
+              onOpenChange={setAuthHelpOpen}
+              open={authHelpOpen}
+            >
+              <CollapsibleTrigger
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-foreground outline-none hover:bg-muted/50 [&[data-state=open]]:rounded-b-none"
+                type="button"
+              >
+                <ChevronDownIcon
+                  aria-hidden
+                  className={cn(
+                    "size-4 shrink-0 text-muted-foreground transition-transform duration-200",
+                    authHelpOpen && "rotate-180",
+                  )}
+                />
+                Authenticated endpoints
+              </CollapsibleTrigger>
+              <CollapsibleContent className="border-border/60 border-t px-3 py-3 text-muted-foreground text-sm">
+                <div className="space-y-2">
+                  <p>
+                    For a static token or API key, add headers below. Examples:
+                  </p>
+                  <ul className="list-none space-y-1.5 border-l-2 border-muted-foreground/25 pl-3 font-mono text-xs text-foreground">
+                    <li>
+                      <span className="text-muted-foreground">Authorization</span> →{" "}
+                      <span className="break-all">Bearer &lt;token&gt;</span>
+                    </li>
+                    <li>
+                      <span className="text-muted-foreground">X-Api-Key</span> →{" "}
+                      <span className="break-all">&lt;key&gt;</span>{" "}
+                      <span className="font-sans text-muted-foreground">
+                        (or the header your API expects)
+                      </span>
+                    </li>
+                  </ul>
+                  <p className="text-xs">
+                    Omit headers for public endpoints or other auth flows.
+                  </p>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-[11rem_minmax(0,1fr)] sm:items-start">
+              <FormField
+                control={form.control}
+                name="method"
+                render={({ field }) => (
+                  <FormItem className="min-w-0">
+                    <FormLabel>HTTP method</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Method" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="GET">GET (query parameters)</SelectItem>
+                        <SelectItem value="POST">POST (JSON body)</SelectItem>
+                        <SelectItem value="PUT">PUT (JSON body)</SelectItem>
+                        <SelectItem value="PATCH">PATCH (JSON body)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="endpoint"
+                render={({ field }) => (
+                  <FormItem className="min-w-0">
+                    <FormLabel>Endpoint URL</FormLabel>
+                    <FormControl>
+                      <Input
+                        className="font-mono text-sm"
+                        placeholder="https://api.example.com/v1/recharge"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      HTTPS required (HTTP ok on localhost).
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
 
             <div className="space-y-2">
@@ -508,9 +532,8 @@ export const CustomToolFormDialog = ({
                 </Button>
               </div>
               <p className="text-muted-foreground text-sm">
-                Optional static headers (for example{" "}
-                <span className="font-mono">Authorization</span>). Store secrets
-                carefully.
+                Static headers (e.g. <span className="font-mono">Authorization</span>
+                ). Treat values as secrets.
               </p>
               <div className="space-y-2">
                 {headerFields.map((row, index) => (
