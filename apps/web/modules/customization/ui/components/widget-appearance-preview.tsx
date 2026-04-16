@@ -210,8 +210,8 @@ export function WidgetAppearancePreview({
             {/* Same block order/classes as {@link WidgetChatScreen} composer */}
             <div className="relative">
               <AIInput
+                as="div"
                 className="rounded-none border-x-0 border-b-0"
-                onSubmit={(e) => e.preventDefault()}
               >
                 <AIInputTextarea
                   readOnly
@@ -235,7 +235,7 @@ export function WidgetAppearancePreview({
                   <AIInputSubmit
                     disabled
                     status="ready"
-                    type="submit"
+                    type="button"
                     tabIndex={-1}
                     className="pointer-events-none"
                   />

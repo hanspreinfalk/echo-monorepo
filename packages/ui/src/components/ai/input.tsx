@@ -73,17 +73,35 @@ const useAutoResizeTextarea = ({
     return { textareaRef, adjustHeight };
 };
 
-export type AIInputProps = HTMLAttributes<HTMLFormElement>;
+type AIInputRootClassProps = {
+    className?: string;
+};
 
-export const AIInput = ({ className, ...props }: AIInputProps) => (
-    <form
-        className={cn(
-            "w-full divide-y overflow-hidden rounded-md border bg-background",
-            className
-        )}
-        {...props}
-    />
-);
+/** Use `as="div"` when embedding the composer inside another `<form>` (nested forms are invalid HTML). */
+export type AIInputProps =
+    | (AIInputRootClassProps &
+          Omit<HTMLAttributes<HTMLFormElement>, "className"> & {
+              as?: "form";
+          })
+    | (AIInputRootClassProps &
+          Omit<HTMLAttributes<HTMLDivElement>, "className"> & {
+              as: "div";
+          });
+
+const aiInputRootClass =
+    "w-full divide-y overflow-hidden rounded-md border bg-background";
+
+export const AIInput = (props: AIInputProps) => {
+    if (props.as === "div") {
+        const { as: _as, className, ...rest } = props;
+        return (
+            <div className={cn(aiInputRootClass, className)} {...rest} />
+        );
+    }
+
+    const { as: _as, className, ...rest } = props;
+    return <form className={cn(aiInputRootClass, className)} {...rest} />;
+};
 
 export type AIInputTextareaProps = ComponentProps<typeof Textarea> & {
     minHeight?: number;

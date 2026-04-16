@@ -63,14 +63,14 @@ export function WidgetSelectionScreen() {
                     {showBrandLogo ? (
                         hasCustomLogo ? (
                             <DicebearAvatar
-                                className="border-primary-foreground/25 bg-primary-foreground/10"
+                                className="border-0 bg-primary-foreground/10 after:border-0"
                                 imageUrl={logoUrl}
                                 seed="assistant"
                                 size={44}
                             />
                         ) : (
                             <div
-                                className="flex size-11 shrink-0 items-center justify-center rounded-full border border-dashed border-primary-foreground/35 bg-primary-foreground/10 text-primary-foreground/50"
+                                className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary-foreground/10 text-primary-foreground/50"
                                 role="img"
                                 aria-label="Logo placeholder"
                             >
