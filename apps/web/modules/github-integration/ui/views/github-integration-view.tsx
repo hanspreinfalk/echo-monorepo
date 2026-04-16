@@ -40,6 +40,7 @@ function buildEchoProductIssueWorkflowYaml(
   enableConvexMcp: boolean,
   enableVercelMcp: boolean,
   enableSentryMcp: boolean,
+  enableFirebaseMcp: boolean,
 ): string {
   const autoMergeSteps = autoMergePr
     ? `
@@ -79,13 +80,15 @@ function buildEchoProductIssueWorkflowYaml(
     ...(enableConvexMcp ? ["mcp__convex__*"] : []),
     ...(enableVercelMcp ? ["mcp__vercel__*"] : []),
     ...(enableSentryMcp ? ["mcp__sentry__*"] : []),
+    ...(enableFirebaseMcp ? ["mcp__firebase__*"] : []),
   ].join(",");
 
   const hasMcp =
     enableSupabaseMcp ||
     enableConvexMcp ||
     enableVercelMcp ||
-    enableSentryMcp;
+    enableSentryMcp ||
+    enableFirebaseMcp;
   let claudeArgsYaml: string;
   if (!hasMcp) {
     claudeArgsYaml = `          claude_args: "--allowedTools '${allowedToolsList}'"`;
@@ -134,6 +137,22 @@ function buildEchoProductIssueWorkflowYaml(
           SENTRY_ACCESS_TOKEN: "${{ secrets.SENTRY_ACCESS_TOKEN }}",
           EMBEDDED_AGENT_PROVIDER: "anthropic",
           ANTHROPIC_API_KEY: "${{ secrets.ANTHROPIC_API_KEY }}",
+        },
+      };
+    }
+    if (enableFirebaseMcp) {
+      mcpServers.firebase = {
+        type: "stdio",
+        command: "npx",
+        args: [
+          "-y",
+          "firebase-tools@latest",
+          "experimental:mcp",
+          "--project",
+          "${{ secrets.FIREBASE_PROJECT_ID }}",
+        ],
+        env: {
+          FIREBASE_TOKEN: "${{ secrets.FIREBASE_TOKEN }}",
         },
       };
     }
@@ -216,6 +235,7 @@ export const GithubIntegrationView = () => {
   const workflowConvexMcp = workflowPrefs?.convexMcp ?? false;
   const workflowVercelMcp = workflowPrefs?.vercelMcp ?? false;
   const workflowSentryMcp = workflowPrefs?.sentryMcp ?? false;
+  const workflowFirebaseMcp = workflowPrefs?.firebaseMcp ?? false;
 
   const workflowYaml = useMemo(
     () =>
@@ -225,6 +245,7 @@ export const GithubIntegrationView = () => {
         workflowConvexMcp,
         workflowVercelMcp,
         workflowSentryMcp,
+        workflowFirebaseMcp,
       ),
     [
       workflowAutoMergePr,
@@ -232,6 +253,7 @@ export const GithubIntegrationView = () => {
       workflowConvexMcp,
       workflowVercelMcp,
       workflowSentryMcp,
+      workflowFirebaseMcp,
     ],
   );
 
@@ -242,6 +264,7 @@ export const GithubIntegrationView = () => {
       convexMcp: boolean;
       vercelMcp: boolean;
       sentryMcp: boolean;
+      firebaseMcp: boolean;
     }) => {
       try {
         await setWorkflowPrefs(next);
@@ -581,6 +604,7 @@ export const GithubIntegrationView = () => {
                       convexMcp: workflowPrefs.convexMcp,
                       vercelMcp: workflowPrefs.vercelMcp,
                       sentryMcp: workflowPrefs.sentryMcp,
+                      firebaseMcp: workflowPrefs.firebaseMcp,
                     });
                   }}
                 />
@@ -626,6 +650,7 @@ export const GithubIntegrationView = () => {
                           convexMcp: workflowPrefs.convexMcp,
                           vercelMcp: workflowPrefs.vercelMcp,
                           sentryMcp: workflowPrefs.sentryMcp,
+                          firebaseMcp: workflowPrefs.firebaseMcp,
                         });
                       }}
                     />
@@ -681,6 +706,7 @@ export const GithubIntegrationView = () => {
                           convexMcp: checked,
                           vercelMcp: workflowPrefs.vercelMcp,
                           sentryMcp: workflowPrefs.sentryMcp,
+                          firebaseMcp: workflowPrefs.firebaseMcp,
                         });
                       }}
                     />
@@ -739,6 +765,7 @@ export const GithubIntegrationView = () => {
                           convexMcp: workflowPrefs.convexMcp,
                           vercelMcp: checked,
                           sentryMcp: workflowPrefs.sentryMcp,
+                          firebaseMcp: workflowPrefs.firebaseMcp,
                         });
                       }}
                     />
@@ -796,6 +823,7 @@ export const GithubIntegrationView = () => {
                           convexMcp: workflowPrefs.convexMcp,
                           vercelMcp: workflowPrefs.vercelMcp,
                           sentryMcp: checked,
+                          firebaseMcp: workflowPrefs.firebaseMcp,
                         });
                       }}
                     />
@@ -803,6 +831,81 @@ export const GithubIntegrationView = () => {
                   <Button
                     className="w-full gap-2 sm:w-auto"
                     onClick={() => setGuideKind("sentry")}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    <BookOpen className="size-4" />
+                    Instructions
+                  </Button>
+                </div>
+
+                <div
+                  className={cn(
+                    "flex flex-col gap-3 rounded-lg border bg-background p-4 text-left",
+                    prefsLoading && "pointer-events-none opacity-60",
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <div className="bg-muted text-foreground relative flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-md p-1.5">
+                        <svg
+                          aria-hidden
+                          className="size-7 shrink-0"
+                          fill="none"
+                          viewBox="0 0 32 32"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path
+                            d="M5.23 24.02 8.2 5.05a.6.6 0 0 1 1.12-.2l3.06 5.72z"
+                            fill="#FFC24A"
+                          />
+                          <path
+                            d="m5.23 24.02 11.3-19.2a.6.6 0 0 1 1.02.09l2.12 4.02z"
+                            fill="#FFA712"
+                          />
+                          <path
+                            d="M16.54 4.82a.6.6 0 0 0-1.02-.09L5.23 24.02 15.7 29.82a1.2 1.2 0 0 0 1.17 0l9.9-5.8z"
+                            fill="#F4BD62"
+                          />
+                          <path
+                            d="M19.67 9.76a.6.6 0 0 0-1.02-.1l-2.8 4.75L5.23 24.02l10.47 5.8a1.2 1.2 0 0 0 1.17 0l9.9-5.8z"
+                            fill="#F6820C"
+                          />
+                        </svg>
+                      </div>
+                      <div className="min-w-0 space-y-0.5">
+                        <p className="text-sm font-medium">Firebase MCP</p>
+                        <p className="text-muted-foreground text-xs">
+                          Stdio MCP via <code className="text-[0.7rem]">firebase-tools</code> +{" "}
+                          <code className="text-[0.7rem]">mcp__firebase__*</code>; add{" "}
+                          <code className="text-[0.7rem]">FIREBASE_TOKEN</code> and{" "}
+                          <code className="text-[0.7rem]">FIREBASE_PROJECT_ID</code> in Actions secrets.
+                        </p>
+                      </div>
+                    </div>
+                    <Switch
+                      aria-label="Firebase MCP"
+                      checked={workflowFirebaseMcp}
+                      disabled={prefsLoading}
+                      onCheckedChange={(checked) => {
+                        if (workflowPrefs === undefined) {
+                          return;
+                        }
+                        void persistWorkflowPrefs({
+                          autoMergePr: workflowPrefs.autoMergePr,
+                          supabaseMcp: workflowPrefs.supabaseMcp,
+                          convexMcp: workflowPrefs.convexMcp,
+                          vercelMcp: workflowPrefs.vercelMcp,
+                          sentryMcp: workflowPrefs.sentryMcp,
+                          firebaseMcp: checked,
+                        });
+                      }}
+                    />
+                  </div>
+                  <Button
+                    className="w-full gap-2 sm:w-auto"
+                    onClick={() => setGuideKind("firebase")}
                     size="sm"
                     type="button"
                     variant="outline"

@@ -71,6 +71,7 @@ export const getWorkflowPrefs = query({
       convexMcp: row?.convexMcp ?? false,
       vercelMcp: row?.vercelMcp ?? false,
       sentryMcp: row?.sentryMcp ?? false,
+      firebaseMcp: row?.firebaseMcp ?? false,
       manualGithubWorkflowDispatchedAt: row?.manualGithubWorkflowDispatchedAt,
       manualGithubWorkflowRepository: row?.manualGithubWorkflowRepository,
       manualGithubWorkflowRunId: row?.manualGithubWorkflowRunId,
@@ -87,6 +88,7 @@ export const setWorkflowPrefs = mutation({
     convexMcp: v.boolean(),
     vercelMcp: v.boolean(),
     sentryMcp: v.boolean(),
+    firebaseMcp: v.boolean(),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -119,6 +121,7 @@ export const setWorkflowPrefs = mutation({
       convexMcp: args.convexMcp,
       vercelMcp: args.vercelMcp,
       sentryMcp: args.sentryMcp,
+      firebaseMcp: args.firebaseMcp,
     };
 
     if (existing) {
@@ -128,6 +131,7 @@ export const setWorkflowPrefs = mutation({
         convexMcp: args.convexMcp,
         vercelMcp: args.vercelMcp,
         sentryMcp: args.sentryMcp,
+        firebaseMcp: args.firebaseMcp,
       });
     } else {
       await ctx.db.insert("githubIntegrationWorkflowPrefs", payload);
@@ -172,6 +176,7 @@ export const recordManualGithubWorkflowDispatch = mutation({
         convexMcp: false,
         vercelMcp: false,
         sentryMcp: false,
+        firebaseMcp: false,
         manualGithubWorkflowDispatchedAt: args.dispatchedAt,
         manualGithubWorkflowRepository: args.repository,
         manualGithubWorkflowRunStatus: "queued",

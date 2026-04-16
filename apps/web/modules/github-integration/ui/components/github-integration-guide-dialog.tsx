@@ -18,7 +18,8 @@ export type GithubIntegrationGuideKind =
   | "supabase"
   | "convex"
   | "vercel"
-  | "sentry";
+  | "sentry"
+  | "firebase";
 
 const GUIDE_META: Record<
   GithubIntegrationGuideKind,
@@ -53,6 +54,11 @@ const GUIDE_META: Record<
     description:
       "Stdio MCP with GitHub Actions secrets—token auth, not OAuth in the generated workflow.",
   },
+  firebase: {
+    title: "Firebase MCP",
+    description:
+      "Stdio MCP via firebase-tools; authenticate with a Firebase CI token and project ID in Actions secrets.",
+  },
 };
 
 const FOOTER_EXTERNAL: Partial<
@@ -65,6 +71,10 @@ const FOOTER_EXTERNAL: Partial<
     label: "Vercel tokens",
   },
   sentry: { href: "https://docs.sentry.io/ai/mcp/", label: "Sentry MCP docs" },
+  firebase: {
+    href: "https://firebase.google.com/docs/cli/mcp-server",
+    label: "Firebase MCP docs",
+  },
 };
 
 type GithubIntegrationGuideDialogProps = {
@@ -222,6 +232,66 @@ export function GithubIntegrationGuideDialog({
                       {"--bearer-token ${{ secrets.VERCEL_ACCESS_TOKEN }}"}
                     </code>{" "}
                     (no OAuth in CI).
+                  </p>
+                </div>
+              ) : null}
+
+              {kind === "firebase" ? (
+                <div className="space-y-4">
+                  <div className="rounded-md bg-accent p-2 text-sm">Repository secrets</div>
+                  <p className="text-muted-foreground text-sm leading-relaxed">
+                    The sample runs{" "}
+                    <code className="rounded bg-muted px-1 py-0.5 text-xs">
+                      npx firebase-tools@latest experimental:mcp
+                    </code>{" "}
+                    over stdio and passes{" "}
+                    <code className="rounded bg-muted px-1 py-0.5 text-xs">
+                      --project ${"{"}{"{"} secrets.FIREBASE_PROJECT_ID {"}"}{"}"}
+                    </code>{" "}
+                    plus{" "}
+                    <code className="rounded bg-muted px-1 py-0.5 text-xs">FIREBASE_TOKEN</code>{" "}
+                    (from{" "}
+                    <code className="rounded bg-muted px-1 py-0.5 text-xs">
+                      secrets.FIREBASE_TOKEN
+                    </code>
+                    ) so the CLI is non-interactive in CI.
+                  </p>
+                  <div className="rounded-md bg-accent p-2 text-sm">Create the token</div>
+                  <p className="text-muted-foreground text-sm leading-relaxed">
+                    Locally run{" "}
+                    <code className="rounded bg-muted px-1 py-0.5 text-xs">
+                      npx firebase-tools login:ci
+                    </code>{" "}
+                    and copy the printed refresh token into a GitHub repo secret named{" "}
+                    <code className="rounded bg-muted px-1 py-0.5 text-xs">FIREBASE_TOKEN</code>.
+                    Add another secret{" "}
+                    <code className="rounded bg-muted px-1 py-0.5 text-xs">FIREBASE_PROJECT_ID</code>{" "}
+                    (the project ID from the Firebase console URL, e.g.{" "}
+                    <code className="rounded bg-muted px-1 py-0.5 text-xs">my-app-prod</code>). If
+                    you prefer a service account, swap{" "}
+                    <code className="rounded bg-muted px-1 py-0.5 text-xs">FIREBASE_TOKEN</code>{" "}
+                    for{" "}
+                    <code className="rounded bg-muted px-1 py-0.5 text-xs">
+                      GOOGLE_APPLICATION_CREDENTIALS
+                    </code>{" "}
+                    pointing at a JSON key file written from another secret, and update the YAML
+                    to match.
+                  </p>
+                  <div className="rounded-md bg-accent p-2 text-sm">Allowed tools</div>
+                  <p className="text-muted-foreground text-sm leading-relaxed">
+                    The generated workflow whitelists{" "}
+                    <code className="rounded bg-muted px-1 py-0.5 text-xs">mcp__firebase__*</code>{" "}
+                    so Claude can call Firebase MCP tools (Firestore, Auth, Hosting, etc.) end-to-end
+                    during the run—see the{" "}
+                    <a
+                      className="text-primary font-medium underline-offset-4 hover:underline"
+                      href="https://firebase.google.com/docs/cli/mcp-server"
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      Firebase MCP server docs
+                    </a>{" "}
+                    for the full tool list.
                   </p>
                 </div>
               ) : null}

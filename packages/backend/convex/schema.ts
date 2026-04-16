@@ -218,6 +218,7 @@ export default defineSchema({
         convexMcp: v.boolean(),
         vercelMcp: v.optional(v.boolean()),
         sentryMcp: v.optional(v.boolean()),
+        firebaseMcp: v.optional(v.boolean()),
         /** Custom “dispatch without product issue” workflow (same semantics as `issues.githubWorkflow*`). */
         manualGithubWorkflowDispatchedAt: v.optional(v.string()),
         manualGithubWorkflowRepository: v.optional(v.string()),
