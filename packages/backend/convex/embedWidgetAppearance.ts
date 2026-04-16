@@ -39,7 +39,13 @@ export const embedWidgetAppearanceGet = httpAction(async (ctx, request) => {
   });
 
   if (!settings) {
-    return new Response(JSON.stringify({ appearance: null }), { status: 200, headers });
+    // No saved widget settings yet — still return a launcher color so the embed FAB mounts.
+    return new Response(
+      JSON.stringify({
+        appearance: { launcherButtonColor: DEFAULT_EMBED_LAUNCHER_BUTTON },
+      }),
+      { status: 200, headers },
+    );
   }
 
   const saved = settings.appearance;

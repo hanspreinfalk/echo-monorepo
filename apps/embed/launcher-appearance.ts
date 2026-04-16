@@ -8,6 +8,9 @@ export type EmbedWidgetAppearance = {
 
 const HEX_RE = /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/;
 
+/** Keep in sync with `DEFAULT_EMBED_LAUNCHER_BUTTON` in `convex/embedWidgetAppearance.ts`. */
+export const DEFAULT_LAUNCHER_BUTTON_COLOR = "#020202";
+
 function expandHex3(h: string): string {
   if (h.length === 6) return h;
   return h
@@ -77,14 +80,17 @@ export async function fetchWidgetAppearanceForLauncher(
   organizationId: string,
 ): Promise<EmbedWidgetAppearance> {
   const base = convexSiteUrl.replace(/\/$/, "");
+  const fallback: EmbedWidgetAppearance = {
+    launcherButtonColor: DEFAULT_LAUNCHER_BUTTON_COLOR,
+  };
   try {
     const res = await fetch(
       `${base}/embed/widget-appearance?organizationId=${encodeURIComponent(organizationId)}`,
     );
-    if (!res.ok) return undefined;
-    const data = (await res.json()) as { appearance?: EmbedWidgetAppearance };
-    return data.appearance ?? undefined;
+    if (!res.ok) return fallback;
+    const data = (await res.json()) as { appearance?: EmbedWidgetAppearance | null };
+    return data.appearance ?? fallback;
   } catch {
-    return undefined;
+    return fallback;
   }
 }
