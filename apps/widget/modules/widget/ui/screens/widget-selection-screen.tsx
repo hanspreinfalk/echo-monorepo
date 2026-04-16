@@ -10,9 +10,17 @@ import {
     widgetSettingsAtom,
 } from "@/modules/widget/atoms/widget-atoms"
 import { Button } from "@workspace/ui/components/button"
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@workspace/ui/components/dialog"
 import { DicebearAvatar } from "@workspace/ui/components/dicebear-avatar"
 import { Spinner } from "@workspace/ui/components/spinner"
-import { ChevronRightIcon, ImageIcon, MessageSquareTextIcon } from "lucide-react"
+import { ChevronRightIcon, ImageIcon, LogOutIcon, MessageSquareTextIcon } from "lucide-react"
 import { useAtomValue, useSetAtom } from "jotai"
 import { useMutation, usePaginatedQuery } from "convex/react"
 import { api } from "@workspace/backend/_generated/api"
@@ -29,6 +37,7 @@ export function WidgetSelectionScreen() {
     const setConversationId = useSetAtom(conversationIdAtom)
 
     const organizationId = useAtomValue(organizationIdAtom)
+    const setContactSessionId = useSetAtom(contactSessionIdAtomFamily(organizationId || ""))
     const contactSessionId = useAtomValue(contactSessionIdAtomFamily(organizationId || ""))
     const widgetSettings = useAtomValue(widgetSettingsAtom)
     const showBrandLogo = widgetSettings?.showLogo !== false
@@ -37,6 +46,7 @@ export function WidgetSelectionScreen() {
 
     const createConversation = useMutation(api.public.conversations.create)
     const [isPending, setIsPending] = useState(false)
+    const [isSignOutDialogOpen, setIsSignOutDialogOpen] = useState(false)
 
     const conversations = usePaginatedQuery(
         api.public.conversations.getMany,
@@ -85,6 +95,14 @@ export function WidgetSelectionScreen() {
         }
     }
 
+    const handleConfirmSignOut = () => {
+        setContactSessionId(null)
+        setConversationId(null)
+        setErrorMessage(null)
+        setIsSignOutDialogOpen(false)
+        setScreen("auth")
+    }
+
     const conversationRows = conversations.results ?? []
     const isLoadingConversations =
         Boolean(contactSessionId) && conversations.status === "LoadingFirstPage"
@@ -96,8 +114,41 @@ export function WidgetSelectionScreen() {
 
     return (
         <>
-            <WidgetHeader>
-                <div className="flex flex-col gap-3 py-2">
+            <Dialog onOpenChange={setIsSignOutDialogOpen} open={isSignOutDialogOpen}>
+                <DialogContent className="sm:max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle>Sign out</DialogTitle>
+                        <DialogDescription>
+                            Are you sure you want to sign out? You will need to enter your details again
+                            to start a new chat session.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button onClick={() => setIsSignOutDialogOpen(false)} variant="outline">
+                            Cancel
+                        </Button>
+                        <Button onClick={handleConfirmSignOut} variant="destructive">
+                            Sign out
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+            <WidgetHeader className="relative">
+                {contactSessionId ? (
+                    <Button
+                        aria-label="Sign out"
+                        className="absolute top-3 right-3 z-10 rounded-full hover:bg-primary-foreground/10"
+                        onClick={() => setIsSignOutDialogOpen(true)}
+                        size="icon-lg"
+                        type="button"
+                        variant="transparent"
+                    >
+                        <LogOutIcon aria-hidden className="size-[18px]" />
+                    </Button>
+                ) : null}
+                <div
+                    className={`flex flex-col gap-3 py-2${contactSessionId ? " pr-14" : ""}`}
+                >
                     {showBrandLogo ? (
                         hasCustomLogo ? (
                             <DicebearAvatar
