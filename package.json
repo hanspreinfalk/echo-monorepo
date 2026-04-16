@@ -2,9 +2,10 @@
   "name": "echo-monorepo",
   "version": "0.0.1",
   "private": true,
-  "scripts": {
-    "build": "turbo build",
-    "dev": "turbo dev",
+    "scripts": {
+        "build": "turbo build",
+        "deploy": "pnpm --filter @workspace/backend run deploy",
+        "dev": "turbo dev",
     "lint": "turbo lint",
     "format": "turbo format",
     "typecheck": "turbo typecheck"
