@@ -14,7 +14,7 @@ const features = [
     {
         icon: ClipboardCheck,
         title: 'Chat to product issues',
-        description: 'Echo drafts structured issues from the thread. Your team reviews and accepts.',
+        description: 'Bryan drafts structured issues from the thread. Your team reviews and accepts.',
     },
     {
         icon: Layers,

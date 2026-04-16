@@ -40,19 +40,19 @@ const faqCategories = [
                 id: 'integrations-1',
                 question: 'Which chat platforms do you support?',
                 answer:
-                    'Only the Echo chatbot widget you embed in your app or site. Conversations happen inside that widget; we do not connect to Slack, team chat, help desks, or other third party chat surfaces yet.',
+                    'Only the Bryan chatbot widget you embed in your app or site. Conversations happen inside that widget; we do not connect to Slack, team chat, help desks, or other third party chat surfaces yet.',
             },
             {
                 id: 'integrations-2',
                 question: 'Can I push issues into our engineering tracker?',
                 answer:
-                    'Not yet. Today Echo is where issues are captured, refined, and prioritized. We are building export and deeper integrations so you can plug into your existing tools when they are ready.',
+                    'Not yet. Today Bryan is where issues are captured, refined, and prioritized. We are building export and deeper integrations so you can plug into your existing tools when they are ready.',
             },
             {
                 id: 'integrations-3',
                 question: 'Do you work with our existing help desk or CRM?',
                 answer:
-                    'Not yet. Today everything flows through the embedded widget and Echo\'s dashboard. Help desk and CRM connectors are not available right now.',
+                    'Not yet. Today everything flows through the embedded widget and Bryan\'s dashboard. Help desk and CRM connectors are not available right now.',
             },
         ],
     },

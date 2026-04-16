@@ -132,7 +132,7 @@ export default function HeroSection() {
                                     <iframe
                                         className="pointer-events-none absolute left-1/2 top-1/2 h-[118%] w-[118%] max-w-none -translate-x-1/2 -translate-y-1/2 border-0 sm:h-[125%] sm:w-[125%]"
                                         src="https://www.youtube.com/embed/EJPFV9kCeZ8?autoplay=1&mute=1&loop=1&playlist=EJPFV9kCeZ8&controls=0&showinfo=0&rel=0&vq=hd1080"
-                                        title="Echo demo"
+                                        title="Bryan demo"
                                         allow="autoplay; encrypted-media; fullscreen"
                                         allowFullScreen
                                     />

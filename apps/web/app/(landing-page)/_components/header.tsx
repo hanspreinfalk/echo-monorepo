@@ -35,8 +35,8 @@ export const HeroHeader = () => {
                                 href="/"
                                 aria-label="home"
                                 className="flex items-center gap-2">
-                                <Image src="/logo.svg" alt="Echo logo" width={28} height={28} />
-                                <span className="text-foreground text-sm font-semibold">Echo</span>
+                                <Image src="/logo.svg" alt="Bryan logo" width={28} height={28} />
+                                <span className="text-foreground text-sm font-semibold">Bryan</span>
                             </Link>
 
                             <button

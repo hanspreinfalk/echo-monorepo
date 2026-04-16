@@ -13,7 +13,7 @@ const sections = [
         category: 'Issue Capture',
         title: 'Turn conversations into structured work',
         description:
-            'When something is truly broken, Echo drafts clear product issues from the thread — with all the context your team needs to act.',
+            'When something is truly broken, Bryan drafts clear product issues from the thread — with all the context your team needs to act.',
         benefits: ['Rich context preserved', 'No retyping required', 'Team-ready instantly'],
         reverse: true,
     },

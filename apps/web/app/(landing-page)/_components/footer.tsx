@@ -20,9 +20,9 @@ export function Footer() {
         <footer className="bg-background border-t border-border">
             <div className="mx-auto max-w-6xl px-6 py-12 lg:px-12">
                 <div className="flex flex-col gap-8 sm:flex-row sm:items-start sm:justify-between">
-                    <Link href="/" className="flex items-center gap-2" aria-label="Echo home">
+                    <Link href="/" className="flex items-center gap-2" aria-label="Bryan home">
                         <Image src="/logo.svg" alt="" width={28} height={28} />
-                        <span className="text-foreground text-sm font-semibold">Echo</span>
+                        <span className="text-foreground text-sm font-semibold">Bryan</span>
                     </Link>
                     <div className="flex items-center gap-4 sm:justify-end">
                         <a
@@ -30,7 +30,7 @@ export function Footer() {
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-muted-foreground hover:text-foreground transition-colors"
-                            aria-label="Echo on X">
+                            aria-label="Bryan on X">
                             <XIcon className="size-4" />
                         </a>
                         <a
@@ -38,7 +38,7 @@ export function Footer() {
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-muted-foreground hover:text-foreground transition-colors"
-                            aria-label="Echo on LinkedIn">
+                            aria-label="Bryan on LinkedIn">
                             <Linkedin className="size-4" strokeWidth={1.75} />
                         </a>
                     </div>
@@ -67,7 +67,7 @@ export function Footer() {
                 </nav>
 
                 <div className="border-border mt-8 border-t pt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <p className="text-muted-foreground text-xs">© 2026 Echo. All rights reserved.</p>
+                    <p className="text-muted-foreground text-xs">© 2026 Bryan. All rights reserved.</p>
                     <div className="border-border bg-muted text-muted-foreground inline-flex w-fit items-center gap-2 rounded-full border px-3 py-1 text-xs">
                         <span className="size-1.5 shrink-0 rounded-full bg-emerald-500" aria-hidden />
                         <span>All Systems Normal</span>
