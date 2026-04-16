@@ -149,9 +149,15 @@ export const create = mutation({
             })
         }
 
+        const operatorName =
+            (identity.name as string | undefined)?.trim() ||
+            (identity.givenName as string | undefined)?.trim() ||
+            (identity.familyName as string | undefined)?.trim() ||
+            (identity.email as string | undefined)?.trim() ||
+            "Agent";
         await saveMessage(ctx, components.agent, {
-            threadId: conversation.threadId, 
-            agentName: identity.familyName, 
+            threadId: conversation.threadId,
+            agentName: operatorName,
             message: {
                 role: "assistant",
                 content: args.prompt

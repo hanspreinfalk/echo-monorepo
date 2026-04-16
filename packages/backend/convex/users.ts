@@ -26,6 +26,24 @@ export const getMe = query({
     },
 });
 
+export const completeOnboarding = mutation({
+    args: {},
+    handler: async (ctx) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (identity === null) return null;
+
+        const existing = await ctx.db
+            .query("users")
+            .withIndex("by_clerk_user_id", (q) => q.eq("clerkUserId", identity.subject))
+            .unique();
+
+        if (!existing) return null;
+
+        await ctx.db.patch(existing._id, { onboardingFinished: true });
+        return existing._id;
+    },
+});
+
 /** Ensures a Convex `users` row exists for the signed-in Clerk user; inserts only when missing. */
 export const ensureCurrentUser = mutation({
     args: {},

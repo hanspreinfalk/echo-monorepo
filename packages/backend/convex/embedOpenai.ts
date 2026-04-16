@@ -4,7 +4,9 @@ import { internal } from "./_generated/api";
 const corsHeaders = (): Record<string, string> => ({
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  // Use * so the OpenAI SDK's extra headers (x-stainless-*, openai-*, etc.)
+  // are not blocked during the preflight on real domains.
+  "Access-Control-Allow-Headers": "*",
 });
 
 /** CORS preflight for the embed script (third-party origins). */

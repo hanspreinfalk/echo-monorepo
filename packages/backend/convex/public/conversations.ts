@@ -236,6 +236,7 @@ export const setPageControlResult = mutation({
                 (args.result.success ? "Completed" : "Failed");
             await supportAgent.saveMessage(ctx, {
                 threadId: conversation.threadId,
+                metadata: { finishReason: "stop" },
                 message: {
                     role: "assistant",
                     content: summary,

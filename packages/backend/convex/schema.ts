@@ -169,7 +169,8 @@ export default defineSchema({
                 v.literal('admin'),
                 v.literal('user'),
             )
-        )
+        ),
+        onboardingFinished: v.optional(v.boolean()),
     })
         .index("by_clerk_user_id", ["clerkUserId"])
         .index("by_email", ["email"])

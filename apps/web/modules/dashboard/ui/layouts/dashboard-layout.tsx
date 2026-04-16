@@ -1,5 +1,6 @@
 import { AuthGuard } from "@/modules/auth/ui/components/auth-guard";
 import { OrganizationGuard } from "@/modules/auth/ui/components/organization-guard";
+import { OnboardingGuard } from "@/modules/auth/ui/components/onboarding-guard";
 import { SidebarProvider } from "@workspace/ui/components/sidebar";
 import { TooltipProvider } from "@workspace/ui/components/tooltip";
 import { cookies } from "next/headers";
@@ -14,19 +15,21 @@ export async function DashboardLayout({ children }: { children: React.ReactNode 
     return (
         <AuthGuard>
             <OrganizationGuard>
-                <Provider>
-                    <TooltipProvider>
-                        <SidebarProvider defaultOpen={defaultOpen} className="h-svh overflow-hidden">
-                            <DashboardSidebar />
-                            <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-                                <DashboardMobileSidebarBar />
-                                <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
-                                    {children}
-                                </div>
-                            </main>
-                        </SidebarProvider>
-                    </TooltipProvider>
-                </Provider>
+                <OnboardingGuard>
+                    <Provider>
+                        <TooltipProvider>
+                            <SidebarProvider defaultOpen={defaultOpen} className="h-svh overflow-hidden">
+                                <DashboardSidebar />
+                                <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+                                    <DashboardMobileSidebarBar />
+                                    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
+                                        {children}
+                                    </div>
+                                </main>
+                            </SidebarProvider>
+                        </TooltipProvider>
+                    </Provider>
+                </OnboardingGuard>
             </OrganizationGuard>
         </AuthGuard>
     )

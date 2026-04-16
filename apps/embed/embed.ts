@@ -425,7 +425,7 @@ const WIDGET_Z_BUTTON = 2147483647;
     if (!agent) {
       agent = new PageAgent({
         model: 'gpt-5.1',
-        baseURL: `https://wandering-beagle-503.convex.site/embed/openai/v1`,
+        baseURL: `${EMBED_CONFIG.CONVEX_SITE_URL}/embed/openai/v1`,
         apiKey: organizationId!,
         language: 'en-US',
         instructions: {
