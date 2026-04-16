@@ -2,9 +2,9 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { Control, FieldPath } from "react-hook-form";
-import { useForm, useWatch } from "react-hook-form";
+import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Button } from "@workspace/ui/components/button";
 import {
   Card,
@@ -26,18 +26,36 @@ import { Input } from "@workspace/ui/components/input";
 import { Separator } from "@workspace/ui/components/separator";
 import { Switch } from "@workspace/ui/components/switch";
 import { Textarea } from "@workspace/ui/components/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@workspace/ui/components/select";
 import { Doc } from "@workspace/backend/_generated/dataModel";
 import { useAction, useMutation } from "convex/react";
 import { api } from "@workspace/backend/_generated/api";
 import { FormSchema } from "../../types";
 import { WIDGET_THEME_DEFAULT_HEX } from "@workspace/ui/lib/widget-default-appearance-hex";
 import {
+  WIDGET_SUPPORTED_LANGUAGES,
+  type WidgetSupportedLanguage,
+} from "@workspace/ui/lib/widget-i18n";
+import {
   appearanceForConvex,
   mergeAppearanceForForm,
   widgetSettingsSchema,
 } from "../../schemas";
 import { WidgetAppearancePreview } from "./widget-appearance-preview";
-import { ImageIcon, Loader2Icon, Trash2Icon, UploadIcon } from "lucide-react";
+import {
+  ImageIcon,
+  Loader2Icon,
+  PlusIcon,
+  Trash2Icon,
+  UploadIcon,
+  XIcon,
+} from "lucide-react";
 import { cn } from "@workspace/ui/lib/utils";
 
 type WidgetSettings = Doc<"widgetSettings">;
@@ -222,6 +240,127 @@ function LogoUpload({ logoUrl, onLogoChange }: LogoUploadProps) {
   );
 }
 
+/** Looks up a language's native label, falling back to the raw tag. */
+function languageLabel(code: string): string {
+  return (
+    WIDGET_SUPPORTED_LANGUAGES.find((l) => l.code === code)?.label ?? code
+  );
+}
+
+/**
+ * Renders the editable greeting + suggestions block for a single language
+ * entry. Used both for the default language (bound to top-level form
+ * fields) and for each item in the translations array.
+ */
+function LanguageContentFields({
+  control,
+  greetName,
+  suggestion1Name,
+  suggestion2Name,
+  suggestion3Name,
+}: {
+  control: Control<FormSchema>;
+  greetName: FieldPath<FormSchema>;
+  suggestion1Name: FieldPath<FormSchema>;
+  suggestion2Name: FieldPath<FormSchema>;
+  suggestion3Name: FieldPath<FormSchema>;
+}) {
+  return (
+    <div className="space-y-4">
+      <FormField
+        control={control}
+        name={greetName}
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Greeting message</FormLabel>
+            <FormControl>
+              <Textarea
+                value={typeof field.value === "string" ? field.value : ""}
+                onBlur={field.onBlur}
+                onChange={field.onChange}
+                ref={field.ref}
+                name={field.name}
+                disabled={field.disabled}
+                placeholder="Welcome message shown when chat opens"
+                rows={3}
+              />
+            </FormControl>
+            <FormDescription>
+              The first message customers see when they open the chat
+            </FormDescription>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+      <div className="grid gap-4 sm:grid-cols-3">
+        <FormField
+          control={control}
+          name={suggestion1Name}
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Suggestion 1</FormLabel>
+              <FormControl>
+                <Input
+                  value={typeof field.value === "string" ? field.value : ""}
+                  onBlur={field.onBlur}
+                  onChange={field.onChange}
+                  ref={field.ref}
+                  name={field.name}
+                  disabled={field.disabled}
+                  placeholder="e.g., How do I get started?"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={control}
+          name={suggestion2Name}
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Suggestion 2</FormLabel>
+              <FormControl>
+                <Input
+                  value={typeof field.value === "string" ? field.value : ""}
+                  onBlur={field.onBlur}
+                  onChange={field.onChange}
+                  ref={field.ref}
+                  name={field.name}
+                  disabled={field.disabled}
+                  placeholder="e.g., What are your pricing plans?"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={control}
+          name={suggestion3Name}
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Suggestion 3</FormLabel>
+              <FormControl>
+                <Input
+                  value={typeof field.value === "string" ? field.value : ""}
+                  onBlur={field.onBlur}
+                  onChange={field.onChange}
+                  ref={field.ref}
+                  name={field.name}
+                  disabled={field.disabled}
+                  placeholder="e.g., I need help with my account"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+      </div>
+    </div>
+  );
+}
+
 interface CustomizationFormProps {
   initialData?: WidgetSettings | null;
 }
@@ -238,6 +377,7 @@ export const CustomizationForm = ({
   const form = useForm<FormSchema>({
     resolver: zodResolver(widgetSettingsSchema),
     defaultValues: {
+      defaultLanguage: initialData?.defaultLanguage || "en",
       greetMessage:
         initialData?.greetMessage || "Hi! How can I help you today?",
       showLogo: initialData?.showLogo !== false,
@@ -246,13 +386,35 @@ export const CustomizationForm = ({
         suggestion2: initialData?.defaultSuggestions.suggestion2 || "",
         suggestion3: initialData?.defaultSuggestions.suggestion3 || "",
       },
+      translations: (initialData?.translations ?? []).map((t) => ({
+        language: t.language,
+        greetMessage: t.greetMessage,
+        defaultSuggestions: {
+          suggestion1: t.defaultSuggestions.suggestion1 || "",
+          suggestion2: t.defaultSuggestions.suggestion2 || "",
+          suggestion3: t.defaultSuggestions.suggestion3 || "",
+        },
+      })),
       appearance: mergeAppearanceForForm(initialData?.appearance),
     },
+  });
+
+  const {
+    fields: translationFields,
+    append: appendTranslation,
+    remove: removeTranslation,
+  } = useFieldArray({
+    control: form.control,
+    name: "translations",
   });
 
   const watchedAppearance = useWatch({
     control: form.control,
     name: "appearance",
+  });
+  const watchedDefaultLanguage = useWatch({
+    control: form.control,
+    name: "defaultLanguage",
   });
   const watchedGreet = useWatch({
     control: form.control,
@@ -262,17 +424,65 @@ export const CustomizationForm = ({
     control: form.control,
     name: "defaultSuggestions",
   });
+  const watchedTranslations = useWatch({
+    control: form.control,
+    name: "translations",
+  });
+
+  /**
+   * Languages already in use (default + every translation). Used to hide
+   * already-taken entries from the "Add language" picker so admins can't
+   * create collisions that the schema would then reject.
+   */
+  const usedLanguages = useMemo(() => {
+    const set = new Set<string>();
+    if (watchedDefaultLanguage) set.add(watchedDefaultLanguage);
+    (watchedTranslations ?? []).forEach((t) => {
+      if (t?.language) set.add(t.language);
+    });
+    return set;
+  }, [watchedDefaultLanguage, watchedTranslations]);
+
+  /** Candidate languages the admin can add (minus the ones already used). */
+  const availableToAdd: WidgetSupportedLanguage[] = useMemo(
+    () => WIDGET_SUPPORTED_LANGUAGES.filter((l) => !usedLanguages.has(l.code)),
+    [usedLanguages],
+  );
+
+  const [languageToAdd, setLanguageToAdd] = useState<string>("");
+
+  const handleAddLanguage = () => {
+    if (!languageToAdd) return;
+    if (usedLanguages.has(languageToAdd)) return;
+    appendTranslation({
+      language: languageToAdd,
+      greetMessage: "",
+      defaultSuggestions: {
+        suggestion1: "",
+        suggestion2: "",
+        suggestion3: "",
+      },
+    });
+    setLanguageToAdd("");
+  };
+
   const onSubmit = async (values: FormSchema) => {
     try {
       await upsertWidgetSettings({
         greetMessage: values.greetMessage,
         showLogo: values.showLogo,
         defaultSuggestions: values.defaultSuggestions,
+        defaultLanguage: values.defaultLanguage,
+        translations: values.translations.map((t) => ({
+          language: t.language,
+          greetMessage: t.greetMessage,
+          defaultSuggestions: t.defaultSuggestions,
+        })),
         appearance: appearanceForConvex(values.appearance),
       });
 
       toast.success("Widget settings saved");
-    } catch(error) {
+    } catch (error) {
       console.error(error);
       toast.error("Something went wrong");
     }
@@ -289,27 +499,6 @@ export const CustomizationForm = ({
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <FormField
-              control={form.control}
-              name="greetMessage"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Greeting Message</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      {...field}
-                      placeholder="Welcome message shown when chat open"
-                      rows={3}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    The first message customers see when they open the chat
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
             <FormField
               control={form.control}
               name="showLogo"
@@ -333,69 +522,195 @@ export const CustomizationForm = ({
             />
 
             <LogoUpload logoUrl={logoUrl} onLogoChange={setLogoUrl} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Languages</CardTitle>
+            <CardDescription>
+              Configure greeting and suggestions per language. The widget
+              auto-selects a language based on the visitor&apos;s browser
+              settings and falls back to the default language below.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <FormField
+              control={form.control}
+              name="defaultLanguage"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Default language</FormLabel>
+                  <Select
+                    onValueChange={(value) => {
+                      // Prevent setting the default to a language that's
+                      // already in the translations array — swap them.
+                      const idx = (form.getValues("translations") ?? []).findIndex(
+                        (t) => t.language === value,
+                      );
+                      if (idx >= 0) {
+                        const prevDefault = form.getValues("defaultLanguage");
+                        const prevGreet = form.getValues("greetMessage");
+                        const prevSuggestions = form.getValues(
+                          "defaultSuggestions",
+                        );
+                        const swap = form.getValues(`translations.${idx}`);
+                        form.setValue(
+                          "greetMessage",
+                          swap.greetMessage || prevGreet,
+                          { shouldDirty: true },
+                        );
+                        form.setValue(
+                          "defaultSuggestions",
+                          swap.defaultSuggestions,
+                          { shouldDirty: true },
+                        );
+                        form.setValue(
+                          `translations.${idx}`,
+                          {
+                            language: prevDefault,
+                            greetMessage: prevGreet,
+                            defaultSuggestions: prevSuggestions,
+                          },
+                          { shouldDirty: true },
+                        );
+                      }
+                      field.onChange(value);
+                    }}
+                    value={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger className="w-full max-w-sm">
+                        <SelectValue placeholder="Select language" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {WIDGET_SUPPORTED_LANGUAGES.map((lang) => (
+                        <SelectItem key={lang.code} value={lang.code}>
+                          {lang.label}
+                          <span className="ml-2 text-muted-foreground">
+                            ({lang.code})
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>
+                    Used when the visitor&apos;s browser language is not
+                    configured below.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <Separator />
 
             <div className="space-y-4">
               <div>
-                <h3 className="mb-4 text-sm">
-                  Default Suggestions
+                <h3 className="text-sm font-medium">
+                  Default ({languageLabel(watchedDefaultLanguage || "en")})
                 </h3>
-                <p className="mb-4 text-muted-foreground text-sm">
-                  Quick reply suggestions shown to customers to help guide the
-                  conversation
+                <p className="text-xs text-muted-foreground">
+                  These values are used as the fallback when a visitor&apos;s
+                  language isn&apos;t configured.
                 </p>
+              </div>
+              <LanguageContentFields
+                control={form.control}
+                greetName="greetMessage"
+                suggestion1Name="defaultSuggestions.suggestion1"
+                suggestion2Name="defaultSuggestions.suggestion2"
+                suggestion3Name="defaultSuggestions.suggestion3"
+              />
+            </div>
 
-                <div className="space-y-4">
-                  <FormField
+            {translationFields.length > 0 ? <Separator /> : null}
+
+            {translationFields.map((fieldItem, index) => {
+              const code = watchedTranslations?.[index]?.language ?? fieldItem.language;
+              return (
+                <div
+                  key={fieldItem.id}
+                  className="space-y-4 rounded-lg border border-dashed border-border p-4"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h3 className="text-sm font-medium">
+                        {languageLabel(code)}
+                      </h3>
+                      <p className="text-xs text-muted-foreground">
+                        Shown when the visitor&apos;s browser language matches{" "}
+                        <code className="rounded bg-muted px-1 py-0.5">
+                          {code}
+                        </code>
+                        .
+                      </p>
+                    </div>
+                    <Button
+                      aria-label="Remove language"
+                      onClick={() => removeTranslation(index)}
+                      size="icon"
+                      type="button"
+                      variant="ghost"
+                      className="text-muted-foreground hover:text-destructive"
+                    >
+                      <XIcon className="size-4" />
+                    </Button>
+                  </div>
+                  <LanguageContentFields
                     control={form.control}
-                    name="defaultSuggestions.suggestion1"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Suggestion 1</FormLabel>
-                        <FormControl>
-                          <Input
-                            {...field}
-                            placeholder="e.g., How do I get started?"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="defaultSuggestions.suggestion2"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Suggestion 2</FormLabel>
-                        <FormControl>
-                          <Input
-                            {...field}
-                            placeholder="e.g., What are your pricing plans?"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="defaultSuggestions.suggestion3"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Suggestion 3</FormLabel>
-                        <FormControl>
-                          <Input
-                            {...field}
-                            placeholder="e.g., I need help with my account"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+                    greetName={`translations.${index}.greetMessage`}
+                    suggestion1Name={`translations.${index}.defaultSuggestions.suggestion1`}
+                    suggestion2Name={`translations.${index}.defaultSuggestions.suggestion2`}
+                    suggestion3Name={`translations.${index}.defaultSuggestions.suggestion3`}
                   />
                 </div>
+              );
+            })}
+
+            <Separator />
+
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Add language</p>
+              <p className="text-xs text-muted-foreground">
+                Pick a language and enter the greeting and suggestions for it.
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <Select
+                  onValueChange={setLanguageToAdd}
+                  value={languageToAdd}
+                  disabled={availableToAdd.length === 0}
+                >
+                  <SelectTrigger className="w-full max-w-sm">
+                    <SelectValue
+                      placeholder={
+                        availableToAdd.length === 0
+                          ? "All languages added"
+                          : "Select language to add"
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableToAdd.map((lang) => (
+                      <SelectItem key={lang.code} value={lang.code}>
+                        {lang.label}
+                        <span className="ml-2 text-muted-foreground">
+                          ({lang.code})
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  disabled={!languageToAdd}
+                  onClick={handleAddLanguage}
+                  type="button"
+                  variant="outline"
+                >
+                  <PlusIcon className="size-4" />
+                  Add language
+                </Button>
               </div>
             </div>
           </CardContent>

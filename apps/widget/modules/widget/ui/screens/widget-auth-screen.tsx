@@ -19,21 +19,19 @@ import { api } from "@workspace/backend/_generated/api";
 import { useMutation } from "convex/react";
 import { Doc } from "@workspace/backend/_generated/dataModel";
 import { useAtomValue, useSetAtom } from "jotai";
+import { useMemo } from "react";
 import {
     contactSessionIdAtomFamily,
     organizationIdAtom,
     screenAtom,
     widgetSettingsAtom,
 } from "../../atoms/widget-atoms";
+import { useWidgetStrings } from "@/modules/widget/hooks/use-widget-i18n";
 import { ImageIcon } from "lucide-react";
-
-const formSchema = z.object({
-    name: z.string().min(1, { message: "Name is required" }),
-    email: z.string().email({ message: "Invalid email address" }),
-});
 
 export function WidgetAuthScreen() {
     const setScreen = useSetAtom(screenAtom);
+    const { t } = useWidgetStrings();
 
     const organizationId = useAtomValue(organizationIdAtom);
     const widgetSettings = useAtomValue(widgetSettingsAtom);
@@ -42,6 +40,17 @@ export function WidgetAuthScreen() {
     const hasCustomLogo = Boolean(logoUrl);
 
     const setContactSessionId = useSetAtom(contactSessionIdAtomFamily(organizationId || ""));
+
+    // Schema is rebuilt per-render so validation messages follow the
+    // current language. Cheap and avoids having to thread `t` into zod.
+    const formSchema = useMemo(
+        () =>
+            z.object({
+                name: z.string().min(1, { message: t("auth.nameRequired") }),
+                email: z.string().email({ message: t("auth.emailInvalid") }),
+            }),
+        [t],
+    );
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -106,9 +115,11 @@ export function WidgetAuthScreen() {
                         )
                     ) : null}
                     <div className="flex flex-col gap-1">
-                        <h1 className="text-pretty text-2xl font-semibold tracking-tight">Hi there</h1>
+                        <h1 className="text-pretty text-2xl font-semibold tracking-tight">
+                            {t("greeting.title")}
+                        </h1>
                         <p className="text-pretty text-sm leading-relaxed text-primary-foreground/75">
-                            Let&apos;s get you started. We&apos;re here when you need us.
+                            {t("greeting.subtitleExtended")}
                         </p>
                     </div>
                 </div>
@@ -120,7 +131,7 @@ export function WidgetAuthScreen() {
                 >
                     <div className="flex flex-col gap-2">
                         <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-                            Your details
+                            {t("auth.yourDetails")}
                         </p>
                         <div className="flex flex-col gap-4">
                             <FormField
@@ -129,13 +140,13 @@ export function WidgetAuthScreen() {
                                 render={({ field }) => (
                                     <FormItem className="gap-1.5">
                                         <FormLabel className="text-muted-foreground text-xs font-medium">
-                                            Name
+                                            {t("auth.nameLabel")}
                                         </FormLabel>
                                         <FormControl>
                                             <Input
                                                 autoComplete="name"
                                                 className="h-12 rounded-lg border-border/80 bg-background px-3.5 shadow-xs"
-                                                placeholder="e.g. John Doe"
+                                                placeholder={t("auth.namePlaceholder")}
                                                 type="text"
                                                 {...field}
                                             />
@@ -150,13 +161,13 @@ export function WidgetAuthScreen() {
                                 render={({ field }) => (
                                     <FormItem className="gap-1.5">
                                         <FormLabel className="text-muted-foreground text-xs font-medium">
-                                            Email
+                                            {t("auth.emailLabel")}
                                         </FormLabel>
                                         <FormControl>
                                             <Input
                                                 autoComplete="email"
                                                 className="h-12 rounded-lg border-border/80 bg-background px-3.5 shadow-xs"
-                                                placeholder="e.g. john.doe@example.com"
+                                                placeholder={t("auth.emailPlaceholder")}
                                                 type="email"
                                                 {...field}
                                             />
@@ -172,7 +183,7 @@ export function WidgetAuthScreen() {
                         disabled={form.formState.isSubmitting}
                         type="submit"
                     >
-                        Continue
+                        {t("auth.continue")}
                     </Button>
                 </form>
             </Form>

@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { useInfiniteScroll } from "@workspace/ui/hooks/use-infinite-scroll";
 import { InfiniteScrollTrigger } from "@workspace/ui/components/infinite-scroll-trigger";
-import { contactSessionIdAtomFamily, conversationIdAtom, organizationIdAtom, screenAtom, widgetSettingsAtom } from "../../atoms/widget-atoms";
+import { contactSessionIdAtomFamily, conversationIdAtom, organizationIdAtom, screenAtom } from "../../atoms/widget-atoms";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { Id } from "@workspace/backend/_generated/dataModel";
 import { api } from "@workspace/backend/_generated/api";
@@ -79,6 +79,10 @@ import {
     PageControlCard,
 } from "@workspace/ui/components/ai/page-control-card";
 import type { Doc } from "@workspace/backend/_generated/dataModel";
+import {
+    useAuthoredContent,
+    useWidgetStrings,
+} from "@/modules/widget/hooks/use-widget-i18n";
 
 const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024; // 10 MB
 
@@ -209,8 +213,9 @@ function WidgetPageControlRow({
 export const WidgetChatScreen = () => {
     const setScreen = useSetAtom(screenAtom);
     const setConversationId = useSetAtom(conversationIdAtom);
+    const { t } = useWidgetStrings();
+    const authoredContent = useAuthoredContent();
 
-    const widgetSettings = useAtomValue(widgetSettingsAtom);
     const conversationId = useAtomValue(conversationIdAtom);
     const organizationId = useAtomValue(organizationIdAtom);
     const contactSessionId = useAtomValue(
@@ -241,16 +246,11 @@ export const WidgetChatScreen = () => {
     };
 
     const suggestions = useMemo(() => {
-        if (!widgetSettings) {
-            return [];
-        }
-
-        return Object.keys(widgetSettings.defaultSuggestions).map((key) => {
-            return widgetSettings.defaultSuggestions[
-                key as keyof typeof widgetSettings.defaultSuggestions
-            ];
-        });
-    }, [widgetSettings]);
+        // Pull from the language-matched authored content — keeps suggestion
+        // order stable across languages (suggestion1 → 2 → 3).
+        const s = authoredContent.defaultSuggestions;
+        return [s.suggestion1, s.suggestion2, s.suggestion3];
+    }, [authoredContent.defaultSuggestions]);
 
     const conversation = useQuery(
         api.public.conversations.getOne,
@@ -316,7 +316,7 @@ export const WidgetChatScreen = () => {
             if (!contactSessionId) return;
 
             if (file.size > MAX_ATTACHMENT_SIZE) {
-                setAttachmentError(`"${file.name}" exceeds the 10 MB limit.`);
+                setAttachmentError(t("chat.attachmentTooLarge", { name: file.name }));
                 return;
             }
 
@@ -363,7 +363,7 @@ export const WidgetChatScreen = () => {
                 );
             }
         },
-        [contactSessionId, storeAttachment],
+        [contactSessionId, storeAttachment, t],
     );
 
     const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -381,9 +381,7 @@ export const WidgetChatScreen = () => {
         setAttachmentError(null);
         if (!contactSessionId) return;
         if (window.parent === window.self) {
-            setAttachmentError(
-                "Screenshots of your site are available when the chat is embedded on your page.",
-            );
+            setAttachmentError(t("chat.screenshotNotEmbedded"));
             return;
         }
         const requestId = crypto.randomUUID();
@@ -396,7 +394,7 @@ export const WidgetChatScreen = () => {
             if (pendingScreenshotRequestIdRef.current !== requestId) return;
             pendingScreenshotRequestIdRef.current = null;
             setScreenshotPending(false);
-            setAttachmentError("Screenshot timed out. Try again.");
+            setAttachmentError(t("chat.screenshotTimedOut"));
         }, 60_000);
         window.parent.postMessage(
             { type: "echo-request-host-screenshot", payload: { requestId } },
@@ -434,7 +432,7 @@ export const WidgetChatScreen = () => {
                 setScreenshotPending(false);
                 const bytes = payload.bytes as ArrayBuffer | undefined;
                 if (!bytes) {
-                    setAttachmentError("Screenshot data was missing.");
+                    setAttachmentError(t("chat.screenshotDataMissing"));
                     return;
                 }
                 const mime = (payload.mimeType as string) || "image/png";
@@ -452,7 +450,9 @@ export const WidgetChatScreen = () => {
                 }
                 setScreenshotPending(false);
                 setAttachmentError(
-                    typeof payload.message === "string" ? payload.message : "Screenshot failed.",
+                    typeof payload.message === "string"
+                        ? payload.message
+                        : t("chat.screenshotFailedGeneric"),
                 );
             }
         };
@@ -463,7 +463,7 @@ export const WidgetChatScreen = () => {
                 clearTimeout(screenshotTimeoutRef.current);
             }
         };
-    }, [contactSessionId, addStep, setResult, uploadFileToAttachments]);
+    }, [contactSessionId, addStep, setResult, uploadFileToAttachments, t]);
 
     const handleRemoveAttachment = (id: string) => {
         setAttachedFiles(prev => prev.filter(f => f.id !== id));
@@ -521,10 +521,9 @@ export const WidgetChatScreen = () => {
             <Dialog onOpenChange={setIsDeleteDialogOpen} open={isDeleteDialogOpen}>
                 <DialogContent className="sm:max-w-sm">
                     <DialogHeader>
-                        <DialogTitle>Delete conversation</DialogTitle>
+                        <DialogTitle>{t("chat.deleteConversationTitle")}</DialogTitle>
                         <DialogDescription>
-                            Are you sure you want to delete this conversation? All messages and
-                            attachments will be permanently removed. This action cannot be undone.
+                            {t("chat.deleteConversationDescription")}
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
@@ -533,14 +532,14 @@ export const WidgetChatScreen = () => {
                             onClick={() => setIsDeleteDialogOpen(false)}
                             variant="outline"
                         >
-                            Cancel
+                            {t("chat.cancel")}
                         </Button>
                         <Button
                             disabled={isDeleting}
                             onClick={handleDeleteConversation}
                             variant="destructive"
                         >
-                            {isDeleting ? "Deleting..." : "Delete"}
+                            {isDeleting ? t("chat.deleting") : t("chat.delete")}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -554,7 +553,7 @@ export const WidgetChatScreen = () => {
                     >
                         <ArrowLeftIcon />
                     </Button>
-                    <p>Chat</p>
+                    <p>{t("chat.headerTitle")}</p>
                 </div>
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -568,7 +567,7 @@ export const WidgetChatScreen = () => {
                             onClick={() => setIsDeleteDialogOpen(true)}
                         >
                             <Trash2Icon className="size-4" />
-                            Delete
+                            {t("chat.delete")}
                         </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
@@ -979,8 +978,8 @@ export const WidgetChatScreen = () => {
                                     }}
                                     placeholder={
                                         conversation?.status === "resolved"
-                                            ? "This conversation has been resolved."
-                                            : "Type your message..."
+                                            ? t("chat.conversationResolved")
+                                            : t("chat.typeYourMessage")
                                     }
                                     value={field.value}
                                 />
@@ -997,7 +996,7 @@ export const WidgetChatScreen = () => {
                                     type="button"
                                 >
                                     <PaperclipIcon />
-                                    Attach
+                                    {t("chat.attach")}
                                 </AIInputButton>
                                 <AIInputButton
                                     disabled={
@@ -1009,7 +1008,7 @@ export const WidgetChatScreen = () => {
                                     type="button"
                                 >
                                     <Camera />
-                                    Screenshot
+                                    {t("chat.screenshot")}
                                 </AIInputButton>
                             </AIInputTools>
                             <AIInputSubmit

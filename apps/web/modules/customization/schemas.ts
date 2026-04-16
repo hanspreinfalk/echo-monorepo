@@ -21,16 +21,49 @@ const widgetAppearanceSchema = z.object({
   launcherButtonColor: optionalHex,
 });
 
-export const widgetSettingsSchema = z.object({
-  greetMessage: z.string().min(1, "Greeting message is required"),
-  showLogo: z.boolean(),
-  defaultSuggestions: z.object({
-    suggestion1: z.string().optional(),
-    suggestion2: z.string().optional(),
-    suggestion3: z.string().optional(),
-  }),
-  appearance: widgetAppearanceSchema,
+const suggestionsSchema = z.object({
+  suggestion1: z.string().optional(),
+  suggestion2: z.string().optional(),
+  suggestion3: z.string().optional(),
 });
+
+/**
+ * A per-language translation of greeting + suggestions. `language` is a
+ * BCP-47 tag (e.g. "en", "pt-BR"). The default language's translation is
+ * stored in the top-level `greetMessage` / `defaultSuggestions` fields;
+ * this array holds *additional* languages only.
+ */
+const widgetTranslationSchema = z.object({
+  language: z.string().min(1, "Language is required"),
+  greetMessage: z.string().min(1, "Greeting message is required"),
+  defaultSuggestions: suggestionsSchema,
+});
+
+export const widgetSettingsSchema = z
+  .object({
+    defaultLanguage: z.string().min(1, "Default language is required"),
+    greetMessage: z.string().min(1, "Greeting message is required"),
+    showLogo: z.boolean(),
+    defaultSuggestions: suggestionsSchema,
+    translations: z.array(widgetTranslationSchema),
+    appearance: widgetAppearanceSchema,
+  })
+  .superRefine((data, ctx) => {
+    // Reject duplicate language tags: default language cannot also appear
+    // in translations, and translations can't collide with each other.
+    const seen = new Set<string>([data.defaultLanguage.toLowerCase()]);
+    data.translations.forEach((t, i) => {
+      const key = t.language.toLowerCase();
+      if (seen.has(key)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Duplicate language — each language can only be configured once",
+          path: ["translations", i, "language"],
+        });
+      }
+      seen.add(key);
+    });
+  });
 
 export type WidgetAppearanceForm = z.infer<typeof widgetAppearanceSchema>;
 

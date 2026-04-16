@@ -6,6 +6,10 @@ import { MessageDoc, saveMessage } from "@convex-dev/agent";
 import { paginationOptsValidator } from "convex/server";
 import { Id } from "../_generated/dataModel";
 import { ATTACHMENT_MARKDOWN_URL_REGEX } from "../lib/attachmentMarkdown";
+import {
+    languagesFromSessionMetadata,
+    pickGreetMessageForLanguages,
+} from "../lib/widgetLanguage";
 
 export const getIsAiTyping = query({
     args: {
@@ -148,11 +152,19 @@ export const create = mutation({
             userId: args.organizationId,
         });
 
+        // Pick a greeting that matches the visitor's browser language(s),
+        // falling back to the organization's default-language greeting.
+        const requestedLanguages = languagesFromSessionMetadata(session.metadata);
+        const localizedGreeting =
+            pickGreetMessageForLanguages(widgetSettings, requestedLanguages) ||
+            widgetSettings?.greetMessage ||
+            "Hello, how can I help you today?";
+
         await saveMessage(ctx, components.agent, {
             threadId,
             message: {
                 role: "assistant",
-                content: widgetSettings?.greetMessage || "Hello, how can I help you today?",
+                content: localizedGreeting,
             },
         });
 

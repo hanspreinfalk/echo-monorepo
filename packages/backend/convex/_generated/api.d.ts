@@ -16,6 +16,7 @@ import type * as http from "../http.js";
 import type * as lib_assertAdmin from "../lib/assertAdmin.js";
 import type * as lib_attachmentMarkdown from "../lib/attachmentMarkdown.js";
 import type * as lib_extractTextContent from "../lib/extractTextContent.js";
+import type * as lib_widgetLanguage from "../lib/widgetLanguage.js";
 import type * as pricing from "../pricing.js";
 import type * as private_agentCustomTools from "../private/agentCustomTools.js";
 import type * as private_contactSessions from "../private/contactSessions.js";
@@ -75,6 +76,7 @@ declare const fullApi: ApiFromModules<{
   "lib/assertAdmin": typeof lib_assertAdmin;
   "lib/attachmentMarkdown": typeof lib_attachmentMarkdown;
   "lib/extractTextContent": typeof lib_extractTextContent;
+  "lib/widgetLanguage": typeof lib_widgetLanguage;
   pricing: typeof pricing;
   "private/agentCustomTools": typeof private_agentCustomTools;
   "private/contactSessions": typeof private_contactSessions;

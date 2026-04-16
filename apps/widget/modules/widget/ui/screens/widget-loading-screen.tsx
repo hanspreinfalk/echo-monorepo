@@ -7,6 +7,7 @@ import { contactSessionIdAtomFamily, errorMessageAtom, loadingMessageAtom, organ
 import { WidgetHeader } from "@/modules/widget/ui/components/widget-header";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "@workspace/backend/_generated/api";
+import { useWidgetStrings } from "@/modules/widget/hooks/use-widget-i18n";
 
 type InitStep = "org" | "session" | "settings" | "vapi" | "done";
 
@@ -20,6 +21,7 @@ export const WidgetLoadingScreen = ({ organizationId }: { organizationId: string
     const setLoadingMessage = useSetAtom(loadingMessageAtom);
     const setErrorMessage = useSetAtom(errorMessageAtom);
     const setScreen = useSetAtom(screenAtom);
+    const { t } = useWidgetStrings();
 
     const contactSessionId = useAtomValue(contactSessionIdAtomFamily(organizationId || ""));
 
@@ -30,15 +32,15 @@ export const WidgetLoadingScreen = ({ organizationId }: { organizationId: string
             return;
         }
 
-        setLoadingMessage("Finding organization ID...");
+        setLoadingMessage(t("loading.findingOrg"));
 
         if (!organizationId) {
-            setErrorMessage("Organization ID is required");
+            setErrorMessage(t("error.missingOrgIdShort"));
             setScreen("error");
             return;
         }
 
-        setLoadingMessage("Verifying organization...");
+        setLoadingMessage(t("loading.verifyingOrg"));
 
         validateOrganization({ organizationId })
             .then((result) => {
@@ -46,12 +48,12 @@ export const WidgetLoadingScreen = ({ organizationId }: { organizationId: string
                     setOrganizationId(organizationId);
                     setStep("session");
                 } else {
-                    setErrorMessage(result.reason || "Invalid configuration");
+                    setErrorMessage(result.reason || t("error.invalidConfig"));
                     setScreen("error");
                 }
             })
             .catch(() => {
-                setErrorMessage("Unable to verify organization");
+                setErrorMessage(t("error.unableVerify"));
                 setScreen("error");
             })
     }, [
@@ -62,7 +64,8 @@ export const WidgetLoadingScreen = ({ organizationId }: { organizationId: string
         setOrganizationId,
         setStep,
         validateOrganization,
-        setLoadingMessage
+        setLoadingMessage,
+        t
     ]);
 
     // Step 2: Validate session (if exists)
@@ -72,7 +75,7 @@ export const WidgetLoadingScreen = ({ organizationId }: { organizationId: string
             return;
         }
 
-        setLoadingMessage("Finding contact session ID...");
+        setLoadingMessage(t("loading.findingSession"));
 
         if (!contactSessionId) {
             setSessionValid(false);
@@ -80,7 +83,7 @@ export const WidgetLoadingScreen = ({ organizationId }: { organizationId: string
             return;
         }
 
-        setLoadingMessage("Validating session...");
+        setLoadingMessage(t("loading.validatingSession"));
 
         validateContactSession({ contactSessionId })
             .then((result) => {
@@ -91,7 +94,7 @@ export const WidgetLoadingScreen = ({ organizationId }: { organizationId: string
                 setSessionValid(false);
                 setStep("settings");
             })
-    }, [step, contactSessionId, validateContactSession, setLoadingMessage]);
+    }, [step, contactSessionId, validateContactSession, setLoadingMessage, t]);
 
     // Step 3: Load Widget Settings
     const widgetSettings = useQuery(api.public.widgetSettings.getByOrganizationId,
@@ -104,7 +107,7 @@ export const WidgetLoadingScreen = ({ organizationId }: { organizationId: string
             return;
         }
 
-        setLoadingMessage("Loading widget settings...");
+        setLoadingMessage(t("loading.loadingSettings"));
 
         if (widgetSettings !== undefined) {
             setWidgetSettings(widgetSettings);
@@ -116,6 +119,7 @@ export const WidgetLoadingScreen = ({ organizationId }: { organizationId: string
         setStep,
         setWidgetSettings,
         setLoadingMessage,
+        t,
     ]);
 
     useEffect(() => {
@@ -132,17 +136,17 @@ export const WidgetLoadingScreen = ({ organizationId }: { organizationId: string
             <WidgetHeader>
                 <div className="flex flex-col justify-between gap-y-2 px-2 py-6 font-semibold">
                     <p className="text-3xl">
-                        Hi there
+                        {t("greeting.title")}
                     </p>
                     <p className="text-lg">
-                        Let&apos;s get you started
+                        {t("greeting.subtitle")}
                     </p>
                 </div>
             </WidgetHeader>
             <div className="flex flex-1 flex-col items-center justify-center gap-y-4 p-4 text-muted-foreground">
                 <LoaderIcon className="animate-spin" />
                 <p className="text-sm">
-                    {loadingMessage || "Loading..."}
+                    {loadingMessage || t("loading.default")}
                 </p>
             </div>
         </>

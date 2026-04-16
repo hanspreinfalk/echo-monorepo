@@ -30,11 +30,13 @@ import { ConversationStatusIcon } from "@workspace/ui/components/conversation-st
 import { useInfiniteScroll } from "@workspace/ui/hooks/use-infinite-scroll"
 import { InfiniteScrollTrigger } from "@workspace/ui/components/infinite-scroll-trigger"
 import { formatConversationLastMessagePreview } from "@workspace/ui/lib/conversation-last-message-preview"
+import { useWidgetStrings } from "@/modules/widget/hooks/use-widget-i18n"
 
 export function WidgetSelectionScreen() {
     const setScreen = useSetAtom(screenAtom)
     const setErrorMessage = useSetAtom(errorMessageAtom)
     const setConversationId = useSetAtom(conversationIdAtom)
+    const { t } = useWidgetStrings()
 
     const organizationId = useAtomValue(organizationIdAtom)
     const setContactSessionId = useSetAtom(contactSessionIdAtomFamily(organizationId || ""))
@@ -69,7 +71,7 @@ export function WidgetSelectionScreen() {
     const handleNewConversation = async () => {
         if (!organizationId) {
             setScreen("error")
-            setErrorMessage("Missing Organization ID")
+            setErrorMessage(t("error.missingOrgId"))
             return
         }
 
@@ -117,18 +119,17 @@ export function WidgetSelectionScreen() {
             <Dialog onOpenChange={setIsSignOutDialogOpen} open={isSignOutDialogOpen}>
                 <DialogContent className="sm:max-w-sm">
                     <DialogHeader>
-                        <DialogTitle>Sign out</DialogTitle>
+                        <DialogTitle>{t("selection.signOutTitle")}</DialogTitle>
                         <DialogDescription>
-                            Are you sure you want to sign out? You will need to enter your details again
-                            to start a new chat session.
+                            {t("selection.signOutDescription")}
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
                         <Button onClick={() => setIsSignOutDialogOpen(false)} variant="outline">
-                            Cancel
+                            {t("selection.cancel")}
                         </Button>
                         <Button onClick={handleConfirmSignOut} variant="destructive">
-                            Sign out
+                            {t("selection.signOut")}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -136,7 +137,7 @@ export function WidgetSelectionScreen() {
             <WidgetHeader className="relative">
                 {contactSessionId ? (
                     <Button
-                        aria-label="Sign out"
+                        aria-label={t("selection.signOutAria")}
                         className="absolute top-3 right-3 z-10 rounded-full hover:bg-primary-foreground/10"
                         onClick={() => setIsSignOutDialogOpen(true)}
                         size="icon-lg"
@@ -168,9 +169,11 @@ export function WidgetSelectionScreen() {
                         )
                     ) : null}
                     <div className="flex flex-col gap-1">
-                        <h1 className="text-pretty text-2xl font-semibold tracking-tight">Hi there</h1>
+                        <h1 className="text-pretty text-2xl font-semibold tracking-tight">
+                            {t("greeting.title")}
+                        </h1>
                         <p className="text-pretty text-sm leading-relaxed text-primary-foreground/75">
-                            Let&apos;s get you started. We&apos;re here when you need us.
+                            {t("greeting.subtitleExtended")}
                         </p>
                     </div>
                 </div>
@@ -191,7 +194,7 @@ export function WidgetSelectionScreen() {
                             )}
                         </span>
                         <span className="truncate text-sm font-medium text-foreground">
-                            {isPending ? "One moment…" : "Chat with us"}
+                            {isPending ? t("selection.oneMoment") : t("selection.chatWithUs")}
                         </span>
                     </span>
                     {!isPending ? (
@@ -205,7 +208,7 @@ export function WidgetSelectionScreen() {
                 {showRecentSection ? (
                     <div className="flex flex-col gap-2">
                         <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-                            Recent chats
+                            {t("selection.recentChats")}
                         </p>
                         <div className="flex flex-col gap-y-2">
                             {isLoadingConversations && conversationRows.length === 0 ? (
@@ -225,7 +228,7 @@ export function WidgetSelectionScreen() {
                                 >
                                     <div className="flex w-full flex-col gap-4 overflow-hidden text-start">
                                         <div className="flex w-full items-center justify-between gap-x-2">
-                                            <p className="text-muted-foreground text-xs">Chat</p>
+                                            <p className="text-muted-foreground text-xs">{t("selection.chat")}</p>
                                             <p className="text-muted-foreground text-xs">
                                                 {formatDistanceToNow(new Date(conversation._creationTime))}
                                             </p>

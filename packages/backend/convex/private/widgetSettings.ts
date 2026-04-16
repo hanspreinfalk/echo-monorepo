@@ -26,11 +26,25 @@ export const upsert = mutation({
       suggestion2: v.optional(v.string()),
       suggestion3: v.optional(v.string()),
     }),
+    defaultLanguage: v.optional(v.string()),
+    translations: v.optional(
+      v.array(
+        v.object({
+          language: v.string(),
+          greetMessage: v.string(),
+          defaultSuggestions: v.object({
+            suggestion1: v.optional(v.string()),
+            suggestion2: v.optional(v.string()),
+            suggestion3: v.optional(v.string()),
+          }),
+        }),
+      ),
+    ),
     appearance: appearanceArgs,
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
-            
+
     if (identity === null) {
       throw new ConvexError({ code: "UNAUTHORIZED", message: "Identity not found" });
     }
@@ -50,6 +64,8 @@ export const upsert = mutation({
       greetMessage: args.greetMessage,
       showLogo: args.showLogo,
       defaultSuggestions: args.defaultSuggestions,
+      defaultLanguage: args.defaultLanguage ?? "en",
+      translations: args.translations ?? [],
       ...(args.appearance !== undefined ? { appearance: args.appearance } : {}),
     };
 

@@ -102,6 +102,20 @@ export default defineSchema({
           suggestion2: v.optional(v.string()),
           suggestion3: v.optional(v.string()),
         }),
+        defaultLanguage: v.optional(v.string()),
+        translations: v.optional(
+          v.array(
+            v.object({
+              language: v.string(),
+              greetMessage: v.string(),
+              defaultSuggestions: v.object({
+                suggestion1: v.optional(v.string()),
+                suggestion2: v.optional(v.string()),
+                suggestion3: v.optional(v.string()),
+              }),
+            }),
+          ),
+        ),
         appearance: v.optional(
           v.object({
             primaryColor: v.optional(v.string()),
