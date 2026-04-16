@@ -138,6 +138,10 @@ const WIDGET_Z_BUTTON = 2147483647;
     };
   });
 
+  type EchoHostIdentity = { name: string; email: string; pictureUrl?: string };
+  const HOST_IDENTITY_MESSAGE_TYPE = 'echo-host-identity';
+  const HOST_CLEAR_IDENTITY_MESSAGE_TYPE = 'echo-host-clear-identity';
+
   let iframe: HTMLIFrameElement | null = null;
   let container: HTMLDivElement | null = null;
   let button: HTMLButtonElement | null = null;
@@ -148,6 +152,12 @@ const WIDGET_Z_BUTTON = 2147483647;
   let activePageControlRequestId: string | undefined;
   let suppressNextAgentDone = false;
   const widgetMessageTarget = new URL(EMBED_CONFIG.WIDGET_URL).origin;
+
+  let pendingIdentity: EchoHostIdentity | null = null;
+  let iframeLoaded = false;
+  let requireActiveSession = false;
+  let widgetSessionActive: boolean | null = null;
+  const WIDGET_SESSION_STATE_MESSAGE_TYPE = 'echo-widget-session-state';
 
   // Get configuration from script tag
   let organizationId: string | null = null;
@@ -195,6 +205,27 @@ const WIDGET_Z_BUTTON = 2147483647;
     btn.style.color = t.color;
     btn.style.boxShadow = t.boxShadow;
     btn.style.border = '1px solid rgba(15, 23, 42, 0.12)';
+  }
+
+  function shouldShowLauncher(): boolean {
+    if (!resolveLauncherButtonColors(cachedEmbedAppearance)) return false;
+    if (!requireActiveSession) return true;
+    return widgetSessionActive === true;
+  }
+
+  function syncLauncherVisibility() {
+    if (shouldShowLauncher()) {
+      mountLauncherButton(cachedEmbedAppearance);
+    } else {
+      unmountLauncherButton();
+      if (isOpen) hide();
+    }
+  }
+
+  function unmountLauncherButton() {
+    if (!button) return;
+    button.remove();
+    button = null;
   }
 
   function mountLauncherButton(appearance: EmbedWidgetAppearance) {
@@ -295,7 +326,11 @@ const WIDGET_Z_BUTTON = 2147483647;
     scheduleHostContextFlush = scheduleHostContextFlushInner;
 
     iframe.addEventListener('load', () => {
+      iframeLoaded = true;
       flushHostContextToWidget();
+      if (pendingIdentity) {
+        postIdentityToWidget(pendingIdentity);
+      }
     });
 
     window.addEventListener('message', handleMessage);
@@ -306,10 +341,12 @@ const WIDGET_Z_BUTTON = 2147483647;
       EMBED_CONFIG.CONVEX_SITE_URL,
       organizationId!,
     ).then((raw) => {
-      const appearance = raw ?? undefined;
-      cachedEmbedAppearance = appearance;
+      cachedEmbedAppearance = raw.appearance;
+      requireActiveSession = raw.requireActiveSession === true;
       setupEmbedShell();
-      mountLauncherButton(appearance);
+      if (!requireActiveSession) {
+        mountLauncherButton(cachedEmbedAppearance);
+      }
     });
   }
 
@@ -413,6 +450,20 @@ const WIDGET_Z_BUTTON = 2147483647;
         );
         break;
       }
+      case WIDGET_SESSION_STATE_MESSAGE_TYPE: {
+        const active = payload?.active === true;
+        // Widget reports no session but we have a pending identity — the
+        // identity message posted on iframe load was missed because React
+        // hadn't hydrated yet. Re-post now that the widget is listening.
+        if (!active && pendingIdentity) {
+          postIdentityToWidget(pendingIdentity);
+          break;
+        }
+        if (widgetSessionActive === active) break;
+        widgetSessionActive = active;
+        syncLauncherVisibility();
+        break;
+      }
     }
   }
 
@@ -501,6 +552,45 @@ Final message examples:
     }
   }
 
+  function postIdentityToWidget(identity: EchoHostIdentity) {
+    if (!iframe?.contentWindow) return;
+    try {
+      iframe.contentWindow.postMessage(
+        { type: HOST_IDENTITY_MESSAGE_TYPE, payload: identity },
+        widgetMessageTarget,
+      );
+    } catch { /* ignore */ }
+  }
+
+  function setUser(
+    nameOrIdentity: string | EchoHostIdentity,
+    emailArg?: string,
+    pictureUrlArg?: string,
+  ) {
+    const identity: EchoHostIdentity =
+      typeof nameOrIdentity === 'object' && nameOrIdentity !== null
+        ? { name: String(nameOrIdentity.name ?? '').trim(), email: String(nameOrIdentity.email ?? '').trim(), pictureUrl: typeof nameOrIdentity.pictureUrl === 'string' ? nameOrIdentity.pictureUrl : undefined }
+        : { name: String(nameOrIdentity ?? '').trim(), email: String(emailArg ?? '').trim(), pictureUrl: typeof pictureUrlArg === 'string' ? pictureUrlArg : undefined };
+
+    if (!identity.name || !identity.email) {
+      console.error('Bryan.setUser: name and email are required');
+      return;
+    }
+    pendingIdentity = identity;
+    if (iframeLoaded) postIdentityToWidget(identity);
+  }
+
+  function clearUser() {
+    pendingIdentity = null;
+    widgetSessionActive = false;
+    if (iframe?.contentWindow) {
+      try {
+        iframe.contentWindow.postMessage({ type: HOST_CLEAR_IDENTITY_MESSAGE_TYPE }, widgetMessageTarget);
+      } catch { /* ignore */ }
+    }
+    syncLauncherVisibility();
+  }
+
   function toggleWidget() {
     if (!button) return;
     if (isOpen) {
@@ -557,6 +647,8 @@ Final message examples:
       agent = null;
     }
     isOpen = false;
+    iframeLoaded = false;
+    widgetSessionActive = null;
   }
 
   // Function to reinitialize with new config
@@ -574,12 +666,16 @@ Final message examples:
   }
 
   // Expose API to global scope
-  (window as any).EchoWidget = {
+  const publicApi = {
     init: reinit,
     show,
     hide,
-    destroy
+    destroy,
+    setUser,
+    clearUser,
   };
+  (window as any).EchoWidget = publicApi;
+  (window as any).Bryan = publicApi;
 
   // Auto-initialize
   init();

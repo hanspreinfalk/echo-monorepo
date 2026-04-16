@@ -47,6 +47,7 @@ import {
   mergeAppearanceForForm,
   widgetSettingsSchema,
 } from "../../schemas";
+import { BryanSetUserTutorialDialog } from "./bryan-setuser-tutorial-dialog";
 import { WidgetAppearancePreview } from "./widget-appearance-preview";
 import {
   ImageIcon,
@@ -381,6 +382,7 @@ export const CustomizationForm = ({
       greetMessage:
         initialData?.greetMessage || "Hi! How can I help you today?",
       showLogo: initialData?.showLogo !== false,
+      requireActiveSession: initialData?.requireActiveSession === true,
       defaultSuggestions: {
         suggestion1: initialData?.defaultSuggestions.suggestion1 || "",
         suggestion2: initialData?.defaultSuggestions.suggestion2 || "",
@@ -471,6 +473,7 @@ export const CustomizationForm = ({
       await upsertWidgetSettings({
         greetMessage: values.greetMessage,
         showLogo: values.showLogo,
+        requireActiveSession: values.requireActiveSession,
         defaultSuggestions: values.defaultSuggestions,
         defaultLanguage: values.defaultLanguage,
         translations: values.translations.map((t) => ({
@@ -510,6 +513,34 @@ export const CustomizationForm = ({
                       Toggle the logo next to assistant messages in the embedded
                       widget
                     </FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="requireActiveSession"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-start justify-between gap-4 rounded-lg border p-4">
+                  <div className="space-y-2">
+                    <FormLabel>Show launcher only for identified users</FormLabel>
+                    <FormDescription>
+                      When on, the floating chat button only appears after the
+                      host page calls{" "}
+                      <code className="rounded bg-muted px-1 py-0.5 text-xs">
+                        Bryan.setUser(name, email, pictureUrl)
+                      </code>{" "}
+                      or the visitor already has a saved session. When off, the
+                      launcher shows for everyone (default).
+                    </FormDescription>
+                    <BryanSetUserTutorialDialog />
                   </div>
                   <FormControl>
                     <Switch

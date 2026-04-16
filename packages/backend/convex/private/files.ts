@@ -254,6 +254,170 @@ export const addKnowledgeText = action({
     },
 });
 
+export const addUrl = action({
+    args: {
+        url: v.string(),
+        title: v.optional(v.string()),
+        category: v.optional(v.string()),
+    },
+    handler: async (ctx, args) => {
+        const identity = await ctx.auth.getUserIdentity();
+
+        if (identity === null) {
+            throw new ConvexError({
+                code: "UNAUTHORIZED",
+                message: "Identity not found",
+            });
+        }
+
+        const orgId = identity.orgId as string;
+
+        if (!orgId) {
+            throw new ConvexError({
+                code: "UNAUTHORIZED",
+                message: "Organization not found",
+            });
+        }
+
+        const subscription = await ctx.runQuery(
+            internal.system.subscriptions.getByOrganizationId,
+            {
+                organizationId: orgId,
+            },
+        );
+
+        if (subscription?.status !== "active") {
+            throw new ConvexError({
+                code: "BAD_REQUEST",
+                message: "Missing subscription",
+            });
+        }
+
+        const url = args.url.trim();
+
+        if (!url) {
+            throw new ConvexError({
+                code: "BAD_REQUEST",
+                message: "URL is required",
+            });
+        }
+
+        // Fetch the URL content
+        let response: Response;
+        try {
+            response = await fetch(url, {
+                headers: {
+                    "User-Agent": "Mozilla/5.0 (compatible; EchoBot/1.0)",
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,text/plain;q=0.8,*/*;q=0.5",
+                },
+                redirect: "follow",
+            });
+        } catch (error) {
+            throw new ConvexError({
+                code: "BAD_REQUEST",
+                message: `Failed to fetch URL: ${error instanceof Error ? error.message : "Unknown error"}`,
+            });
+        }
+
+        if (!response.ok) {
+            throw new ConvexError({
+                code: "BAD_REQUEST",
+                message: `Failed to fetch URL: HTTP ${response.status}`,
+            });
+        }
+
+        const contentType = response.headers.get("content-type") || "text/html";
+        const htmlContent = await response.text();
+
+        if (!htmlContent.trim()) {
+            throw new ConvexError({
+                code: "BAD_REQUEST",
+                message: "The URL returned empty content",
+            });
+        }
+
+        // Strip script, style, noscript tags and HTML comments to reduce token count
+        let cleaned = htmlContent
+            .replace(/<script[\s\S]*?<\/script>/gi, "")
+            .replace(/<style[\s\S]*?<\/style>/gi, "")
+            .replace(/<noscript[\s\S]*?<\/noscript>/gi, "")
+            .replace(/<!--[\s\S]*?-->/g, "")
+            .replace(/<svg[\s\S]*?<\/svg>/gi, "")
+            .replace(/<header[\s\S]*?<\/header>/gi, "")
+            .replace(/<footer[\s\S]*?<\/footer>/gi, "")
+            .replace(/<nav[\s\S]*?<\/nav>/gi, "");
+
+        // Collapse whitespace
+        cleaned = cleaned.replace(/\s{2,}/g, " ").trim();
+
+        // Truncate to ~60k chars (~15k tokens) to stay within limits
+        const MAX_CHARS = 60000;
+        if (cleaned.length > MAX_CHARS) {
+            cleaned = cleaned.slice(0, MAX_CHARS) + "\n[Content truncated]";
+        }
+
+        // Use AI to extract clean text from the HTML
+        const { generateText } = await import("ai");
+        const { openai } = await import("@ai-sdk/openai");
+
+        const result = await generateText({
+            model: openai.chat("gpt-4o-mini"),
+            system: "You transform web page content into clean markdown text. Extract the main content, ignoring navigation, ads, footers, and other boilerplate. Preserve the structure with headings, lists, and paragraphs.",
+            messages: [
+                {
+                    role: "user",
+                    content: [
+                        { type: "text", text: cleaned },
+                        {
+                            type: "text",
+                            text: "Extract the main content from this web page and format it as clean markdown. Do not explain what you are doing.",
+                        },
+                    ],
+                },
+            ],
+        });
+
+        const text = result.text;
+
+        if (!text.trim()) {
+            throw new ConvexError({
+                code: "BAD_REQUEST",
+                message: "Could not extract any text from the URL",
+            });
+        }
+
+        // Generate a filename from the title or URL
+        const title = args.title?.trim() || new URL(url).hostname + new URL(url).pathname.replace(/\//g, "-").replace(/-$/, "");
+        const filename = title.includes(".") ? title : `${title}.url`;
+
+        const category = args.category?.trim();
+
+        const utf8 = new TextEncoder().encode(text);
+        const contentHash = await contentHashFromArrayBuffer(
+            utf8.buffer.slice(
+                utf8.byteOffset,
+                utf8.byteOffset + utf8.byteLength,
+            ),
+        );
+
+        const { entryId, created } = await rag.add(ctx, {
+            namespace: orgId,
+            text,
+            key: filename,
+            title: filename,
+            metadata: {
+                sourceUrl: url,
+                uploadedBy: orgId,
+                filename,
+                category: category ? category : null,
+            } as EntryMetadata,
+            contentHash,
+        });
+
+        return { entryId, created };
+    },
+});
+
 export const list = query({
     args: {
         category: v.optional(v.string()),
@@ -323,6 +487,7 @@ export type PublicFile = {
 
 type EntryMetadata = {
     storageId?: Id<"_storage">;
+    sourceUrl?: string;
     uploadedBy: string;
     filename: string;
     category: string | null;
@@ -532,6 +697,8 @@ async function convertEntryToPublicFile(
         } catch (error) {
             console.error("Failed to get storage metadata: ", error);
         }
+    } else if (metadata?.sourceUrl) {
+        fileSize = "URL";
     } else {
         fileSize = "Text";
     }
@@ -547,7 +714,9 @@ async function convertEntryToPublicFile(
         status = "processing";
     }
 
-    const url = storageId ? await ctx.storage.getUrl(storageId) : null;
+    const url = storageId
+        ? await ctx.storage.getUrl(storageId)
+        : metadata?.sourceUrl ?? null;
 
     return {
         id: entry.entryId,

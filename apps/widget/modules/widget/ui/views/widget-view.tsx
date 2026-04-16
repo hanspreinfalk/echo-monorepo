@@ -5,6 +5,8 @@ import { useAtomValue } from "jotai";
 import { useMemo } from "react";
 import { screenAtom, widgetSettingsAtom } from "@/modules/widget/atoms/widget-atoms";
 import { useHostContextBridge } from "@/modules/widget/hooks/use-host-context-bridge";
+import { useHostIdentityBridge } from "@/modules/widget/hooks/use-host-identity-bridge";
+import { useSessionStateBroadcast } from "@/modules/widget/hooks/use-session-state-broadcast";
 import { widgetAppearanceToStyle } from "@workspace/ui/lib/widget-appearance-style";
 import { WidgetErrorScreen } from "../screens/widget-error-screen";
 import { WidgetLoadingScreen } from "../screens/widget-loading-screen";
@@ -23,6 +25,8 @@ export function WidgetView({ organizationId }: Props) {
     [widgetSettings?.appearance],
   );
   useHostContextBridge();
+  useHostIdentityBridge();
+  useSessionStateBroadcast();
 
   const screenComponents = {
     loading: <WidgetLoadingScreen organizationId={organizationId}/>,

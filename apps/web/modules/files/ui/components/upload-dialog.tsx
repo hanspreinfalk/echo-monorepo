@@ -74,6 +74,7 @@ export const UploadDialog = ({
 }: UploadDialogProps) => {
     const addFile = useAction(api.private.files.addFile);
     const addKnowledgeText = useAction(api.private.files.addKnowledgeText);
+    const addUrl = useAction(api.private.files.addUrl);
 
     const [tab, setTab] = useState("file");
     const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
@@ -84,6 +85,8 @@ export const UploadDialog = ({
     });
     const [textTitle, setTextTitle] = useState("");
     const [textBody, setTextBody] = useState("");
+    const [urlValue, setUrlValue] = useState("");
+    const [urlTitle, setUrlTitle] = useState("");
 
     const resetForm = () => {
         setTab("file");
@@ -94,6 +97,8 @@ export const UploadDialog = ({
         });
         setTextTitle("");
         setTextBody("");
+        setUrlValue("");
+        setUrlTitle("");
     };
 
     const handleFileDrop = (acceptedFiles: File[]) => {
@@ -168,6 +173,32 @@ export const UploadDialog = ({
         }
     };
 
+    const handleAddUrl = async () => {
+        setIsUploading(true);
+        try {
+            await addUrl({
+                url: urlValue,
+                title: urlTitle || undefined,
+                category: uploadForm.category,
+            });
+
+            toast.success("URL added", {
+                description: "The web page was fetched and indexed for the knowledge base.",
+            });
+            onFileUploaded?.();
+            resetForm();
+            onOpenChange(false);
+        } catch (error) {
+            console.error(error);
+            toast.error("Could not add URL", {
+                description:
+                    error instanceof Error ? error.message : "Please try again.",
+            });
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
     const handleDialogOpenChange = (next: boolean) => {
         if (!next) {
             resetForm();
@@ -181,6 +212,7 @@ export const UploadDialog = ({
         textTitle.trim().length > 0 &&
         textBody.trim().length > 0 &&
         categoryOk;
+    const urlReady = urlValue.trim().length > 0 && categoryOk;
 
     return (
         <Dialog onOpenChange={handleDialogOpenChange} open={open}>
@@ -211,6 +243,12 @@ export const UploadDialog = ({
                                 value="text"
                             >
                                 Paste text
+                            </TabsTrigger>
+                            <TabsTrigger
+                                className="flex-1 sm:flex-initial"
+                                value="url"
+                            >
+                                Add URL
                             </TabsTrigger>
                         </TabsList>
                     </div>
@@ -310,6 +348,49 @@ export const UploadDialog = ({
                                     />
                                 </div>
                             </TabsContent>
+
+                            <TabsContent className="mt-0 space-y-4" value="url">
+                                <div className="space-y-2">
+                                    <Label htmlFor="url-value">
+                                        URL{" "}
+                                        <span className="text-destructive">*</span>
+                                    </Label>
+                                    <Input
+                                        className="w-full"
+                                        id="url-value"
+                                        onChange={(e) =>
+                                            setUrlValue(e.target.value)
+                                        }
+                                        placeholder="https://example.com/page"
+                                        type="url"
+                                        value={urlValue}
+                                    />
+                                    <p className="text-muted-foreground text-xs">
+                                        The web page will be fetched and its content extracted and indexed.
+                                    </p>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="url-title">
+                                        Title{" "}
+                                        <span className="text-muted-foreground text-xs">
+                                            (optional)
+                                        </span>
+                                    </Label>
+                                    <Input
+                                        className="w-full"
+                                        id="url-title"
+                                        onChange={(e) =>
+                                            setUrlTitle(e.target.value)
+                                        }
+                                        placeholder="e.g., Pricing page, API docs"
+                                        type="text"
+                                        value={urlTitle}
+                                    />
+                                    <p className="text-muted-foreground text-xs">
+                                        Used as the document name. Defaults to the URL hostname and path.
+                                    </p>
+                                </div>
+                            </TabsContent>
                         </div>
                     </div>
                 </Tabs>
@@ -326,7 +407,7 @@ export const UploadDialog = ({
                     >
                         Cancel
                     </Button>
-                    {tab === "file" ? (
+                    {tab === "file" && (
                         <Button
                             disabled={!fileReady || isUploading}
                             onClick={() => void handleUploadFile()}
@@ -334,13 +415,23 @@ export const UploadDialog = ({
                         >
                             {isUploading ? "Adding…" : "Upload"}
                         </Button>
-                    ) : (
+                    )}
+                    {tab === "text" && (
                         <Button
                             disabled={!textReady || isUploading}
                             onClick={() => void handleAddText()}
                             type="button"
                         >
                             {isUploading ? "Adding…" : "Add text"}
+                        </Button>
+                    )}
+                    {tab === "url" && (
+                        <Button
+                            disabled={!urlReady || isUploading}
+                            onClick={() => void handleAddUrl()}
+                            type="button"
+                        >
+                            {isUploading ? "Fetching…" : "Add URL"}
                         </Button>
                     )}
                 </div>

@@ -6,6 +6,11 @@ export type EmbedWidgetAppearance = {
   launcherButtonColor?: string;
 } | undefined;
 
+export type EmbedWidgetSettings = {
+  appearance: EmbedWidgetAppearance;
+  requireActiveSession: boolean;
+};
+
 const HEX_RE = /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/;
 
 /** Keep in sync with `DEFAULT_EMBED_LAUNCHER_BUTTON` in `convex/embedWidgetAppearance.ts`. */
@@ -78,18 +83,25 @@ export function resolveLauncherButtonColors(
 export async function fetchWidgetAppearanceForLauncher(
   convexSiteUrl: string,
   organizationId: string,
-): Promise<EmbedWidgetAppearance> {
+): Promise<EmbedWidgetSettings> {
   const base = convexSiteUrl.replace(/\/$/, "");
-  const fallback: EmbedWidgetAppearance = {
-    launcherButtonColor: DEFAULT_LAUNCHER_BUTTON_COLOR,
+  const fallback: EmbedWidgetSettings = {
+    appearance: { launcherButtonColor: DEFAULT_LAUNCHER_BUTTON_COLOR },
+    requireActiveSession: false,
   };
   try {
     const res = await fetch(
       `${base}/embed/widget-appearance?organizationId=${encodeURIComponent(organizationId)}`,
     );
     if (!res.ok) return fallback;
-    const data = (await res.json()) as { appearance?: EmbedWidgetAppearance | null };
-    return data.appearance ?? fallback;
+    const data = (await res.json()) as {
+      appearance?: EmbedWidgetAppearance | null;
+      requireActiveSession?: boolean;
+    };
+    return {
+      appearance: data.appearance ?? fallback.appearance,
+      requireActiveSession: data.requireActiveSession === true,
+    };
   } catch {
     return fallback;
   }

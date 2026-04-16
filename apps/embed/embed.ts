@@ -7,6 +7,21 @@ import {
 import type { EmbedWidgetAppearance } from './launcher-appearance';
 import { PageAgent } from 'page-agent';
 
+/**
+ * Identity payload for `Bryan.setUser(...)`. Mirrored on the widget side as
+ * `HOST_IDENTITY_MESSAGE_TYPE`. Picture is optional.
+ */
+type EchoHostIdentity = {
+  name: string;
+  email: string;
+  pictureUrl?: string;
+};
+
+const HOST_IDENTITY_MESSAGE_TYPE = 'echo-host-identity';
+const HOST_CLEAR_IDENTITY_MESSAGE_TYPE = 'echo-host-clear-identity';
+/** Widget → embed: reports current contact-session state so the embed can gate the launcher. */
+const WIDGET_SESSION_STATE_MESSAGE_TYPE = 'echo-widget-session-state';
+
 // test
 // cd apps/embed && VITE_CONVEX_SITE_URL=https://wandering-beagle-503.convex.site VITE_WIDGET_URL=https://echo-monorepo-widget.vercel.app pnpm build
 
@@ -153,6 +168,22 @@ const WIDGET_Z_BUTTON = 2147483647;
   let suppressNextAgentDone = false;
   const widgetMessageTarget = new URL(EMBED_CONFIG.WIDGET_URL).origin;
 
+  /**
+   * When the host calls `Bryan.setUser(...)` before the iframe has loaded we
+   * cache the identity here and post it on the iframe `load` event.
+   */
+  let pendingIdentity: EchoHostIdentity | null = null;
+  /** True after the iframe has fired its `load` event so we can postMessage. */
+  let iframeLoaded = false;
+  /** Mirrors `widgetSettings.requireActiveSession` from the appearance HTTP response. */
+  let requireActiveSession = false;
+  /**
+   * Latest session-state value the widget has reported. `null` means the
+   * widget hasn't reported yet (still loading); `true` means a contact
+   * session is active; `false` means no session.
+   */
+  let widgetSessionActive: boolean | null = null;
+
   // Get configuration from script tag
   let organizationId: string | null = null;
   let position: 'bottom-right' | 'bottom-left' = EMBED_CONFIG.DEFAULT_POSITION;
@@ -200,6 +231,36 @@ const WIDGET_Z_BUTTON = 2147483647;
     btn.style.boxShadow = t.boxShadow;
     // Light launcher fills (e.g. default white) stay visible on light host pages.
     btn.style.border = '1px solid rgba(15, 23, 42, 0.12)';
+  }
+
+  /**
+   * Whether the launcher button should currently be on the page. When
+   * `requireActiveSession` is on we wait for the widget to confirm a session
+   * exists; otherwise we mount as soon as a launcher color is configured.
+   */
+  function shouldShowLauncher(): boolean {
+    if (!resolveLauncherButtonColors(cachedEmbedAppearance)) return false;
+    if (!requireActiveSession) return true;
+    return widgetSessionActive === true;
+  }
+
+  function syncLauncherVisibility() {
+    if (shouldShowLauncher()) {
+      mountLauncherButton(cachedEmbedAppearance);
+    } else {
+      unmountLauncherButton();
+      if (isOpen) {
+        // Session went away while the panel was open — close it so the user
+        // is not stranded inside a hidden widget.
+        hide();
+      }
+    }
+  }
+
+  function unmountLauncherButton() {
+    if (!button) return;
+    button.remove();
+    button = null;
   }
 
   function mountLauncherButton(appearance: EmbedWidgetAppearance) {
@@ -300,10 +361,41 @@ const WIDGET_Z_BUTTON = 2147483647;
     scheduleHostContextFlush = scheduleHostContextFlushInner;
 
     iframe.addEventListener('load', () => {
+      iframeLoaded = true;
       flushHostContextToWidget();
+      flushPendingIdentityToWidget();
     });
 
     window.addEventListener('message', handleMessage);
+  }
+
+  function postIdentityToWidget(identity: EchoHostIdentity) {
+    if (!iframe?.contentWindow) return;
+    try {
+      iframe.contentWindow.postMessage(
+        { type: HOST_IDENTITY_MESSAGE_TYPE, payload: identity },
+        widgetMessageTarget,
+      );
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function flushPendingIdentityToWidget() {
+    if (!pendingIdentity) return;
+    postIdentityToWidget(pendingIdentity);
+  }
+
+  function postClearIdentityToWidget() {
+    if (!iframe?.contentWindow) return;
+    try {
+      iframe.contentWindow.postMessage(
+        { type: HOST_CLEAR_IDENTITY_MESSAGE_TYPE },
+        widgetMessageTarget,
+      );
+    } catch {
+      /* ignore */
+    }
   }
 
   function render() {
@@ -311,10 +403,14 @@ const WIDGET_Z_BUTTON = 2147483647;
       EMBED_CONFIG.CONVEX_SITE_URL,
       organizationId!,
     ).then((raw) => {
-      const appearance = raw ?? undefined;
-      cachedEmbedAppearance = appearance;
+      cachedEmbedAppearance = raw.appearance;
+      requireActiveSession = raw.requireActiveSession === true;
       setupEmbedShell();
-      mountLauncherButton(appearance);
+      // When gating is on, defer mounting the launcher until the widget
+      // confirms a session. Otherwise mount immediately as before.
+      if (!requireActiveSession) {
+        mountLauncherButton(cachedEmbedAppearance);
+      }
     });
   }
 
@@ -416,6 +512,20 @@ const WIDGET_Z_BUTTON = 2147483647;
           },
           widgetMessageTarget,
         );
+        break;
+      }
+      case WIDGET_SESSION_STATE_MESSAGE_TYPE: {
+        const active = payload?.active === true;
+        // Widget reports no session but we have a pending identity — the
+        // identity message posted on iframe load was missed because React
+        // hadn't hydrated yet. Re-post now that the widget is listening.
+        if (!active && pendingIdentity) {
+          postIdentityToWidget(pendingIdentity);
+          break;
+        }
+        if (widgetSessionActive === active) break;
+        widgetSessionActive = active;
+        syncLauncherVisibility();
         break;
       }
     }
@@ -562,6 +672,58 @@ Final message examples:
       agent = null;
     }
     isOpen = false;
+    iframeLoaded = false;
+    widgetSessionActive = null;
+  }
+
+  /**
+   * Public identity API.
+   *
+   * Accepts either an object (`setUser({ name, email, pictureUrl })`) or
+   * positional args (`setUser(name, email, pictureUrl)`) so host integrations
+   * can use whichever shape they prefer. The widget receives the identity via
+   * postMessage and creates / refreshes a contact session — so the auth screen
+   * is skipped if the user already exists in the org's contacts.
+   */
+  function setUser(
+    nameOrIdentity: string | EchoHostIdentity,
+    emailArg?: string,
+    pictureUrlArg?: string,
+  ) {
+    const identity: EchoHostIdentity =
+      typeof nameOrIdentity === 'object' && nameOrIdentity !== null
+        ? {
+            name: String(nameOrIdentity.name ?? '').trim(),
+            email: String(nameOrIdentity.email ?? '').trim(),
+            pictureUrl:
+              typeof nameOrIdentity.pictureUrl === 'string'
+                ? nameOrIdentity.pictureUrl
+                : undefined,
+          }
+        : {
+            name: String(nameOrIdentity ?? '').trim(),
+            email: String(emailArg ?? '').trim(),
+            pictureUrl: typeof pictureUrlArg === 'string' ? pictureUrlArg : undefined,
+          };
+
+    if (!identity.name || !identity.email) {
+      console.error('Bryan.setUser: name and email are required');
+      return;
+    }
+
+    pendingIdentity = identity;
+    if (iframeLoaded) {
+      postIdentityToWidget(identity);
+    }
+  }
+
+  function clearUser() {
+    pendingIdentity = null;
+    widgetSessionActive = false;
+    if (iframeLoaded) {
+      postClearIdentityToWidget();
+    }
+    syncLauncherVisibility();
   }
 
   // Function to reinitialize with new config
@@ -578,13 +740,18 @@ Final message examples:
     init();
   }
 
-  // Expose API to global scope
-  (window as any).EchoWidget = {
+  // Expose API to global scope. `Bryan` is the canonical name; `EchoWidget`
+  // is kept as an alias so older host pages keep working.
+  const publicApi = {
     init: reinit,
     show,
     hide,
-    destroy
+    destroy,
+    setUser,
+    clearUser,
   };
+  (window as any).EchoWidget = publicApi;
+  (window as any).Bryan = publicApi;
 
   // Auto-initialize
   init();

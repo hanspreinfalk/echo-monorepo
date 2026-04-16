@@ -44,6 +44,7 @@ export const widgetSettingsSchema = z
     defaultLanguage: z.string().min(1, "Default language is required"),
     greetMessage: z.string().min(1, "Greeting message is required"),
     showLogo: z.boolean(),
+    requireActiveSession: z.boolean(),
     defaultSuggestions: suggestionsSchema,
     translations: z.array(widgetTranslationSchema),
     appearance: widgetAppearanceSchema,

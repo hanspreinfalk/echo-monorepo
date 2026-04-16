@@ -1345,7 +1345,25 @@ function renderDepartments() {
 renderPatients(patients);
 </script>
 
-<!-- <script type="module" src="/embed.ts" data-organization-id="org_3CQBgW3E4y5oI5UsfCBg2UHt46h"></script> -->
-<script src="https://widget.bryan.chat/widget.js" data-organization-id="org_3CQ6vTq0eOdEJ4lM0vW8fCTxx4F"></script>
+<script type="module" src="/embed.ts" data-organization-id="org_3CQBgW3E4y5oI5UsfCBg2UHt46h"></script>
+<!-- <script src="https://widget.bryan.chat/widget.js" data-organization-id="org_3CQ6vTq0eOdEJ4lM0vW8fCTxx4F"></script> -->
+
+<script type="module">
+  // Identify the simulated logged-in user so the widget skips the auth screen.
+  function identifyDemoUser() {
+    if (!window.Bryan) return false;
+    window.Bryan.setUser({
+      name: "Hans Preinfalk",
+      email: "hans@bryanchat.com",
+      pictureUrl: "https://api.dicebear.com/7.x/initials/svg?seed=HP",
+    });
+    return true;
+  }
+  if (!identifyDemoUser()) {
+    const id = setInterval(() => {
+      if (identifyDemoUser()) clearInterval(id);
+    }, 100);
+  }
+</script>
 </body>
 </html>

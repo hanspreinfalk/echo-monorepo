@@ -99,6 +99,21 @@
       <button onclick="destroyWidget()">Destroy Widget</button>
     </div>
 
+    <div style="margin-top: 30px;">
+      <h2>Identified user</h2>
+      <p style="margin-top: 8px; color: #555; font-size: 14px;">
+        Skip the manual login screen by asserting an identity from the host page.
+      </p>
+      <div class="controls" style="margin-top: 12px; flex-wrap: wrap;">
+        <button onclick="setBryanUser()" style="background: #16a34a;">
+          Bryan.setUser(...)
+        </button>
+        <button onclick="clearBryanUser()" style="background: #6b7280;">
+          Bryan.clearUser()
+        </button>
+      </div>
+    </div>
+
     <div style="margin-top: 40px;">
       <h2>Counter</h2>
       <div style="display: flex; align-items: center; gap: 16px; margin-top: 12px;">
@@ -168,6 +183,25 @@
         window.EchoWidget.destroy();
         console.log('Widget destroyed');
       }
+    }
+
+    window.setBryanUser = function() {
+      if (!window.Bryan) {
+        alert('Bryan global not ready yet — wait for the embed to initialize.');
+        return;
+      }
+      window.Bryan.setUser({
+        name: 'Hans Preinfalk',
+        email: 'hans@example.com',
+        pictureUrl: 'https://api.dicebear.com/7.x/initials/svg?seed=Hans',
+      });
+      console.log('Called Bryan.setUser');
+    }
+
+    window.clearBryanUser = function() {
+      if (!window.Bryan) return;
+      window.Bryan.clearUser();
+      console.log('Called Bryan.clearUser');
     }
 
     let count = 0;

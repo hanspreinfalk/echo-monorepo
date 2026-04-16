@@ -42,6 +42,72 @@ export const create = mutation({
   },
 });
 
+/**
+ * Identity assertion from the host page (`Bryan.setUser(...)` in the embed).
+ *
+ * Looks up the most recent non-expired session for this email + org and
+ * returns it (refreshed name/avatar/expiresAt). If none exists, inserts a new
+ * one. Email is normalized (trim + lowercase) so casing differences don't
+ * fragment sessions.
+ *
+ * NOTE: identity is *unverified* — anyone with the embed loaded can call
+ * `setUser` from devtools. Treat this as the same trust level as a manual
+ * login form fill. If real auth is needed later, add a signed `identityHash`.
+ */
+export const findOrCreateByIdentity = mutation({
+  args: {
+    name: v.string(),
+    email: v.string(),
+    organizationId: v.string(),
+    pictureUrl: v.optional(v.string()),
+    metadata: v.optional(contactSessionMetadata),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const expiresAt = now + SESSION_DURATION_MS;
+    const normalizedEmail = args.email.trim().toLowerCase();
+
+    if (!normalizedEmail) {
+      throw new ConvexError({
+        code: "INVALID_ARGUMENT",
+        message: "Email is required",
+      });
+    }
+
+    const existing = await ctx.db
+      .query("contactSessions")
+      .withIndex("by_organization_and_email", (q) =>
+        q.eq("organizationId", args.organizationId).eq("email", normalizedEmail),
+      )
+      .order("desc")
+      .first();
+
+    if (existing && existing.expiresAt > now) {
+      const prevMetadata = existing.metadata ?? {};
+      await ctx.db.patch(existing._id, {
+        name: args.name,
+        expiresAt,
+        ...(args.pictureUrl !== undefined ? { pictureUrl: args.pictureUrl } : {}),
+        ...(args.metadata !== undefined
+          ? { metadata: { ...prevMetadata, ...args.metadata } }
+          : {}),
+      });
+      return existing._id;
+    }
+
+    const contactSessionId = await ctx.db.insert("contactSessions", {
+      name: args.name,
+      email: normalizedEmail,
+      organizationId: args.organizationId,
+      expiresAt,
+      ...(args.pictureUrl !== undefined ? { pictureUrl: args.pictureUrl } : {}),
+      metadata: args.metadata,
+    });
+
+    return contactSessionId;
+  },
+});
+
 export const patchHostContext = mutation({
   args: {
     contactSessionId: v.id("contactSessions"),

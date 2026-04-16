@@ -25,6 +25,7 @@ import {
     ExternalLinkIcon,
     FileIcon,
     FilePenLineIcon,
+    GlobeIcon,
     MoreHorizontalIcon,
     PlusIcon,
     TrashIcon,
@@ -145,7 +146,7 @@ export const FilesView = () => {
                                         <TableRow className="hover:bg-muted/50" key={file.id}>
                                             <TableCell className="px-6 py-4">
                                                 <div className="flex items-center gap-3">
-                                                    <FileIcon />
+                                                    {file.size === "URL" ? <GlobeIcon /> : <FileIcon />}
                                                     {file.name}
                                                 </div>
                                             </TableCell>

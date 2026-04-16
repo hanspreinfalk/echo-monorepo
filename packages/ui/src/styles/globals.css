@@ -181,6 +181,33 @@
   --shadow-2xl: var(--shadow-2xl);
 }
 
+@keyframes onboarding-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes onboarding-fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes onboarding-pulse-slow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+@utility animate-float {
+  animation: onboarding-float 3s ease-in-out infinite;
+}
+
+@utility animate-fade-in {
+  animation: onboarding-fade-in 0.4s ease-out both;
+}
+
+@utility animate-pulse-slow {
+  animation: onboarding-pulse-slow 2.5s ease-in-out infinite;
+}
+
 @layer base {
   button:not([disabled]),
   [role="button"]:not([disabled]) {

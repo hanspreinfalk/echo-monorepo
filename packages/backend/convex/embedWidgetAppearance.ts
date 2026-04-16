@@ -43,6 +43,7 @@ export const embedWidgetAppearanceGet = httpAction(async (ctx, request) => {
     return new Response(
       JSON.stringify({
         appearance: { launcherButtonColor: DEFAULT_EMBED_LAUNCHER_BUTTON },
+        requireActiveSession: false,
       }),
       { status: 200, headers },
     );
@@ -61,5 +62,11 @@ export const embedWidgetAppearanceGet = httpAction(async (ctx, request) => {
       ) ?? DEFAULT_EMBED_LAUNCHER_BUTTON,
   };
 
-  return new Response(JSON.stringify({ appearance }), { status: 200, headers });
+  return new Response(
+    JSON.stringify({
+      appearance,
+      requireActiveSession: settings.requireActiveSession === true,
+    }),
+    { status: 200, headers },
+  );
 });

@@ -21,6 +21,7 @@ export const upsert = mutation({
   args: {
     greetMessage: v.string(),
     showLogo: v.boolean(),
+    requireActiveSession: v.optional(v.boolean()),
     defaultSuggestions: v.object({
       suggestion1: v.optional(v.string()),
       suggestion2: v.optional(v.string()),
@@ -63,6 +64,7 @@ export const upsert = mutation({
     const fields = {
       greetMessage: args.greetMessage,
       showLogo: args.showLogo,
+      requireActiveSession: args.requireActiveSession ?? false,
       defaultSuggestions: args.defaultSuggestions,
       defaultLanguage: args.defaultLanguage ?? "en",
       translations: args.translations ?? [],

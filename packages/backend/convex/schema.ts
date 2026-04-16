@@ -95,6 +95,13 @@ export default defineSchema({
         organizationId: v.string(),
         greetMessage: v.string(),
         showLogo: v.optional(v.boolean()),
+        /**
+         * When true, the embed launcher only mounts after the widget reports a
+         * valid contact session (either restored from localStorage or created
+         * via `Bryan.setUser(...)` from the host page). When false / absent,
+         * the launcher mounts as soon as `launcherButtonColor` is set.
+         */
+        requireActiveSession: v.optional(v.boolean()),
         logoUrl: v.optional(v.string()),
         logoStorageId: v.optional(v.id("_storage")),
         defaultSuggestions: v.object({
@@ -151,6 +158,8 @@ export default defineSchema({
     contactSessions: defineTable({
         name: v.string(),
         email: v.string(),
+        /** Optional avatar URL set via `Bryan.setUser(...)` from the host page. */
+        pictureUrl: v.optional(v.string()),
         organizationId: v.string(),
         expiresAt: v.number(),
         metadata: v.optional(v.object({
@@ -173,6 +182,7 @@ export default defineSchema({
         })),
     })
     .index("by_organization_id", ["organizationId"])
+    .index("by_organization_and_email", ["organizationId", "email"])
     .index("by_expires_at", ["expiresAt"]),
     users: defineTable({
         name: v.string(),
