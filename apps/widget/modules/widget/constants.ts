@@ -4,7 +4,6 @@ export const WIDGET_SCREENS = [
     'selection',
     'voice',
     'auth',
-    'inbox',
     'chat',
     'contact'
 ] as const
