@@ -7,7 +7,11 @@ import {
 import type { EmbedWidgetAppearance } from './launcher-appearance';
 import { PageAgent } from 'page-agent';
 
+// test
 // cd apps/embed && VITE_CONVEX_SITE_URL=https://wandering-beagle-503.convex.site VITE_WIDGET_URL=https://echo-monorepo-widget.vercel.app pnpm build
+
+// prod 
+// cd apps/embed && VITE_CONVEX_SITE_URL=https://successful-fly-660.convex.site VITE_WIDGET_URL=https://widget.bryan.chat pnpm build
 
 /** Above page-agent SimulatorMask (z-index 2147483641) so the chat iframe and Stop stay clickable. */
 const WIDGET_Z_PANEL = 2147483646;
