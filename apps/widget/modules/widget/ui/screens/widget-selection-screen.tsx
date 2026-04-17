@@ -20,7 +20,7 @@ import {
 } from "@workspace/ui/components/dialog"
 import { DicebearAvatar } from "@workspace/ui/components/dicebear-avatar"
 import { Spinner } from "@workspace/ui/components/spinner"
-import { ChevronRightIcon, ImageIcon, LogOutIcon, MessageSquareTextIcon } from "lucide-react"
+import { ChevronRightIcon, ImageIcon, LogOutIcon, MessageSquareTextIcon, XIcon } from "lucide-react"
 import { useAtomValue, useSetAtom } from "jotai"
 import { useMutation, usePaginatedQuery } from "convex/react"
 import { api } from "@workspace/backend/_generated/api"
@@ -135,21 +135,31 @@ export function WidgetSelectionScreen() {
                 </DialogContent>
             </Dialog>
             <WidgetHeader className="relative">
-                {contactSessionId ? (
+                <div className="absolute top-3 right-3 z-10 flex items-center gap-1">
+                    {contactSessionId ? (
+                        <Button
+                            aria-label={t("selection.signOutAria")}
+                            className="rounded-full hover:bg-primary-foreground/10"
+                            onClick={() => setIsSignOutDialogOpen(true)}
+                            size="icon-lg"
+                            type="button"
+                            variant="transparent"
+                        >
+                            <LogOutIcon aria-hidden className="size-[18px]" />
+                        </Button>
+                    ) : null}
                     <Button
-                        aria-label={t("selection.signOutAria")}
-                        className="absolute top-3 right-3 z-10 rounded-full hover:bg-primary-foreground/10"
-                        onClick={() => setIsSignOutDialogOpen(true)}
+                        aria-label="Close"
+                        className="rounded-full hover:bg-primary-foreground/10"
+                        onClick={() => window.parent.postMessage({ type: 'close' }, '*')}
                         size="icon-lg"
                         type="button"
                         variant="transparent"
                     >
-                        <LogOutIcon aria-hidden className="size-[18px]" />
+                        <XIcon aria-hidden className="size-[18px]" />
                     </Button>
-                ) : null}
-                <div
-                    className={`flex flex-col gap-3 py-2${contactSessionId ? " pr-14" : ""}`}
-                >
+                </div>
+                <div className="flex flex-col gap-3 py-2 pr-14">
                     {showBrandLogo ? (
                         hasCustomLogo ? (
                             <DicebearAvatar

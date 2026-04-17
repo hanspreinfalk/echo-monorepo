@@ -27,7 +27,7 @@ import {
     widgetSettingsAtom,
 } from "../../atoms/widget-atoms";
 import { useWidgetStrings } from "@/modules/widget/hooks/use-widget-i18n";
-import { ImageIcon } from "lucide-react";
+import { ImageIcon, XIcon } from "lucide-react";
 
 export function WidgetAuthScreen() {
     const setScreen = useSetAtom(screenAtom);
@@ -94,8 +94,18 @@ export function WidgetAuthScreen() {
 
     return (
         <>
-            <WidgetHeader>
-                <div className="flex flex-col gap-3 py-2">
+            <WidgetHeader className="relative">
+                <Button
+                    aria-label="Close"
+                    className="absolute top-3 right-3 z-10 rounded-full hover:bg-primary-foreground/10"
+                    onClick={() => window.parent.postMessage({ type: 'close' }, '*')}
+                    size="icon-lg"
+                    type="button"
+                    variant="transparent"
+                >
+                    <XIcon aria-hidden className="size-[18px]" />
+                </Button>
+                <div className="flex flex-col gap-3 py-2 pr-14">
                     {showBrandLogo ? (
                         hasCustomLogo ? (
                             <DicebearAvatar
