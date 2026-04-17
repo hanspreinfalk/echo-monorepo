@@ -373,11 +373,21 @@ const WIDGET_Z_BUTTON = 2147483647;
     }
     try {
       const { default: html2canvas } = await import('html2canvas');
+      const vpW = document.documentElement.clientWidth;
+      const vpH = document.documentElement.clientHeight;
       const canvas = await html2canvas(document.body, {
         useCORS: true,
         allowTaint: true,
         logging: false,
         scale: Math.min(2, Math.max(1, typeof devicePixelRatio === 'number' ? devicePixelRatio : 1)),
+        x: window.scrollX,
+        y: window.scrollY,
+        width: vpW,
+        height: vpH,
+        windowWidth: vpW,
+        windowHeight: vpH,
+        scrollX: -window.scrollX,
+        scrollY: -window.scrollY,
       });
       const blob = await new Promise<Blob | null>((resolve) =>
         canvas.toBlob(resolve, 'image/png', 0.9),
