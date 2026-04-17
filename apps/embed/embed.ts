@@ -187,12 +187,16 @@ const WIDGET_Z_BUTTON = 2147483647;
   // Get configuration from script tag
   let organizationId: string | null = null;
   let position: 'bottom-right' | 'bottom-left' = EMBED_CONFIG.DEFAULT_POSITION;
+  /** When true the floating launcher button is never rendered – the host page
+   *  controls visibility entirely via `Bryan.show()` / `Bryan.hide()`. */
+  let hideLauncher = false;
 
   // Try to get the current script
   const currentScript = document.currentScript as HTMLScriptElement;
   if (currentScript) {
     organizationId = currentScript.getAttribute('data-organization-id');
     position = (currentScript.getAttribute('data-position') as 'bottom-right' | 'bottom-left') || EMBED_CONFIG.DEFAULT_POSITION;
+    hideLauncher = currentScript.getAttribute('data-hide-launcher') === 'true';
   } else {
     // Fallback: find script tag by src
     const scripts = document.querySelectorAll('script[src*="embed"]');
@@ -203,6 +207,7 @@ const WIDGET_Z_BUTTON = 2147483647;
     if (embedScript) {
       organizationId = embedScript.getAttribute('data-organization-id');
       position = (embedScript.getAttribute('data-position') as 'bottom-right' | 'bottom-left') || EMBED_CONFIG.DEFAULT_POSITION;
+      hideLauncher = embedScript.getAttribute('data-hide-launcher') === 'true';
     }
   }
 
@@ -239,12 +244,14 @@ const WIDGET_Z_BUTTON = 2147483647;
    * exists; otherwise we mount as soon as a launcher color is configured.
    */
   function shouldShowLauncher(): boolean {
+    if (hideLauncher) return false;
     if (!resolveLauncherButtonColors(cachedEmbedAppearance)) return false;
     if (!requireActiveSession) return true;
     return widgetSessionActive === true;
   }
 
   function syncLauncherVisibility() {
+    if (hideLauncher) return;
     if (shouldShowLauncher()) {
       mountLauncherButton(cachedEmbedAppearance);
     } else {
@@ -727,7 +734,7 @@ Final message examples:
   }
 
   // Function to reinitialize with new config
-  function reinit(newConfig: { organizationId?: string; position?: 'bottom-right' | 'bottom-left' }) {
+  function reinit(newConfig: { organizationId?: string; position?: 'bottom-right' | 'bottom-left'; hideLauncher?: boolean }) {
     destroy();
 
     if (newConfig.organizationId) {
@@ -736,16 +743,28 @@ Final message examples:
     if (newConfig.position) {
       position = newConfig.position;
     }
+    if (newConfig.hideLauncher !== undefined) {
+      hideLauncher = newConfig.hideLauncher;
+    }
 
     init();
   }
 
   // Expose API to global scope. `Bryan` is the canonical name; `EchoWidget`
   // is kept as an alias so older host pages keep working.
+  function toggle() {
+    if (isOpen) {
+      hide();
+    } else {
+      show();
+    }
+  }
+
   const publicApi = {
     init: reinit,
     show,
     hide,
+    toggle,
     destroy,
     setUser,
     clearUser,

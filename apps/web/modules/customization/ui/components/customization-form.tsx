@@ -48,6 +48,7 @@ import {
   widgetSettingsSchema,
 } from "../../schemas";
 import { BryanSetUserTutorialDialog } from "./bryan-setuser-tutorial-dialog";
+import { BryanCustomLauncherTutorialDialog } from "./bryan-custom-launcher-tutorial-dialog";
 import { WidgetAppearancePreview } from "./widget-appearance-preview";
 import {
   ImageIcon,
@@ -551,6 +552,31 @@ export const CustomizationForm = ({
                 </FormItem>
               )}
             />
+
+            <div className="flex flex-row items-start justify-between gap-4 rounded-lg border p-4">
+              <div className="space-y-2">
+                <p className="text-sm font-medium leading-none">
+                  Use your own launcher button
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Hide the default floating button and open the chat panel from
+                  your own button, nav link, or CTA using{" "}
+                  <code className="rounded bg-muted px-1 py-0.5 text-xs">
+                    Bryan.show()
+                  </code>
+                  ,{" "}
+                  <code className="rounded bg-muted px-1 py-0.5 text-xs">
+                    Bryan.hide()
+                  </code>
+                  , or{" "}
+                  <code className="rounded bg-muted px-1 py-0.5 text-xs">
+                    Bryan.toggle()
+                  </code>
+                  .
+                </p>
+                <BryanCustomLauncherTutorialDialog />
+              </div>
+            </div>
 
             <LogoUpload logoUrl={logoUrl} onLogoChange={setLogoUrl} />
           </CardContent>
