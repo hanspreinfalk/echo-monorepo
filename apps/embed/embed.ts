@@ -410,11 +410,9 @@ const WIDGET_Z_BUTTON = 2147483647;
       cachedEmbedAppearance = raw.appearance;
       requireActiveSession = raw.requireActiveSession === true;
       setupEmbedShell();
-      // When gating is on, defer mounting the launcher until the widget
-      // confirms a session. Otherwise mount immediately as before.
-      if (!requireActiveSession) {
-        mountLauncherButton(cachedEmbedAppearance);
-      }
+      // Sync launcher visibility using the central check that respects
+      // hideLauncher, requireActiveSession, and appearance config.
+      syncLauncherVisibility();
     });
   }
 
