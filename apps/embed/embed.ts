@@ -198,11 +198,8 @@ const WIDGET_Z_BUTTON = 2147483647;
     position = (currentScript.getAttribute('data-position') as 'bottom-right' | 'bottom-left') || EMBED_CONFIG.DEFAULT_POSITION;
     hideLauncher = currentScript.getAttribute('data-hide-launcher') === 'true';
   } else {
-    // Fallback: find script tag by src
-    const scripts = document.querySelectorAll('script[src*="embed"]');
-    const embedScript = Array.from(scripts).find(script =>
-      script.hasAttribute('data-organization-id')
-    ) as HTMLScriptElement;
+    // Fallback: find script tag by data-organization-id attribute
+    const embedScript = document.querySelector('script[data-organization-id]') as HTMLScriptElement;
 
     if (embedScript) {
       organizationId = embedScript.getAttribute('data-organization-id');
