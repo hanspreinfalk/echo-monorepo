@@ -438,13 +438,42 @@ const WIDGET_Z_BUTTON = 2147483647;
       return;
     }
     try {
-      const { default: html2canvas } = await import('html2canvas');
-      const canvas = await html2canvas(document.body, {
+      const html2canvasModule = await import('html2canvas');
+      const html2canvas = html2canvasModule.default;
+
+      // html2canvas 1.4.x does not support modern CSS color functions (lab, lch,
+      // oklch, oklab, color, color-mix, etc.) and throws when it encounters them.
+      // Patch the computed style getter so unsupported color values are replaced
+      // with transparent before html2canvas tries to parse them.
+      const unsupportedColorFnRe = /\b(?:lab|lch|oklch|oklab|color-mix|color)\s*\(/i;
+      const origGetComputedStyle = window.getComputedStyle;
+      window.getComputedStyle = function (el: Element, pseudo?: string | null) {
+        const cs = origGetComputedStyle.call(window, el, pseudo);
+        return new Proxy(cs, {
+          get(target, prop) {
+            const val = (target as any)[prop];
+            if (typeof val === 'function') {
+              return val.bind(target);
+            }
+            if (typeof val === 'string' && unsupportedColorFnRe.test(val)) {
+              return 'transparent';
+            }
+            return val;
+          },
+        });
+      };
+
+      let canvas: HTMLCanvasElement;
+      try {
+        canvas = await html2canvas(document.body, {
         useCORS: true,
         allowTaint: true,
         logging: false,
         scale: Math.min(2, Math.max(1, typeof devicePixelRatio === 'number' ? devicePixelRatio : 1)),
       });
+      } finally {
+        window.getComputedStyle = origGetComputedStyle;
+      }
       const blob = await new Promise<Blob | null>((resolve) =>
         canvas.toBlob(resolve, 'image/png', 0.9),
       );
